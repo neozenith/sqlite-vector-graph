@@ -18,15 +18,18 @@
 | **Erdos-Renyi** | Random edges, uniform probability | Uniform degree distribution |
 | **Barabasi-Albert** | Preferential attachment | Power-law (scale-free) degree distribution |
 
+## Query Latency
+
 {% for op in operations %}
-### {{ op.label }} — Erdos-Renyi
+### {{ op.label }}
 
 ```plotly
---8<-- "benchmarks/charts/graph_query_time_{{ op.key }}_erdos_renyi.json"
+--8<-- "benchmarks/charts/graph_query_time_{{ op.key }}.json"
 ```
 
 {% endfor %}
-### Edge Insertion Throughput
+
+## Insertion Throughput
 
 ```plotly
 --8<-- "benchmarks/charts/graph_setup_time.json"

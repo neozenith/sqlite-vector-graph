@@ -697,7 +697,7 @@ def chart_model_tipping_point(agg):
                 height=500,
                 width=900,
                 template="plotly_white",
-                legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "center", "x": 0.5},
+                legend={"orientation": "v", "yanchor": "top", "y": 0.99, "xanchor": "left", "x": 1.02},
             )
 
             ds_suffix = f"_{ds}" if ds else ""
@@ -1063,7 +1063,7 @@ def chart_dataset_comparison(agg):
             height=500,
             width=900,
             template="plotly_white",
-            legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "center", "x": 0.5},
+            legend={"orientation": "v", "yanchor": "top", "y": 0.99, "xanchor": "left", "x": 1.02},
         )
 
         _save_chart(fig, f"dataset_comparison_{model}")

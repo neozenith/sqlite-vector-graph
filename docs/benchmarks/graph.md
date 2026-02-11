@@ -18,43 +18,46 @@
 | **Erdos-Renyi** | Random edges, uniform probability | Uniform degree distribution |
 | **Barabasi-Albert** | Preferential attachment | Power-law (scale-free) degree distribution |
 
+## Query Latency
 
-### BFS — Erdos-Renyi
+
+### BFS
 
 ```plotly
---8<-- "benchmarks/charts/graph_query_time_bfs_erdos_renyi.json"
+--8<-- "benchmarks/charts/graph_query_time_bfs.json"
 ```
 
 
-### DFS — Erdos-Renyi
+### DFS
 
 ```plotly
---8<-- "benchmarks/charts/graph_query_time_dfs_erdos_renyi.json"
+--8<-- "benchmarks/charts/graph_query_time_dfs.json"
 ```
 
 
-### Shortest Path — Erdos-Renyi
+### Shortest Path
 
 ```plotly
---8<-- "benchmarks/charts/graph_query_time_shortest_path_erdos_renyi.json"
+--8<-- "benchmarks/charts/graph_query_time_shortest_path.json"
 ```
 
 
-### Components — Erdos-Renyi
+### Components
 
 ```plotly
---8<-- "benchmarks/charts/graph_query_time_components_erdos_renyi.json"
+--8<-- "benchmarks/charts/graph_query_time_components.json"
 ```
 
 
-### PageRank — Erdos-Renyi
+### PageRank
 
 ```plotly
---8<-- "benchmarks/charts/graph_query_time_pagerank_erdos_renyi.json"
+--8<-- "benchmarks/charts/graph_query_time_pagerank.json"
 ```
 
 
-### Edge Insertion Throughput
+
+## Insertion Throughput
 
 ```plotly
 --8<-- "benchmarks/charts/graph_setup_time.json"

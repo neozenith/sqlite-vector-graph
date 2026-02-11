@@ -12,10 +12,12 @@
 2. [Python Distribution (PyPI)](#python-distribution-pypi)
 3. [Node.js Distribution (NPM)](#nodejs-distribution-npm)
 4. [Custom SQLite Build Option](#custom-sqlite-build-option)
-5. [Cross-Platform CI/CD](#cross-platform-cicd)
-6. [SQLite Version Testing](#sqlite-version-testing)
-7. [Release Automation](#release-automation)
-8. [Recommended Implementation Order](#recommended-implementation-order)
+5. [Cross-Compilation Mechanics](#cross-compilation-mechanics)
+6. [C/C++ Dependency Distribution](#cc-dependency-distribution)
+7. [Cross-Platform CI/CD](#cross-platform-cicd)
+8. [SQLite Version Testing](#sqlite-version-testing)
+9. [Release Automation](#release-automation)
+10. [Recommended Implementation Order](#recommended-implementation-order)
 
 ---
 
@@ -30,7 +32,7 @@ The goal is to make `vec_graph` installable via `pip install vec-graph` and `npm
 | Build system | Keep Makefile + add MSVC script | Standard for SQLite extensions; CMake is overkill for zero-dependency C11 |
 | Python packaging | `py3-none-{platform}` wheels with precompiled binary | No Python C API dependency; binary loaded via `load_extension()` |
 | NPM packaging | Platform-specific `optionalDependencies` pattern | Proven by esbuild, Prisma, sqlite-vec at massive scale |
-| WASM target | Deferred (optional future work) | Would lose SIMD acceleration; native-first approach |
+| WASM target | Required — compile via Emscripten with SQLite statically linked | Enables browser usage; accepts SIMD performance loss as trade-off |
 | SQLite vendoring | Vendor `sqlite3.h` + `sqlite3ext.h` | Ensures consistent API surface; avoids macOS system SQLite issues |
 | Minimum SQLite | 3.9.0 (table-valued functions) | Required by `graph_tvf.c`; practically test from 3.21.0+ |
 | Packaging tool | Manual (not sqlite-dist) | sqlite-dist is WIP; the wheel/npm structure is simple enough to DIY |
@@ -339,12 +341,14 @@ import vec_graph_sqlite as sqlite3  # drop-in replacement with vec_graph baked i
 
 **Verdict:** Defer this. The loadable extension approach covers 90% of use cases. The bundled SQLite approach adds significant complexity (CPython ABI coupling, cibuildwheel, larger wheels) for marginal benefit.
 
-### WASM Build (Optional, Future)
+### WASM Build (Required)
 
-For browser compatibility, compile SQLite + `vec_graph` to WebAssembly via Emscripten:
+Compile SQLite + `vec_graph` to WebAssembly via Emscripten for browser and edge runtime usage. Extensions cannot be dynamically loaded in WASM — they must be statically linked at compile time.
+
+**Static registration entry point:**
 
 ```c
-// sqlite3_wasm_extra_init.c
+// src/sqlite3_wasm_extra_init.c
 #include "sqlite3.h"
 extern int sqlite3_vecgraph_init(sqlite3*, char**, const sqlite3_api_routines*);
 
@@ -353,7 +357,535 @@ int sqlite3_wasm_extra_init(const char *z) {
 }
 ```
 
-**Trade-off:** WASM would lose the SIMD-accelerated distance functions in `vec_math.c`. The HNSW search performance would degrade significantly. Only pursue if browser usage is a real requirement.
+**Build process (Emscripten):**
+
+```bash
+# 1. Download SQLite amalgamation
+wget https://www.sqlite.org/2025/sqlite-amalgamation-3510000.zip
+unzip sqlite-amalgamation-3510000.zip
+
+# 2. Compile SQLite + vec_graph → WASM
+emcc -O2 -s WASM=1 -s EXPORTED_FUNCTIONS='["_sqlite3_open", ...]' \
+     -DSQLITE_ENABLE_FTS5 -DSQLITE_ENABLE_JSON1 \
+     sqlite-amalgamation-3510000/sqlite3.c \
+     dist/vec_graph.c \
+     src/sqlite3_wasm_extra_init.c \
+     -o dist/vec_graph_sqlite3.js
+```
+
+**NPM distribution:** Ship as a separate `vec-graph-wasm` package (not bundled with the native packages). The WASM binary is platform-independent — a single package works everywhere:
+
+```json
+{
+  "name": "vec-graph-wasm",
+  "version": "0.1.0",
+  "files": ["vec_graph_sqlite3.js", "vec_graph_sqlite3.wasm"],
+  "type": "module"
+}
+```
+
+**Performance trade-off:** WASM builds lose the SIMD-accelerated distance functions in `vec_math.c`. HNSW search will be slower than native. Emscripten does support WASM SIMD (`-msimd128`), which can recover some performance for the vector math operations — this should be investigated during implementation.
+
+**CI requirements:** The release workflow needs an Emscripten build job:
+
+```yaml
+build-wasm:
+  runs-on: ubuntu-22.04
+  steps:
+    - uses: actions/checkout@v4
+    - uses: mymindstorm/setup-emsdk@v14
+    - run: make amalgamation
+    - run: bash scripts/build_wasm.sh
+    - uses: actions/upload-artifact@v4
+      with: { name: wasm, path: "dist/vec_graph_sqlite3.*" }
+```
+
+---
+
+## Cross-Compilation Mechanics
+
+The key question: how do you actually produce `.so`, `.dylib`, and `.dll` files for 5 platform targets from GitHub Actions?
+
+### Strategy: Native Builds on Each Runner (No Cross-Compilation Needed)
+
+For a zero-dependency C11 library, the simplest approach is to compile natively on each platform's runner. GitHub Actions now provides free runners for **all five targets**:
+
+| Target | Runner | Arch | Free? | Notes |
+|--------|--------|------|-------|-------|
+| Linux x86_64 | `ubuntu-22.04` | x86_64 | Yes | Primary target; glibc 2.35 |
+| Linux ARM64 | `ubuntu-22.04-arm` | arm64 | Yes | Native ARM64, no emulation |
+| macOS ARM64 | `macos-15` | arm64 | Yes | Apple Silicon (M1+) |
+| macOS x86_64 | `macos-15-intel` | x86_64 | Yes | **Last Intel runner** — available until Aug 2027 |
+| Windows x86_64 | `windows-2022` | x86_64 | Yes | Has MSVC + MinGW preinstalled |
+
+Because every target has a native runner, **no cross-compilation is strictly necessary**. Each job just runs `make all` on its native runner.
+
+### macOS: Cross-Compilation with `-arch` and Universal Binaries
+
+Apple's Clang can cross-compile between x86_64 and arm64 on a single runner — both SDKs are always present. This means you can build **both architectures on a single ARM64 runner** and combine them into a universal (fat) binary:
+
+```bash
+# Build both architectures on a single macos-15 (ARM64) runner
+cc -arch arm64  -O2 -std=c11 -fPIC -dynamiclib -undefined dynamic_lookup \
+   -Isrc -o vec_graph_arm64.dylib src/*.c -lm
+
+cc -arch x86_64 -O2 -std=c11 -fPIC -dynamiclib -undefined dynamic_lookup \
+   -Isrc -o vec_graph_x86_64.dylib src/*.c -lm
+
+# Combine into a single universal binary
+lipo -create vec_graph_arm64.dylib vec_graph_x86_64.dylib -output vec_graph.dylib
+
+# Verify both slices are present
+lipo -info vec_graph.dylib
+# Architectures in the fat file: x86_64 arm64
+```
+
+**Universal binaries are recommended** — they work on both Intel and Apple Silicon Macs without users knowing their architecture. This also eliminates the need for a second macOS runner, saving CI costs and complexity.
+
+**Makefile support** — add an `ARCH` variable:
+
+```makefile
+ifeq ($(UNAME_S),Darwin)
+    # Cross-compilation: ARCH=x86_64 or ARCH=arm64
+    ifdef ARCH
+        CFLAGS_BASE += -arch $(ARCH)
+    endif
+    CFLAGS_BASE += -mmacosx-version-min=11.0  # Minimum deployment target
+endif
+```
+
+### Linux: ARM64 Options
+
+**Option A: Native ARM64 runner (recommended)**
+
+```yaml
+build-linux-arm64:
+  runs-on: ubuntu-22.04-arm    # Native ARM64, no emulation overhead
+  steps:
+    - uses: actions/checkout@v4
+    - run: make all
+```
+
+**Option B: Cross-compiler on x86_64 (fallback)**
+
+```yaml
+build-linux-arm64:
+  runs-on: ubuntu-22.04
+  steps:
+    - uses: actions/checkout@v4
+    - run: sudo apt-get install -y gcc-aarch64-linux-gnu
+    - run: make CC=aarch64-linux-gnu-gcc all
+```
+
+The Makefile already uses `CC ?= cc` and `$(CC)` throughout, so cross-compilation works with just `CC=aarch64-linux-gnu-gcc` — no Makefile changes needed. But since native ARM64 runners are free, Option A is simpler.
+
+### Windows: MSVC via `ilammy/msvc-dev-cmd`
+
+Windows requires a separate build command since the Makefile uses Unix conventions. Use MSVC (matching SQLite's own build):
+
+```yaml
+build-windows:
+  runs-on: windows-2022
+  steps:
+    - uses: actions/checkout@v4
+    - uses: ilammy/msvc-dev-cmd@v1    # Sets up cl.exe in PATH
+    - name: Build
+      shell: cmd
+      run: |
+        cl.exe /O2 /MT /W4 /LD /Isrc ^
+          src\vec_graph.c src\hnsw_vtab.c src\hnsw_algo.c ^
+          src\graph_tvf.c src\node2vec.c src\vec_math.c ^
+          src\priority_queue.c src\id_validate.c ^
+          /Fe:vec_graph.dll
+```
+
+| Flag | Purpose |
+|------|---------|
+| `/O2` | Optimize for speed |
+| `/MT` | Static CRT — DLL has zero runtime dependencies |
+| `/W4` | High warning level |
+| `/LD` | Create DLL |
+| `/Fe:` | Output filename |
+
+**Why MSVC over MinGW?** SQLite itself is built with MSVC. Python's sqlite3 module loads MSVC-built extensions. `/MT` produces a fully self-contained DLL with no vcruntime dependency. sqlite-vec also uses MSVC.
+
+### The glibc Compatibility Problem (Linux)
+
+When you build on `ubuntu-22.04` (glibc 2.35), the resulting `.so` embeds versioned glibc symbol references. It will **refuse to load** on systems with glibc < 2.35 (e.g., RHEL 8 has glibc 2.28, Amazon Linux 2 has 2.26).
+
+**For a SQLite extension, this is usually fine** — users running SQLite interactively tend to have modern systems. But if you need maximum compatibility:
+
+| Build Environment | glibc | Compatible With |
+|-------------------|-------|-----------------|
+| `ubuntu-22.04` runner | 2.35 | Ubuntu 22.04+, RHEL 9+, Fedora 36+ |
+| `quay.io/pypa/manylinux_2_28_x86_64` container | 2.28 | RHEL 8+, Ubuntu 20.04+, Debian 10+ |
+| `quay.io/pypa/manylinux2014_x86_64` container | 2.17 | Everything from 2014+ |
+
+To verify your binary's glibc requirements:
+
+```bash
+objdump -T vec_graph.so | grep GLIBC_ | sed 's/.*GLIBC_//' | sort -Vu
+```
+
+**Building in a manylinux container** (if needed):
+
+```yaml
+build-linux-x86_64:
+  runs-on: ubuntu-22.04
+  container: quay.io/pypa/manylinux_2_28_x86_64
+  steps:
+    - uses: actions/checkout@v4
+    - run: make all   # Builds with glibc 2.28 compatibility
+```
+
+**sqlite-vec does NOT use manylinux containers** — they build directly on the runner. For now, building on `ubuntu-22.04` is the pragmatic choice.
+
+### Recommended Release Build Matrix
+
+```yaml
+jobs:
+  build-linux-x86_64:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: make all
+      - uses: actions/upload-artifact@v4
+        with: { name: linux-x86_64, path: vec_graph.so }
+
+  build-linux-arm64:
+    runs-on: ubuntu-22.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - run: make all
+      - uses: actions/upload-artifact@v4
+        with: { name: linux-arm64, path: vec_graph.so }
+
+  build-macos-universal:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - run: make ARCH=arm64 all
+      - run: mv vec_graph.dylib vec_graph_arm64.dylib
+      - run: make clean && make ARCH=x86_64 all
+      - run: mv vec_graph.dylib vec_graph_x86_64.dylib
+      - run: lipo -create vec_graph_arm64.dylib vec_graph_x86_64.dylib -output vec_graph.dylib
+      - uses: actions/upload-artifact@v4
+        with: { name: macos-universal, path: vec_graph.dylib }
+
+  build-windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+      - shell: cmd
+        run: cl.exe /O2 /MT /W4 /LD /Isrc src\*.c /Fe:vec_graph.dll
+      - uses: actions/upload-artifact@v4
+        with: { name: windows-x86_64, path: vec_graph.dll }
+```
+
+This uses **4 CI jobs** to produce **5 platform binaries** (the macOS job produces a universal binary containing both architectures).
+
+---
+
+## C/C++ Dependency Distribution
+
+How should C/C++ consumers depend on `vec_graph`? Unlike Python/Node.js, the C ecosystem has no single dominant package manager. Instead, there are several parallel distribution channels, ordered here by priority for the SQLite extension ecosystem.
+
+### Priority 1: Amalgamation (Single `.c` + `.h` File)
+
+This is the **primary distribution format** for the C ecosystem — it's how SQLite itself, sqlite-vec, and most SQLite extensions are consumed.
+
+**What it is:** All source files concatenated into a single `vec_graph.c`, plus a public API header `vec_graph.h`. Consumer just adds two files to their project.
+
+**Consumer usage:**
+
+```bash
+# Download from GitHub release
+wget https://github.com/user/sqlite-vector-graph/releases/download/v0.1.0/vec_graph-amalgamation.tar.gz
+tar xf vec_graph-amalgamation.tar.gz
+
+# Build as loadable extension
+gcc -O2 -fPIC -shared vec_graph.c -o vec_graph.so -lm           # Linux
+cc -O2 -fPIC -dynamiclib vec_graph.c -o vec_graph.dylib -lm     # macOS
+
+# Or compile into their application with static linking
+gcc -O2 myapp.c vec_graph.c -lsqlite3 -lm -o myapp
+```
+
+**Why amalgamation is preferred:**
+- Zero build-system coupling — works with Make, CMake, Meson, Zig, anything
+- Single-translation-unit compilation enables 5-10% better optimization (compiler can inline across module boundaries)
+- Trivial vendoring — just copy two files
+- This is exactly how SQLite itself distributes (130+ source files → single `sqlite3.c`)
+
+**How to create the amalgamation:**
+
+Option A — Simple shell script (`scripts/amalgamate.sh`):
+
+```bash
+#!/bin/bash
+set -euo pipefail
+VERSION=$(cat VERSION)
+OUT=dist/vec_graph.c
+
+mkdir -p dist
+cat > "$OUT" <<HEADER
+/* vec_graph amalgamation - v${VERSION}
+ * Generated $(date -u +%Y-%m-%d)
+ * https://github.com/user/sqlite-vector-graph
+ */
+HEADER
+
+# Concatenate headers (removing internal #include "..." directives)
+for f in src/vec_math.h src/priority_queue.h src/hnsw_algo.h \
+         src/id_validate.h src/hnsw_vtab.h src/graph_tvf.h \
+         src/node2vec.h src/vec_graph.h; do
+    echo "/* ---- $f ---- */"
+    grep -v '#include "' "$f"
+done >> "$OUT"
+
+# Concatenate implementations
+for f in src/vec_math.c src/priority_queue.c src/hnsw_algo.c \
+         src/id_validate.c src/hnsw_vtab.c src/graph_tvf.c \
+         src/node2vec.c src/vec_graph.c; do
+    echo "/* ---- $f ---- */"
+    grep -v '#include "' "$f"
+done >> "$OUT"
+
+# Copy public header
+cp src/vec_graph.h dist/
+
+echo "Amalgamation: dist/vec_graph.c ($(wc -l < "$OUT") lines)"
+```
+
+Option B — Use [cwoffenden/combiner](https://github.com/cwoffenden/combiner) for recursive `#include` resolution:
+
+```bash
+python combiner/combine.py -r src -o dist/vec_graph.c src/vec_graph.c
+```
+
+**Makefile target:**
+
+```makefile
+amalgamation: dist/vec_graph.c dist/vec_graph.h   ## Create amalgamation
+
+dist/vec_graph.c dist/vec_graph.h: $(SRC) $(wildcard src/*.h)
+	bash scripts/amalgamate.sh
+```
+
+### Priority 2: Pre-compiled Binaries (GitHub Releases)
+
+Ship `.so`/`.dylib`/`.dll` files as GitHub Release assets. Consumers download and use `sqlite3_load_extension()` directly. This is what the release workflow already produces.
+
+### Priority 3: `make install` with pkg-config
+
+The standard Unix library installation convention. Enables `pkg-config --cflags --libs vec_graph` for downstream Makefiles.
+
+**`vec_graph.pc.in` template:**
+
+```
+prefix=@PREFIX@
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: vec_graph
+Description: HNSW + Graph Traversal + Node2Vec SQLite Extension
+Version: @VERSION@
+Requires: sqlite3
+Libs: -L${libdir} -lvec_graph -lm
+Cflags: -I${includedir}
+```
+
+**Makefile additions:**
+
+```makefile
+PREFIX  ?= /usr/local
+LIBDIR   = $(PREFIX)/lib
+INCLUDEDIR = $(PREFIX)/include
+PKGCONFIGDIR = $(LIBDIR)/pkgconfig
+DESTDIR ?=
+VERSION  = $(shell cat VERSION 2>/dev/null || echo 0.0.0)
+
+vec_graph.pc: vec_graph.pc.in
+	sed -e 's|@PREFIX@|$(PREFIX)|g' -e 's|@VERSION@|$(VERSION)|g' $< > $@
+
+install: vec_graph$(EXT) vec_graph.pc                ## Install library, headers, pkg-config
+	install -d $(DESTDIR)$(LIBDIR)
+	install -d $(DESTDIR)$(INCLUDEDIR)
+	install -d $(DESTDIR)$(PKGCONFIGDIR)
+	install -m 755 vec_graph$(EXT) $(DESTDIR)$(LIBDIR)/
+	install -m 644 src/vec_graph.h $(DESTDIR)$(INCLUDEDIR)/
+	install -m 644 vec_graph.pc $(DESTDIR)$(PKGCONFIGDIR)/
+
+uninstall:                                           ## Remove installed files
+	rm -f $(DESTDIR)$(LIBDIR)/vec_graph$(EXT)
+	rm -f $(DESTDIR)$(INCLUDEDIR)/vec_graph.h
+	rm -f $(DESTDIR)$(PKGCONFIGDIR)/vec_graph.pc
+```
+
+**Consumer usage:**
+
+```bash
+# Install
+make install PREFIX=/usr/local
+
+# Consume from another Makefile
+CFLAGS += $(shell pkg-config --cflags vec_graph)
+LDFLAGS += $(shell pkg-config --libs vec_graph)
+```
+
+### Priority 4: CMake FetchContent
+
+For CMake-based consumers, provide a `CMakeLists.txt` that supports both `FetchContent` (build from source) and `find_package` (use installed version).
+
+**`CMakeLists.txt` at repo root:**
+
+```cmake
+cmake_minimum_required(VERSION 3.14)
+project(vec_graph VERSION 0.1.0 LANGUAGES C)
+
+find_package(SQLite3 REQUIRED)
+
+add_library(vec_graph
+    src/vec_graph.c src/hnsw_vtab.c src/hnsw_algo.c
+    src/graph_tvf.c src/node2vec.c src/vec_math.c
+    src/priority_queue.c src/id_validate.c
+)
+
+target_include_directories(vec_graph
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+        $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(vec_graph PUBLIC SQLite::SQLite3 PRIVATE m)
+target_compile_features(vec_graph PUBLIC c_std_11)
+set_target_properties(vec_graph PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+# Only build tests when this is the top-level project (not when consumed via FetchContent)
+if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+    enable_testing()
+    add_subdirectory(test)
+endif()
+
+# Install rules (for find_package)
+include(GNUInstallDirs)
+install(TARGETS vec_graph EXPORT vec_graph-targets
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+install(FILES src/vec_graph.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(EXPORT vec_graph-targets
+    FILE vec_graph-config.cmake
+    NAMESPACE vec_graph::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/vec_graph
+)
+```
+
+**Consumer CMakeLists.txt:**
+
+```cmake
+include(FetchContent)
+FetchContent_Declare(
+    vec_graph
+    GIT_REPOSITORY https://github.com/user/sqlite-vector-graph.git
+    GIT_TAG        v0.1.0       # Pin to a release tag
+)
+FetchContent_MakeAvailable(vec_graph)
+
+add_executable(my_app main.c)
+target_link_libraries(my_app PRIVATE vec_graph)
+```
+
+The `CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR` guard is critical — it prevents tests and dev targets from building when consumed as a dependency.
+
+### Priority 5: Git Submodules
+
+The oldest and simplest approach. Consumer adds the repo as a submodule:
+
+```bash
+git submodule add -b v0.1.0 https://github.com/user/sqlite-vector-graph.git vendor/vec_graph
+```
+
+Then in their Makefile:
+
+```makefile
+CFLAGS += -Ivendor/vec_graph/src
+SRCS   += vendor/vec_graph/src/vec_graph.c vendor/vec_graph/src/hnsw_vtab.c ...
+```
+
+No changes needed to `vec_graph` — submodules just clone the repo at a pinned commit. But submodules are considered legacy; FetchContent or the amalgamation is preferred.
+
+### Priority 6: Homebrew Formula (macOS)
+
+```ruby
+class VecGraph < Formula
+  desc "HNSW + graph traversal + Node2Vec SQLite extension"
+  homepage "https://github.com/user/sqlite-vector-graph"
+  url "https://github.com/user/sqlite-vector-graph/archive/refs/tags/v0.1.0.tar.gz"
+  sha256 "<sha256>"
+  license "MIT"
+  depends_on "sqlite"
+
+  def install
+    system "make", "all", "SQLITE_PREFIX=#{Formula["sqlite"].opt_prefix}"
+    lib.install "vec_graph.dylib"
+    include.install "src/vec_graph.h"
+    (lib/"pkgconfig").install "vec_graph.pc"
+  end
+
+  test do
+    system Formula["sqlite"].opt_bin/"sqlite3", ":memory:",
+           ".load #{lib}/vec_graph", "SELECT 1"
+  end
+end
+```
+
+Publish as a custom tap first (`brew tap user/tap`), then consider submitting to homebrew-core if adoption grows.
+
+### Priority 7: vcpkg / Conan (Deferred)
+
+These require a `CMakeLists.txt` (already covered in Priority 4) plus a port/recipe file. Both are well-suited for Windows-heavy ecosystems. Defer until there's demand.
+
+### SQLite Header Detection (Autoconfiguration)
+
+The current Makefile hard-codes the Homebrew path on macOS. A more robust detection chain:
+
+```makefile
+# Try pkg-config first, then Homebrew, then default system paths
+SQLITE_CFLAGS ?= $(shell pkg-config --cflags sqlite3 2>/dev/null)
+SQLITE_LIBS   ?= $(shell pkg-config --libs sqlite3 2>/dev/null)
+
+ifeq ($(SQLITE_CFLAGS),)
+    ifeq ($(UNAME_S),Darwin)
+        SQLITE_PREFIX ?= $(shell brew --prefix sqlite 2>/dev/null || echo /usr/local)
+        SQLITE_CFLAGS = -I$(SQLITE_PREFIX)/include
+        SQLITE_LIBS   = -L$(SQLITE_PREFIX)/lib -lsqlite3
+    else
+        SQLITE_CFLAGS =
+        SQLITE_LIBS   = -lsqlite3
+    endif
+endif
+```
+
+This gives consumers three ways to point at SQLite:
+
+1. **pkg-config** (auto-detected) — works on most Linux systems
+2. **Homebrew** (auto-detected on macOS) — current behavior, preserved
+3. **Manual override** — `make all SQLITE_CFLAGS="-I/path/to/include" SQLITE_LIBS="-L/path/to/lib -lsqlite3"`
+
+### Distribution Channel Summary
+
+| Channel | Consumer Effort | Your Effort | Reach |
+|---------|----------------|-------------|-------|
+| **Amalgamation** | Download 2 files, compile | Low (script) | Widest — any build system |
+| **GitHub Releases** | Download binary, `load_extension()` | Already done by release CI | Wide — runtime loaders |
+| **`make install`** | `./configure && make install` | Low (Makefile targets) | Unix developers |
+| **CMakeLists.txt** | `FetchContent_Declare(...)` | Medium | CMake users |
+| **Homebrew** | `brew install vec-graph` | Low (formula file) | macOS developers |
+| **pip / npm** | `pip install` / `npm install` | Medium (covered above) | Python / JS developers |
+| **vcpkg / Conan** | `vcpkg install vec-graph` | Medium | Windows / cross-platform |
 
 ---
 
@@ -693,37 +1225,52 @@ Build scripts read this file and stamp it into `__init__.py`, `package.json`, an
 _Get green builds on all platforms before thinking about distribution._
 
 1. **Vendor SQLite headers** — `scripts/vendor.sh` to download amalgamation
-2. **Add Windows build support** — `Makefile.msc` or build script
-3. **Create `.github/workflows/ci.yml`** — Build + test on 5 platforms
-4. **Add sanitizer jobs** — ASan+UBSan, MSan on Linux
-5. **Add SQLite version matrix** — Test against 3.21, 3.38, 3.44, latest
+2. **Improve SQLite detection** — `pkg-config` → Homebrew → manual override chain
+3. **Add Windows build support** — MSVC build command in CI (or `Makefile.msc`)
+4. **Create `.github/workflows/ci.yml`** — Build + test on 4 runners (Linux x64, Linux arm64, macOS universal, Windows)
+5. **Add sanitizer jobs** — ASan+UBSan, MSan on Linux
+6. **Add SQLite version matrix** — Test against 3.21, 3.38, 3.44, latest
 
-### Phase 2: Python Distribution
+### Phase 2: C Distribution (Amalgamation + Install)
+
+_Make vec_graph consumable by C/C++ projects._
+
+7. **Create `scripts/amalgamate.sh`** — Produces `dist/vec_graph.c` + `dist/vec_graph.h`
+8. **Add `make amalgamation` target** — Generates the amalgamation
+9. **Add `VERSION` file** — Single source of truth for all packages
+10. **Add `vec_graph.pc.in`** — pkg-config template
+11. **Add `make install` / `make uninstall`** — Standard `PREFIX`/`DESTDIR` conventions
+12. **Add `CMakeLists.txt`** — Support FetchContent + find_package for CMake consumers
+13. **Update release workflow** — Upload amalgamation tarball to GitHub Releases
+
+### Phase 3: Python Distribution
 
 _Ship `pip install vec-graph`._
 
-6. **Create `bindings/python/`** — `__init__.py` with `loadable_path()` + `load()`
-7. **Create `scripts/build_wheels.py`** — Assembles platform-tagged wheels from CI artifacts
-8. **Add PyPI trusted publisher** — Configure at pypi.org
-9. **Add `publish-pypi` job** to `release.yml`
-10. **Test the full flow** — Tag → Release → PyPI
+14. **Create `bindings/python/`** — `__init__.py` with `loadable_path()` + `load()`
+15. **Create `scripts/build_wheels.py`** — Assembles platform-tagged wheels from CI artifacts
+16. **Add PyPI trusted publisher** — Configure at pypi.org
+17. **Add `publish-pypi` job** to `release.yml`
+18. **Test the full flow** — Tag → Release → PyPI
 
-### Phase 3: Node.js Distribution
+### Phase 4: Node.js Distribution
 
 _Ship `npm install vec-graph`._
 
-11. **Create `npm/` directory structure** — Main package + 5 platform packages
-12. **Write `index.mjs`, `index.cjs`, `index.d.ts`** — Wrapper API
-13. **Add npm trusted publisher** — Configure per-package at npmjs.com
-14. **Add `publish-npm` job** to `release.yml`
-15. **Test with `better-sqlite3` and `node:sqlite`**
+19. **Create `npm/` directory structure** — Main package + 5 platform packages
+20. **Write `index.mjs`, `index.cjs`, `index.d.ts`** — Wrapper API
+21. **Add npm trusted publisher** — Configure per-package at npmjs.com
+22. **Add `publish-npm` job** to `release.yml`
+23. **Test with `better-sqlite3` and `node:sqlite`**
 
-### Phase 4: Hardening (Optional)
+### Phase 5: Ecosystem (Optional)
 
-16. **Fuzz testing** — libFuzzer harnesses for `hnsw_algo` and `graph_tvf`
-17. **Performance regression tracking** — Bencher or github-action-benchmark
-18. **WASM build** — Emscripten target for browser usage
-19. **Bundled SQLite package** — `vec-graph-sqlite` with baked-in extension
+24. **Homebrew formula** — Custom tap for `brew install vec-graph`
+25. **Fuzz testing** — libFuzzer harnesses for `hnsw_algo` and `graph_tvf`
+26. **Performance regression tracking** — Bencher or github-action-benchmark
+27. **WASM build** — Emscripten target for browser usage
+28. **Bundled SQLite package** — `vec-graph-sqlite` with baked-in extension
+29. **vcpkg / Conan ports** — When demand warrants
 
 ---
 

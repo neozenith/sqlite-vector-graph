@@ -45,14 +45,50 @@ ENGINE_HUES = {
 
 ENGINE_ORDER = ["vec_graph", "graphqlite"]
 
+GM_SHORT = {
+    "erdos_renyi": "ER",
+    "barabasi_albert": "BA",
+}
+
+OPERATION_LABELS = {
+    "bfs": "BFS",
+    "dfs": "DFS",
+    "shortest_path": "Shortest Path",
+    "components": "Connected Components",
+    "pagerank": "PageRank",
+}
+
 
 def _engine_label(engine):
     return ENGINE_LABELS.get(engine, engine)
 
 
-def _make_color(engine):
+def _trace_label(engine, gm=None, deg=None):
+    """Full trace label for legends.
+
+    Single variant: "vec_graph-tvf"
+    With variant:   "vec_graph-tvf (ER, deg=5)"
+    """
+    base = _engine_label(engine)
+    if gm is not None and deg is not None:
+        return f"{base} ({GM_SHORT.get(gm, gm)}, deg={deg})"
+    return base
+
+
+def _make_color(engine, variant_idx=0, n_variants=1):
+    """Generate HSL color with fiber-bundle effect.
+
+    Hue is fixed per engine. Saturation and luminance vary per
+    (graph_model, degree) variant index.
+    """
     hue = ENGINE_HUES.get(engine, 0)
-    return f"hsl({hue}, 75%, 45%)"
+    if n_variants <= 1:
+        sat, lum = 75, 45
+    else:
+        t = variant_idx / (n_variants - 1)
+        sat = 85 - int(t * 15)   # 85% -> 70%
+        lum = 58 - int(t * 23)   # 58% -> 35%
+    return f"hsl({hue}, {sat}%, {lum}%)"
 
 
 def _trace_opacity(engine):
@@ -183,6 +219,16 @@ def _get_avg_degrees(agg, graph_model=None):
     return sorted(degrees)
 
 
+def _get_variants(agg, operation=None):
+    """Get sorted (graph_model, avg_degree) combinations for fiber-bundle indexing."""
+    variants = set()
+    for k in agg:
+        if operation is not None and k[1] != operation:
+            continue
+        variants.add((k[2], k[4]))
+    return sorted(variants)
+
+
 def _get_val(agg, engine, operation, graph_model, n_nodes, avg_degree, metric):
     key = (engine, operation, graph_model, n_nodes, avg_degree)
     entry = agg.get(key)
@@ -309,120 +355,125 @@ def _save_chart(fig, name):
 
 
 def chart_query_time_by_operation(agg):
-    """Query time vs n_nodes for each operation, engines overlaid."""
+    """Query time vs n_nodes for each operation, all graph topologies combined.
+
+    Fiber bundle: engine hue, (graph_model, degree) as S/L variants.
+    One chart per operation with all topologies overlaid.
+    """
     operations = _get_operations(agg)
     engines = _get_engines(agg)
-    graph_models = sorted(set(k[2] for k in agg))
 
-    for gm in graph_models:
-        for op in operations:
-            avg_degrees = _get_avg_degrees(agg, gm)
-            if not avg_degrees:
-                continue
+    for op in operations:
+        variants = _get_variants(agg, operation=op)
+        n_variants = len(variants)
+        if not variants:
+            continue
 
-            fig = go.Figure()
-            has_traces = False
+        fig = go.Figure()
+        has_traces = False
 
-            deg_dash = {d: dash for d, dash in zip(avg_degrees, ["solid", "dash", "dot", "dashdot"])}
-
-            for engine in engines:
-                for deg in avg_degrees:
-                    nodes = _get_node_counts(agg, operation=op, graph_model=gm, avg_degree=deg)
-                    if not nodes:
-                        continue
-
-                    times = [_get_val(agg, engine, op, gm, n, deg, "query_time_ms") for n in nodes]
-
-                    color = _make_color(engine)
-                    opacity = _trace_opacity(engine)
-                    dash = deg_dash.get(deg, "solid")
-                    line_width = 3 if engine == "vec_graph" else 2
-
-                    fig.add_trace(
-                        go.Scatter(
-                            x=nodes, y=times,
-                            mode="lines+markers",
-                            name=f"{_engine_label(engine)} (deg={deg})",
-                            line={"color": color, "width": line_width, "dash": dash},
-                            marker={"size": 7},
-                            opacity=opacity,
-                        )
-                    )
-                    has_traces = True
-
-            if not has_traces:
-                continue
-
-            fig.update_layout(
-                title=f"Query Time — {op} ({gm})",
-                xaxis_title="Number of Nodes",
-                yaxis_title="Query Time (ms)",
-                xaxis_type="log",
-                yaxis_type="log",
-                height=500,
-                width=900,
-                template="plotly_white",
-                legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "center", "x": 0.5},
-            )
-
-            _save_chart(fig, f"graph_query_time_{op}_{gm}")
-
-
-def chart_setup_time(agg):
-    """Edge insertion throughput (edges/sec) vs graph size."""
-    engines = _get_engines(agg)
-    graph_models = sorted(set(k[2] for k in agg))
-
-    fig = go.Figure()
-    has_traces = False
-
-    for gm in graph_models:
-        avg_degrees = _get_avg_degrees(agg, gm)
-        for deg in avg_degrees:
-            for engine in engines:
-                nodes = _get_node_counts(agg, graph_model=gm, avg_degree=deg)
+        for engine in engines:
+            for var_idx, (gm, deg) in enumerate(variants):
+                nodes = _get_node_counts(agg, operation=op, graph_model=gm, avg_degree=deg)
                 if not nodes:
                     continue
 
-                edge_counts = []
-                throughputs = []
-                for n in nodes:
-                    setup_s = _get_val(agg, engine, "bfs", gm, n, deg, "setup_time_s")
-                    if setup_s is None:
-                        for op in _get_operations(agg):
-                            setup_s = _get_val(agg, engine, op, gm, n, deg, "setup_time_s")
-                            if setup_s is not None:
-                                break
-                    if setup_s is None or setup_s <= 0:
-                        continue
+                times = [_get_val(agg, engine, op, gm, n, deg, "query_time_ms") for n in nodes]
 
-                    key = (engine, "bfs", gm, n, deg)
-                    entry = agg.get(key)
-                    if entry is None:
-                        continue
-                    n_edges = entry.get("n_edges", 0)
-                    if n_edges > 0:
-                        edge_counts.append(n_edges)
-                        throughputs.append(n_edges / setup_s)
-
-                if not edge_counts:
-                    continue
-
-                color = _make_color(engine)
+                color = _make_color(engine, var_idx, n_variants)
                 opacity = _trace_opacity(engine)
                 line_width = 3 if engine == "vec_graph" else 2
 
                 fig.add_trace(
                     go.Scatter(
-                        x=edge_counts, y=throughputs,
+                        x=nodes, y=times,
                         mode="lines+markers",
-                        name=f"{_engine_label(engine)} ({gm}, deg={deg})",
+                        name=_trace_label(engine, gm, deg),
                         line={"color": color, "width": line_width},
                         marker={"size": 7},
                         opacity=opacity,
+                        legendgroup=_engine_label(engine),
+                        legendgrouptitle_text=_engine_label(engine),
                     )
                 )
                 has_traces = True
+
+        if not has_traces:
+            continue
+
+        op_title = OPERATION_LABELS.get(op, op.replace("_", " ").title())
+        fig.update_layout(
+            title=f"Query Time — {op_title}",
+            xaxis_title="Number of Nodes",
+            yaxis_title="Query Time (ms)",
+            xaxis_type="log",
+            yaxis_type="log",
+            height=500,
+            width=900,
+            template="plotly_white",
+            legend={"orientation": "v", "yanchor": "top", "y": 0.99, "xanchor": "left", "x": 1.02,
+                    "groupclick": "togglegroup"},
+        )
+
+        _save_chart(fig, f"graph_query_time_{op}")
+
+
+def chart_setup_time(agg):
+    """Edge insertion throughput (edges/sec) vs graph size, fiber bundle."""
+    engines = _get_engines(agg)
+    variants = _get_variants(agg)
+    n_variants = len(variants)
+
+    fig = go.Figure()
+    has_traces = False
+
+    for engine in engines:
+        for var_idx, (gm, deg) in enumerate(variants):
+            nodes = _get_node_counts(agg, graph_model=gm, avg_degree=deg)
+            if not nodes:
+                continue
+
+            edge_counts = []
+            throughputs = []
+            for n in nodes:
+                setup_s = _get_val(agg, engine, "bfs", gm, n, deg, "setup_time_s")
+                if setup_s is None:
+                    for op in _get_operations(agg):
+                        setup_s = _get_val(agg, engine, op, gm, n, deg, "setup_time_s")
+                        if setup_s is not None:
+                            break
+                if setup_s is None or setup_s <= 0:
+                    continue
+
+                key = (engine, "bfs", gm, n, deg)
+                entry = agg.get(key)
+                if entry is None:
+                    continue
+                n_edges = entry.get("n_edges", 0)
+                if n_edges > 0:
+                    edge_counts.append(n_edges)
+                    throughputs.append(n_edges / setup_s)
+
+            if not edge_counts:
+                continue
+
+            color = _make_color(engine, var_idx, n_variants)
+            opacity = _trace_opacity(engine)
+            line_width = 3 if engine == "vec_graph" else 2
+
+            fig.add_trace(
+                go.Scatter(
+                    x=edge_counts, y=throughputs,
+                    mode="lines+markers",
+                    name=_trace_label(engine, gm, deg),
+                    line={"color": color, "width": line_width},
+                    marker={"size": 7},
+                    opacity=opacity,
+                    legendgroup=_engine_label(engine),
+                    legendgrouptitle_text=_engine_label(engine),
+                )
+            )
+            has_traces = True
 
     if not has_traces:
         return
@@ -436,7 +487,8 @@ def chart_setup_time(agg):
         height=500,
         width=900,
         template="plotly_white",
-        legend={"orientation": "v", "yanchor": "top", "y": 0.99, "xanchor": "left", "x": 1.02},
+        legend={"orientation": "v", "yanchor": "top", "y": 0.99, "xanchor": "left", "x": 1.02,
+                "groupclick": "togglegroup"},
     )
 
     _save_chart(fig, "graph_setup_time")
