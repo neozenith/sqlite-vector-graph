@@ -17,7 +17,7 @@
 
 | Dataset | Source | Passages | Topology |
 |---------|--------|----------|----------|
-| [AG News](https://huggingface.co/datasets/ag_news) | HuggingFace | ~120K | 4 discrete clusters |
+| [AG News](https://huggingface.co/datasets/fancyzhx/ag_news) | HuggingFace | ~120K | 4 discrete clusters |
 | [Wealth of Nations](https://www.gutenberg.org/ebooks/3300) | Project Gutenberg | ~2,500 (256-token windows, 50-token overlap) | Continuous conceptual gradient |
 
 

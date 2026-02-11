@@ -1272,7 +1272,7 @@ def generate_docs():
         {
             "key": "ag_news",
             "label": "AG News",
-            "url": "https://huggingface.co/datasets/ag_news",
+            "url": "https://huggingface.co/datasets/fancyzhx/ag_news",
             "source": "HuggingFace",
             "passages": "~120K",
             "topology": "4 discrete clusters",
