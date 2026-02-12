@@ -5,9 +5,13 @@ with the extension loaded.
 """
 
 import pathlib
-import sqlite3
 import subprocess
 from collections.abc import Generator
+
+try:
+    import pysqlite3 as sqlite3
+except ImportError:
+    import sqlite3
 
 import pytest
 

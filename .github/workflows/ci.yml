@@ -110,7 +110,7 @@ jobs:
       - name: Python integration tests
         if: runner.os != 'Windows'
         run: |
-          pip install pytest pytest-cov
+          pip install pytest pytest-cov pysqlite3-binary
           python -m pytest pytests/ -v
 
       # ── Node.js tests ──────────────────────────────────
@@ -222,6 +222,8 @@ jobs:
         with:
           node-version: "22"
 
+      - uses: astral-sh/setup-uv@v4
+
       - name: Build npm package
         run: |
           npm --prefix npm ci
@@ -229,7 +231,7 @@ jobs:
 
       - name: Run install integration tests
         run: |
-          pip install pytest
+          pip install pytest pysqlite3-binary
           python -m pytest pytests/test_install.py -v -m integration --override-ini="addopts="
 
   # ── WASM Build ───────────────────────────────────────────

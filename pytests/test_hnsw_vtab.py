@@ -5,10 +5,16 @@ Tests the full stack: extension loading → CREATE VIRTUAL TABLE →
 INSERT → KNN search → persistence → DELETE.
 """
 
+import pathlib
 import random
 import struct
 
 import pytest
+
+try:
+    import pysqlite3 as sqlite3
+except ImportError:
+    import sqlite3
 
 
 def make_vector(values: list[float]) -> bytes:
@@ -239,13 +245,8 @@ class TestHnswPointLookup:
 class TestHnswPersistence:
     def test_persistence_via_file(self, tmp_path):
         """Create index, close, reopen, verify search still works."""
-        import sqlite3
-
         db_path = str(tmp_path / "test.db")
-        ext_path = __import__("os").path.join(
-            __import__("os").path.dirname(__import__("os").path.dirname(__import__("os").path.abspath(__file__))),
-            "muninn",
-        )
+        ext_path = str(pathlib.Path(__file__).resolve().parent.parent / "build" / "muninn")
 
         # Create and populate
         conn1 = sqlite3.connect(db_path)
