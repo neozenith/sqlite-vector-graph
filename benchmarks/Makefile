@@ -13,6 +13,10 @@ BENCH_GRAPH = $(PYTHON) $(BENCH_GRAPH_SRC)
 STORAGE ?= disk
 BENCH_FLAGS = --storage $(STORAGE)
 
+# Operation categories for selective graph benchmarking
+CENTRALITY_OPS = degree,betweenness,closeness
+COMMUNITY_OPS = leiden
+
 # Platform detection (for extension prerequisite)
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
@@ -28,10 +32,13 @@ EXTENSION = ../muninn$(EXT)
 .PHONY: help \
         models-prep models-prep-manifest models vss-analyze clean clean-all \
         graph-small graph-medium graph-large graph-scale-free graph-analyze \
-        vss-manifest graph-manifest manifest analyze analyze-vss analyze-graph \
-		vss-embeddings-prep vss-embeddings \
-		vss-embeddings-agnews-all-MiniLM-L6-v2 vss-embeddings-agnews-all-mpnet-base-v2 vss-embeddings-agnews-BAAI-bge-large-en-v1.5 \
-		vss-embeddings-wealth-of-nations-all-models vss-embeddings-all 
+        graph-centrality-small graph-centrality-medium graph-centrality-large graph-centrality-scale-free \
+        graph-community-small graph-community-medium graph-community-large graph-community-scale-free \
+        vss-manifest manifest-vss-all graph-manifest manifest-graph-all manifest \
+        analyze analyze-vss analyze-graph \
+        vss-embeddings-prep vss-embeddings \
+        vss-embeddings-agnews-all-MiniLM-L6-v2 vss-embeddings-agnews-all-mpnet-base-v2 vss-embeddings-agnews-BAAI-bge-large-en-v1.5 \
+        vss-embeddings-wealth-of-nations-all-models vss-embeddings-all
 
 help:                                              ## Show this help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -133,7 +140,91 @@ graph-scale-free: $(EXTENSION)                     ## Graph: Barabasi-Albert sca
 	-$(BENCH_GRAPH) --graph-model barabasi_albert --nodes 50000 --avg-degree 5 $(BENCH_FLAGS)
 	-$(BENCH_GRAPH) --graph-model barabasi_albert --nodes 50000 --avg-degree 10 $(BENCH_FLAGS)
 
+######################################################################
+# GRAPH OPERATION-GROUP TARGETS
+######################################################################
 
+graph-centrality-small: $(EXTENSION)               ## Graph: centrality ops, small (N<=1K)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 100 --avg-degree 5 --operations $(CENTRALITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 100 --avg-degree 20 --operations $(CENTRALITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 500 --avg-degree 5 --operations $(CENTRALITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 500 --avg-degree 20 --operations $(CENTRALITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 1000 --avg-degree 5 --operations $(CENTRALITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 1000 --avg-degree 20 --operations $(CENTRALITY_OPS) $(BENCH_FLAGS)
+
+graph-centrality-medium: $(EXTENSION)              ## Graph: centrality ops, medium (N<=10K)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 1000 --avg-degree 5 --operations $(CENTRALITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 1000 --avg-degree 20 --operations $(CENTRALITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 1000 --avg-degree 50 --operations $(CENTRALITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 5000 --avg-degree 5 --operations $(CENTRALITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 5000 --avg-degree 20 --operations $(CENTRALITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 5000 --avg-degree 50 --operations $(CENTRALITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 10000 --avg-degree 5 --operations $(CENTRALITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 10000 --avg-degree 20 --operations $(CENTRALITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 10000 --avg-degree 50 --operations $(CENTRALITY_OPS) $(BENCH_FLAGS)
+
+graph-centrality-large: $(EXTENSION)               ## Graph: centrality ops, large (N<=100K)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 10000 --avg-degree 5 --operations $(CENTRALITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 10000 --avg-degree 20 --operations $(CENTRALITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 50000 --avg-degree 5 --operations $(CENTRALITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 50000 --avg-degree 20 --operations $(CENTRALITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 100000 --avg-degree 5 --operations $(CENTRALITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 100000 --avg-degree 20 --operations $(CENTRALITY_OPS) $(BENCH_FLAGS)
+
+graph-centrality-scale-free: $(EXTENSION)          ## Graph: centrality ops, Barabasi-Albert
+	-$(BENCH_GRAPH) --graph-model barabasi_albert --nodes 1000 --avg-degree 3 --operations $(CENTRALITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model barabasi_albert --nodes 1000 --avg-degree 5 --operations $(CENTRALITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model barabasi_albert --nodes 1000 --avg-degree 10 --operations $(CENTRALITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model barabasi_albert --nodes 5000 --avg-degree 3 --operations $(CENTRALITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model barabasi_albert --nodes 5000 --avg-degree 5 --operations $(CENTRALITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model barabasi_albert --nodes 5000 --avg-degree 10 --operations $(CENTRALITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model barabasi_albert --nodes 10000 --avg-degree 3 --operations $(CENTRALITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model barabasi_albert --nodes 10000 --avg-degree 5 --operations $(CENTRALITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model barabasi_albert --nodes 10000 --avg-degree 10 --operations $(CENTRALITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model barabasi_albert --nodes 50000 --avg-degree 3 --operations $(CENTRALITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model barabasi_albert --nodes 50000 --avg-degree 5 --operations $(CENTRALITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model barabasi_albert --nodes 50000 --avg-degree 10 --operations $(CENTRALITY_OPS) $(BENCH_FLAGS)
+
+graph-community-small: $(EXTENSION)                ## Graph: community ops, small (N<=1K)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 100 --avg-degree 5 --operations $(COMMUNITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 100 --avg-degree 20 --operations $(COMMUNITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 500 --avg-degree 5 --operations $(COMMUNITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 500 --avg-degree 20 --operations $(COMMUNITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 1000 --avg-degree 5 --operations $(COMMUNITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 1000 --avg-degree 20 --operations $(COMMUNITY_OPS) $(BENCH_FLAGS)
+
+graph-community-medium: $(EXTENSION)               ## Graph: community ops, medium (N<=10K)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 1000 --avg-degree 5 --operations $(COMMUNITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 1000 --avg-degree 20 --operations $(COMMUNITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 1000 --avg-degree 50 --operations $(COMMUNITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 5000 --avg-degree 5 --operations $(COMMUNITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 5000 --avg-degree 20 --operations $(COMMUNITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 5000 --avg-degree 50 --operations $(COMMUNITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 10000 --avg-degree 5 --operations $(COMMUNITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 10000 --avg-degree 20 --operations $(COMMUNITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 10000 --avg-degree 50 --operations $(COMMUNITY_OPS) $(BENCH_FLAGS)
+
+graph-community-large: $(EXTENSION)                ## Graph: community ops, large (N<=100K)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 10000 --avg-degree 5 --operations $(COMMUNITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 10000 --avg-degree 20 --operations $(COMMUNITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 50000 --avg-degree 5 --operations $(COMMUNITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 50000 --avg-degree 20 --operations $(COMMUNITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 100000 --avg-degree 5 --operations $(COMMUNITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 100000 --avg-degree 20 --operations $(COMMUNITY_OPS) $(BENCH_FLAGS)
+
+graph-community-scale-free: $(EXTENSION)           ## Graph: community ops, Barabasi-Albert
+	-$(BENCH_GRAPH) --graph-model barabasi_albert --nodes 1000 --avg-degree 3 --operations $(COMMUNITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model barabasi_albert --nodes 1000 --avg-degree 5 --operations $(COMMUNITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model barabasi_albert --nodes 1000 --avg-degree 10 --operations $(COMMUNITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model barabasi_albert --nodes 5000 --avg-degree 3 --operations $(COMMUNITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model barabasi_albert --nodes 5000 --avg-degree 5 --operations $(COMMUNITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model barabasi_albert --nodes 5000 --avg-degree 10 --operations $(COMMUNITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model barabasi_albert --nodes 10000 --avg-degree 3 --operations $(COMMUNITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model barabasi_albert --nodes 10000 --avg-degree 5 --operations $(COMMUNITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model barabasi_albert --nodes 10000 --avg-degree 10 --operations $(COMMUNITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model barabasi_albert --nodes 50000 --avg-degree 3 --operations $(COMMUNITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model barabasi_albert --nodes 50000 --avg-degree 5 --operations $(COMMUNITY_OPS) $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model barabasi_albert --nodes 50000 --avg-degree 10 --operations $(COMMUNITY_OPS) $(BENCH_FLAGS)
 
 ######################################################################
 # AGGREGATED TARGETS
@@ -155,13 +246,19 @@ analyze: analyze-vss analyze-graph                 ## Analyze all benchmark resu
 manifest-vss-embeddings-prep:                              ## Show models-prep cache completeness
 	$(PYTHON) scripts/benchmark_vss_analyze.py --prep-manifest
 
-manifest-vss:                                      ## Show VSS benchmark completeness
-	$(PYTHON) scripts/benchmark_vss_analyze.py --manifest
+manifest-vss:                                      ## Show missing VSS benchmarks (JSONL)
+	@$(PYTHON) $(BENCH_VSS_ANALYZE_SRC) --manifest-missing $(BENCH_FLAGS)
 
-manifest-graph:                                    ## Show graph benchmark completeness
-	$(PYTHON) scripts/benchmark_graph_analyze.py --manifest
+manifest-vss-all:                                  ## Show all VSS benchmarks (JSONL)
+	@$(PYTHON) $(BENCH_VSS_ANALYZE_SRC) --manifest-all $(BENCH_FLAGS)
 
-manifest: manifest-vss manifest-graph              ## Show overall benchmark completeness
+manifest-graph:                                    ## Show missing graph benchmarks (JSONL)
+	@$(PYTHON) $(BENCH_GRAPH_ANALYZE_SRC) --manifest-missing $(BENCH_FLAGS)
+
+manifest-graph-all:                                ## Show all graph benchmarks (JSONL)
+	@$(PYTHON) $(BENCH_GRAPH_ANALYZE_SRC) --manifest-all $(BENCH_FLAGS)
+
+manifest: manifest-vss manifest-graph              ## Show all missing benchmarks (JSONL)
 
 
 clean:                                             ## Remove generated charts (keeps JSONL results)

@@ -16,6 +16,7 @@ import argparse
 import json
 import logging
 import math
+import sys
 from collections import defaultdict
 from pathlib import Path
 
@@ -563,12 +564,14 @@ def graph_manifest():
     return manifest
 
 
-def check_graph_completeness():
+def check_graph_completeness(storage=None):
     """Check which graph scenarios have JSONL records.
 
     Matches on (graph_model, n_nodes, engine, operation) with avg_degree
     rounded to the nearest integer, since the JSONL stores the realized
     degree (e.g. 4.54) rather than the requested target (e.g. 5).
+
+    When storage is set, only records matching that storage mode are counted.
 
     Returns dict mapping (graph_model, n_nodes, avg_degree, engine, operation)
     -> list of JSONL filenames containing matching records.
@@ -581,6 +584,8 @@ def check_graph_completeness():
             if not line.strip():
                 continue
             record = json.loads(line)
+            if storage and record.get("storage") != storage:
+                continue
             key = (
                 record.get("graph_model"),
                 record.get("n_nodes"),
@@ -601,40 +606,74 @@ def check_graph_completeness():
     return status
 
 
-def print_manifest_report():
-    """Print formatted DONE/MISS completeness report with file patterns."""
-    manifest = graph_manifest()
-    completeness = check_graph_completeness()
+def _build_graph_cmd(graph_model, n_nodes, avg_degree, engine, operation, storage=None):
+    """Build a project-root-relative CLI command for a single graph benchmark."""
+    parts = [
+        ".venv/bin/python benchmarks/scripts/benchmark_graph.py",
+        f"--graph-model {graph_model}",
+        f"--nodes {n_nodes}",
+        f"--avg-degree {avg_degree}",
+        f"--engine {engine}",
+        f"--operations {operation}",
+    ]
+    if storage:
+        parts.append(f"--storage {storage}")
+    return " ".join(parts)
 
-    print("\n=== Graph Benchmark Manifest ===")
+
+def print_manifest_report(mode="all", storage=None, limit=0):
+    """Print JSONL manifest to stdout, summary to stderr.
+
+    Each line is a self-contained JSON object with status, parameters, and cmd.
+    Summary counts go to stderr so stdout stays clean for piping to jq.
+    """
+    manifest = graph_manifest()
+    completeness = check_graph_completeness(storage=storage)
+
     total_done = 0
-    total_expected = 0
+    total_missing = 0
+    emitted = 0
 
     for profile_name, scenarios in manifest.items():
-        done_count = sum(
-            1 for gm, n, d, e, op in scenarios
-            if completeness.get((gm, n, round(d), e, op), [])
-        )
-        total = len(scenarios)
-        total_done += done_count
-        total_expected += total
-
-        print(f"\n--- Profile: {profile_name} ({done_count}/{total} done) ---")
         for graph_model, n_nodes, avg_degree, engine, operation in scenarios:
             key = (graph_model, n_nodes, round(avg_degree), engine, operation)
             found = completeness.get(key, [])
-            target = (f"benchmarks/results/graph_*.jsonl"
-                      f" → ({graph_model}, n={n_nodes}, deg≈{avg_degree}, {engine}, {operation})")
-            if found:
-                print(f"  [DONE] {graph_model} n={n_nodes} deg={avg_degree} / {engine} / {operation}")
-                print(f"         target: {target}")
-                for f in found:
-                    print(f"         found:  {f}")
-            else:
-                print(f"  [MISS] {graph_model} n={n_nodes} deg={avg_degree} / {engine} / {operation}")
-                print(f"         target: {target}")
+            is_done = bool(found)
 
-    print(f"\nSummary: {total_done}/{total_expected} done, {total_expected - total_done} missing")
+            if is_done:
+                total_done += 1
+            else:
+                total_missing += 1
+
+            # Filter by mode
+            if mode == "missing" and is_done:
+                continue
+            if mode == "done" and not is_done:
+                continue
+
+            entry = {
+                "status": "done" if is_done else "missing",
+                "profile": profile_name,
+                "graph_model": graph_model,
+                "n_nodes": n_nodes,
+                "avg_degree": avg_degree,
+                "engine": engine,
+                "operation": operation,
+                "cmd": _build_graph_cmd(graph_model, n_nodes, avg_degree, engine, operation, storage),
+            }
+            if is_done:
+                entry["found"] = found
+
+            print(json.dumps(entry))
+            emitted += 1
+
+            if limit > 0 and emitted >= limit:
+                break
+        if limit > 0 and emitted >= limit:
+            break
+
+    total = total_done + total_missing
+    print(f"Graph manifest: {total_done}/{total} done, {total_missing} missing (emitted {emitted})", file=sys.stderr)
 
 
 # ── CLI ───────────────────────────────────────────────────────────
@@ -642,7 +681,13 @@ def print_manifest_report():
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Analyze graph benchmark results and generate charts")
-    parser.add_argument("--manifest", action="store_true", help="Show benchmark completeness report")
+    manifest_group = parser.add_mutually_exclusive_group()
+    manifest_group.add_argument("--manifest-missing", action="store_true", help="Show only missing benchmarks (JSONL)")
+    manifest_group.add_argument("--manifest-done", action="store_true", help="Show only completed benchmarks (JSONL)")
+    manifest_group.add_argument("--manifest-all", action="store_true", help="Show all benchmarks (JSONL)")
+    manifest_group.add_argument("--manifest", action="store_true", help="Alias for --manifest-all")
+    parser.add_argument("--limit", type=int, default=0, help="Limit output to first N entries (0 = unlimited)")
+    parser.add_argument("--storage", choices=["memory", "disk"], default=None, help="Filter by storage mode")
     parser.add_argument("--filter-engine", help="Filter by engine (e.g., 'muninn', 'cte')")
     parser.add_argument("--filter-operation", help="Filter by operation (e.g., 'bfs', 'pagerank')")
     parser.add_argument("--filter-graph-model", help="Filter by graph model (e.g., 'erdos_renyi')")
@@ -654,8 +699,16 @@ def main():
 
     args = parse_args()
 
-    if args.manifest:
-        print_manifest_report()
+    manifest_mode = None
+    if args.manifest_all or args.manifest:
+        manifest_mode = "all"
+    elif args.manifest_missing:
+        manifest_mode = "missing"
+    elif args.manifest_done:
+        manifest_mode = "done"
+
+    if manifest_mode:
+        print_manifest_report(mode=manifest_mode, storage=args.storage, limit=args.limit)
         return
 
     records = load_graph_results(

@@ -24,6 +24,7 @@ import argparse
 import json
 import logging
 import math
+import sys
 from collections import defaultdict
 from pathlib import Path
 
@@ -1328,8 +1329,8 @@ def vss_manifest():
     Sizes are clamped to dataset limits (from .npy cache) and memory
     limits (MAX_N_BY_DIM), so only feasible permutations are listed.
 
-    Returns dict mapping profile_name -> list of dicts:
-        {"scenario": str, "engine": str, "pattern": str}
+    Returns dict mapping profile_name -> list of dicts with:
+        scenario, engine, pattern, source, sizes, and optionally dim, dataset.
     """
     manifest = {}
     for profile_name, profile in PROFILES.items():
@@ -1339,6 +1340,7 @@ def vss_manifest():
             for dataset in datasets:
                 for model_label, model_info in EMBEDDING_MODELS.items():
                     dim = model_info["dim"]
+                    source_str = f"model:{model_info['model_id']}"
                     # Clamp by dataset size (from cache) and memory budget
                     info = _npy_info(model_label, dataset)
                     max_n_data = info[0] if info else max(profile["sizes"])
@@ -1349,7 +1351,10 @@ def vss_manifest():
                         scenario = make_scenario_name("model", model_label, dataset, dim, n)
                         for engine in ALL_ENGINES:
                             pattern = f"benchmarks/results/{scenario}/*_{engine}.sqlite"
-                            scenarios.append({"scenario": scenario, "engine": engine, "pattern": pattern})
+                            scenarios.append({
+                                "scenario": scenario, "engine": engine, "pattern": pattern,
+                                "source": source_str, "sizes": n, "dataset": dataset,
+                            })
         else:
             for dim in profile["dimensions"]:
                 max_n = MAX_N_BY_DIM.get(dim, 100_000)
@@ -1358,7 +1363,10 @@ def vss_manifest():
                     scenario = make_scenario_name(profile["source"], None, None, dim, n)
                     for engine in ALL_ENGINES:
                         pattern = f"benchmarks/results/{scenario}/*_{engine}.sqlite"
-                        scenarios.append({"scenario": scenario, "engine": engine, "pattern": pattern})
+                        scenarios.append({
+                            "scenario": scenario, "engine": engine, "pattern": pattern,
+                            "source": "random", "dim": dim, "sizes": n,
+                        })
         manifest[profile_name] = scenarios
     return manifest
 
@@ -1417,41 +1425,79 @@ def print_prep_manifest_report():
     print(f"\nSummary: {done}/{total} caches ready, {total - done} missing")
 
 
-def print_manifest_report():
-    """Print formatted DONE/MISS completeness report with file patterns."""
+def _build_vss_cmd(entry, storage=None):
+    """Build a project-root-relative CLI command for a single VSS benchmark."""
+    parts = [
+        ".venv/bin/python benchmarks/scripts/benchmark_vss.py",
+        f"--source {entry['source']}",
+    ]
+    if entry.get("dim"):
+        parts.append(f"--dim {entry['dim']}")
+    parts.append(f"--sizes {entry['sizes']}")
+    if entry.get("dataset"):
+        parts.append(f"--dataset {entry['dataset']}")
+    parts.append(f"--engine {entry['engine']}")
+    if storage:
+        parts.append(f"--storage {storage}")
+    return " ".join(parts)
+
+
+def print_manifest_report(mode="all", storage=None, limit=0):
+    """Print JSONL manifest to stdout, summary to stderr.
+
+    Each line is a self-contained JSON object with status, parameters, and cmd.
+    Summary counts go to stderr so stdout stays clean for piping to jq.
+    """
     manifest = vss_manifest()
     completeness = check_vss_completeness()
 
-    print("\n=== VSS Benchmark Manifest ===")
-
-    # Prep cache status
-    prep_done, prep_total = _print_prep_manifest()
-
     total_done = 0
-    total_expected = 0
+    total_missing = 0
+    emitted = 0
 
     for profile_name, scenarios in manifest.items():
-        done_count = sum(1 for e in scenarios if completeness.get((e["scenario"], e["engine"]), []))
-        total = len(scenarios)
-        total_done += done_count
-        total_expected += total
-
-        print(f"\n--- Profile: {profile_name} ({done_count}/{total} done) ---")
         for entry in scenarios:
-            scenario, engine, pattern = entry["scenario"], entry["engine"], entry["pattern"]
+            scenario, engine = entry["scenario"], entry["engine"]
             found = completeness.get((scenario, engine), [])
-            if found:
-                print(f"  [DONE] {scenario} / {engine}")
-                print(f"         target: {pattern}")
-                for f in found:
-                    print(f"         found:  {f}")
-            else:
-                print(f"  [MISS] {scenario} / {engine}")
-                print(f"         target: {pattern}")
+            is_done = bool(found)
 
-    print(f"\nSummary: {total_done}/{total_expected} scenarios done, "
-          f"{total_expected - total_done} missing | "
-          f"{prep_done}/{prep_total} caches ready")
+            if is_done:
+                total_done += 1
+            else:
+                total_missing += 1
+
+            # Filter by mode
+            if mode == "missing" and is_done:
+                continue
+            if mode == "done" and not is_done:
+                continue
+
+            obj = {
+                "status": "done" if is_done else "missing",
+                "profile": profile_name,
+                "scenario": scenario,
+                "engine": engine,
+                "source": entry["source"],
+                "sizes": entry["sizes"],
+            }
+            if entry.get("dataset"):
+                obj["dataset"] = entry["dataset"]
+            if entry.get("dim"):
+                obj["dim"] = entry["dim"]
+            if is_done:
+                obj["found"] = found
+            obj["cmd"] = _build_vss_cmd(entry, storage)
+
+            print(json.dumps(obj))
+            emitted += 1
+
+            if limit > 0 and emitted >= limit:
+                break
+        if limit > 0 and emitted >= limit:
+            break
+
+    total = total_done + total_missing
+    print(f"VSS manifest: {total_done}/{total} done, {total_missing} missing (emitted {emitted})", file=sys.stderr)
 
 
 # ── CLI ───────────────────────────────────────────────────────────
@@ -1459,7 +1505,13 @@ def print_manifest_report():
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Analyze benchmark results and generate charts")
-    parser.add_argument("--manifest", action="store_true", help="Show benchmark completeness report")
+    manifest_group = parser.add_mutually_exclusive_group()
+    manifest_group.add_argument("--manifest-missing", action="store_true", help="Show only missing benchmarks (JSONL)")
+    manifest_group.add_argument("--manifest-done", action="store_true", help="Show only completed benchmarks (JSONL)")
+    manifest_group.add_argument("--manifest-all", action="store_true", help="Show all benchmarks (JSONL)")
+    manifest_group.add_argument("--manifest", action="store_true", help="Alias for --manifest-all")
+    parser.add_argument("--limit", type=int, default=0, help="Limit output to first N entries (0 = unlimited)")
+    parser.add_argument("--storage", choices=["memory", "disk"], default=None, help="Filter by storage mode")
     parser.add_argument("--prep-manifest", action="store_true", help="Show models-prep cache completeness")
     parser.add_argument("--filter-source", help="Filter by vector source (e.g., 'random', 'model')")
     parser.add_argument("--filter-dim", type=int, help="Filter by dimension")
@@ -1477,8 +1529,16 @@ def main():
         print_prep_manifest_report()
         return
 
-    if args.manifest:
-        print_manifest_report()
+    manifest_mode = None
+    if args.manifest_all or args.manifest:
+        manifest_mode = "all"
+    elif args.manifest_missing:
+        manifest_mode = "missing"
+    elif args.manifest_done:
+        manifest_mode = "done"
+
+    if manifest_mode:
+        print_manifest_report(mode=manifest_mode, storage=args.storage, limit=args.limit)
         return
 
     records = load_all_results(
