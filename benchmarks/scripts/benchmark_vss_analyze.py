@@ -20,6 +20,7 @@ Usage:
     python python/benchmark_vss_analyze.py --filter-model MiniLM
     python python/benchmark_vss_analyze.py --filter-dataset wealth_of_nations
 """
+
 import argparse
 import json
 import logging
@@ -31,12 +32,18 @@ from pathlib import Path
 import jinja2
 import numpy as np
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-
 from benchmark_vss import (
-    ALL_ENGINES, DATASETS, EMBEDDING_MODELS, MAX_N_BY_DIM, PROFILES,
-    RESULTS_DIR as VSS_RESULTS_DIR, VECTORS_DIR, make_scenario_name,
+    ALL_ENGINES,
+    EMBEDDING_MODELS,
+    MAX_N_BY_DIM,
+    PROFILES,
+    VECTORS_DIR,
+    make_scenario_name,
 )
+from benchmark_vss import (
+    RESULTS_DIR as VSS_RESULTS_DIR,
+)
+from plotly.subplots import make_subplots
 
 log = logging.getLogger(__name__)
 
@@ -172,12 +179,12 @@ def _get_models(agg):
 
 def _get_datasets(agg):
     """Get sorted unique dataset names (excluding None)."""
-    return sorted(set(k[4] for k in agg if k[4] is not None))
+    return sorted({k[4] for k in agg if k[4] is not None})
 
 
 def _get_dims(agg):
     """Get sorted unique dimensions."""
-    return sorted(set(k[5] for k in agg))
+    return sorted({k[5] for k in agg})
 
 
 def _get_sizes(agg, dim=None, model=None, dataset=None):
@@ -257,11 +264,11 @@ ENGINE_LABELS = {
 
 # Base hue per library-algorithm (HSL hue degrees)
 ENGINE_HUES = {
-    ("muninn", "hnsw"): 270,                # purple
-    ("sqlite_vector", "quantize_scan"): 175,    # teal
-    ("sqlite_vector", "full_scan"): 18,         # warm orange
-    ("vectorlite", "hnsw"): 210,                # blue
-    ("sqlite_vec", "brute_force"): 130,         # green
+    ("muninn", "hnsw"): 270,  # purple
+    ("sqlite_vector", "quantize_scan"): 175,  # teal
+    ("sqlite_vector", "full_scan"): 18,  # warm orange
+    ("vectorlite", "hnsw"): 210,  # blue
+    ("sqlite_vec", "brute_force"): 130,  # green
 }
 
 
@@ -294,8 +301,8 @@ def _make_color(engine, method, model_idx=0, n_models=1):
         sat, lum = 75, 45
     else:
         t = model_idx / (n_models - 1)
-        sat = 85 - int(t * 15)   # 85% -> 70%
-        lum = 58 - int(t * 23)   # 58% -> 35%
+        sat = 85 - int(t * 15)  # 85% -> 70%
+        lum = 58 - int(t * 23)  # 58% -> 35%
     return f"hsl({hue}, {sat}%, {lum}%)"
 
 
@@ -371,18 +378,20 @@ def print_model_overview(agg, models, active_pairs, ds_label=""):
     print(f"  Engines: {' | '.join(labels)}")
     print("=" * 100)
     print(f"  {'Model':>12} | {'Dim':>5} | {'Sizes Tested':>30} | {'vg-hnsw wins at max N?':>22}")
-    print(f"  {'-'*12}-+-{'-'*5}-+-{'-'*30}-+-{'-'*22}")
+    print(f"  {'-' * 12}-+-{'-' * 5}-+-{'-' * 30}-+-{'-' * 22}")
 
     for model in models:
-        dims = sorted(set(k[5] for k in agg if k[3] == model))
-        sizes = sorted(set(k[6] for k in agg if k[3] == model))
+        dims = sorted({k[5] for k in agg if k[3] == model})
+        sizes = sorted({k[6] for k in agg if k[3] == model})
         dim = dims[0] if dims else 0
         sizes_str = ", ".join(f"{s:,}" for s in sizes)
         ds = next((k[4] for k in agg if k[3] == model), None)
 
         largest_n = max(sizes) if sizes else 0
         hnsw_lat = _get_val(agg, "muninn", "hnsw", "model", model, ds, dim, largest_n, "search_latency_ms")
-        qscan_lat = _get_val(agg, "sqlite_vector", "quantize_scan", "model", model, ds, dim, largest_n, "search_latency_ms")
+        qscan_lat = _get_val(
+            agg, "sqlite_vector", "quantize_scan", "model", model, ds, dim, largest_n, "search_latency_ms"
+        )
         wins = ""
         if hnsw_lat is not None and qscan_lat is not None:
             speedup = qscan_lat / hnsw_lat
@@ -405,7 +414,7 @@ def print_model_search_table(agg, models, active_pairs, ds_label=""):
     print("=" * 100)
 
     for model in models:
-        dims = sorted(set(k[5] for k in agg if k[3] == model))
+        dims = sorted({k[5] for k in agg if k[3] == model})
         for dim in dims:
             ds = next((k[4] for k in agg if k[3] == model and k[5] == dim), None)
             sizes = _get_sizes(agg, dim=dim, model=model, dataset=ds)
@@ -417,7 +426,7 @@ def print_model_search_table(agg, models, active_pairs, ds_label=""):
             for label in col_labels:
                 header += f" | {label:>{col_w}}"
             print(header)
-            print(f"  {'-'*10}" + f"-+-{'-'*col_w}" * len(col_labels))
+            print(f"  {'-' * 10}" + f"-+-{'-' * col_w}" * len(col_labels))
 
             for n in sizes:
                 row = f"  {n:>10,}"
@@ -441,7 +450,7 @@ def print_model_insert_table(agg, models, active_pairs, ds_label=""):
     print("=" * 100)
 
     for model in models:
-        dims = sorted(set(k[5] for k in agg if k[3] == model))
+        dims = sorted({k[5] for k in agg if k[3] == model})
         for dim in dims:
             ds = next((k[4] for k in agg if k[3] == model and k[5] == dim), None)
             sizes = _get_sizes(agg, dim=dim, model=model, dataset=ds)
@@ -453,7 +462,7 @@ def print_model_insert_table(agg, models, active_pairs, ds_label=""):
             for label in col_labels:
                 header += f" | {label:>{col_w}}"
             print(header)
-            print(f"  {'-'*10}" + f"-+-{'-'*col_w}" * len(col_labels))
+            print(f"  {'-' * 10}" + f"-+-{'-' * col_w}" * len(col_labels))
 
             for n in sizes:
                 row = f"  {n:>10,}"
@@ -477,7 +486,7 @@ def print_model_recall_table(agg, models, active_pairs, ds_label=""):
     print("=" * 100)
 
     for model in models:
-        dims = sorted(set(k[5] for k in agg if k[3] == model))
+        dims = sorted({k[5] for k in agg if k[3] == model})
         for dim in dims:
             ds = next((k[4] for k in agg if k[3] == model and k[5] == dim), None)
             sizes = _get_sizes(agg, dim=dim, model=model, dataset=ds)
@@ -489,7 +498,7 @@ def print_model_recall_table(agg, models, active_pairs, ds_label=""):
             for label in col_labels:
                 header += f" | {label:>{col_w}}"
             print(header)
-            print(f"  {'-'*10}" + f"-+-{'-'*col_w}" * len(col_labels))
+            print(f"  {'-' * 10}" + f"-+-{'-' * col_w}" * len(col_labels))
 
             for n in sizes:
                 row = f"  {n:>10,}"
@@ -517,7 +526,7 @@ def print_model_storage_table(agg, models, active_pairs, ds_label=""):
     print("=" * 100)
 
     for model in models:
-        dims = sorted(set(k[5] for k in agg if k[3] == model))
+        dims = sorted({k[5] for k in agg if k[3] == model})
         for dim in dims:
             ds = next((k[4] for k in agg if k[3] == model and k[5] == dim), None)
             sizes = _get_sizes(agg, dim=dim, model=model, dataset=ds)
@@ -537,7 +546,7 @@ def print_model_storage_table(agg, models, active_pairs, ds_label=""):
             for label in col_labels:
                 header += f" | {label:>{col_w}}"
             print(header)
-            print(f"  {'-'*10}" + f"-+-{'-'*col_w}" * len(col_labels))
+            print(f"  {'-' * 10}" + f"-+-{'-' * col_w}" * len(col_labels))
 
             for n in sizes:
                 row = f"  {n:>10,}"
@@ -564,9 +573,9 @@ def print_random_search_table(agg, active_pairs):
     print("SEARCH LATENCY — RANDOM VECTORS (ms/query)")
     print("=" * 100)
 
-    dims = sorted(set(k[5] for k in random_keys))
+    dims = sorted({k[5] for k in random_keys})
     for dim in dims:
-        sizes = sorted(set(k[6] for k in random_keys if k[5] == dim))
+        sizes = sorted({k[6] for k in random_keys if k[5] == dim})
         if not sizes:
             continue
 
@@ -576,7 +585,7 @@ def print_random_search_table(agg, active_pairs):
             header += f" | {label:>{col_w}}"
         header += f" | {'vg wins?':>10}"
         print(header)
-        print(f"  {'-'*10}" + f"-+-{'-'*col_w}" * len(col_labels) + f"-+-{'-'*10}")
+        print(f"  {'-' * 10}" + f"-+-{'-' * col_w}" * len(col_labels) + f"-+-{'-' * 10}")
 
         for n in sizes:
             row = f"  {n:>10,}"
@@ -620,18 +629,15 @@ def print_saturation_table(agg):
     print("  RC -> 1.0 = saturated | CV -> 0 = saturated | NF -> 1.0 = saturated")
     print("=" * 100)
     print(f"  {'Source':>25} | {'Relative Contrast':>18} | {'Distance CV':>12} | {'Near/Far Ratio':>15}")
-    print(f"  {'-'*25}-+-{'-'*18}-+-{'-'*12}-+-{'-'*15}")
+    print(f"  {'-' * 25}-+-{'-' * 18}-+-{'-' * 12}-+-{'-' * 15}")
 
-    for label in sorted(sat_data.keys(), key=lambda l: sat_data[l]["dim"]):
+    for label in sorted(sat_data.keys(), key=lambda lbl: sat_data[lbl]["dim"]):
         d = sat_data[label]
         rc_mean = sum(d["rc"]) / len(d["rc"]) if d["rc"] else None
         cv_mean = sum(d["cv"]) / len(d["cv"]) if d["cv"] else None
         nf_mean = sum(d["nf"]) / len(d["nf"]) if d["nf"] else None
 
-        print(
-            f"  {label:>25} | {_fmt(rc_mean, '.4f'):>18} | "
-            f"{_fmt(cv_mean, '.4f'):>12} | {_fmt(nf_mean, '.4f'):>15}"
-        )
+        print(f"  {label:>25} | {_fmt(rc_mean, '.4f'):>18} | {_fmt(cv_mean, '.4f'):>12} | {_fmt(nf_mean, '.4f'):>15}")
 
 
 # ── Per-model charts ──────────────────────────────────────────────
@@ -652,7 +658,7 @@ def chart_model_tipping_point(agg):
 
     for ds in datasets:
         for model in models:
-            dims = sorted(set(k[5] for k in agg if k[3] == model and k[4] == ds))
+            dims = sorted({k[5] for k in agg if k[3] == model and k[4] == ds})
             if not dims:
                 continue
             dim = dims[0]
@@ -661,15 +667,15 @@ def chart_model_tipping_point(agg):
 
             for engine, method in ENGINE_METHOD_PAIRS:
                 sizes = sorted(
-                    k[6] for k in agg
+                    k[6]
+                    for k in agg
                     if k[0] == engine and k[1] == method and k[3] == model and k[4] == ds and k[5] == dim
                 )
                 if not sizes:
                     continue
 
                 latencies = [
-                    _get_val(agg, engine, method, "model", model, ds, dim, n, "search_latency_ms")
-                    for n in sizes
+                    _get_val(agg, engine, method, "model", model, ds, dim, n, "search_latency_ms") for n in sizes
                 ]
 
                 color = _make_color(engine, method)
@@ -731,15 +737,15 @@ def chart_model_comparison(agg):
         for engine, method in ENGINE_METHOD_PAIRS:
             for model_idx, (model, dim) in enumerate(models_by_dim):
                 sizes = sorted(
-                    k[6] for k in agg
+                    k[6]
+                    for k in agg
                     if k[0] == engine and k[1] == method and k[3] == model and k[4] == ds and k[5] == dim
                 )
                 if not sizes:
                     continue
 
                 latencies = [
-                    _get_val(agg, engine, method, "model", model, ds, dim, n, "search_latency_ms")
-                    for n in sizes
+                    _get_val(agg, engine, method, "model", model, ds, dim, n, "search_latency_ms") for n in sizes
                 ]
 
                 color = _make_color(engine, method, model_idx, n_models)
@@ -774,8 +780,14 @@ def chart_model_comparison(agg):
             height=550,
             width=1000,
             template="plotly_white",
-            legend={"orientation": "v", "yanchor": "top", "y": 0.99, "xanchor": "left", "x": 1.02,
-                    "groupclick": "togglegroup"},
+            legend={
+                "orientation": "v",
+                "yanchor": "top",
+                "y": 0.99,
+                "xanchor": "left",
+                "x": 1.02,
+                "groupclick": "togglegroup",
+            },
         )
 
         ds_suffix = f"_{ds}" if ds else ""
@@ -801,16 +813,14 @@ def chart_model_recall(agg):
         for engine, method in ENGINE_METHOD_PAIRS:
             for model_idx, (model, dim) in enumerate(models_by_dim):
                 sizes = sorted(
-                    k[6] for k in agg
+                    k[6]
+                    for k in agg
                     if k[0] == engine and k[1] == method and k[3] == model and k[4] == ds and k[5] == dim
                 )
                 if not sizes:
                     continue
 
-                recalls = [
-                    _get_val(agg, engine, method, "model", model, ds, dim, n, "recall_at_k")
-                    for n in sizes
-                ]
+                recalls = [_get_val(agg, engine, method, "model", model, ds, dim, n, "recall_at_k") for n in sizes]
 
                 color = _make_color(engine, method, model_idx, n_models)
                 opacity = _trace_opacity(engine)
@@ -871,16 +881,14 @@ def chart_model_insert_throughput(agg):
         for engine, method in ENGINE_METHOD_PAIRS:
             for model_idx, (model, dim) in enumerate(models_by_dim):
                 sizes = sorted(
-                    k[6] for k in agg
+                    k[6]
+                    for k in agg
                     if k[0] == engine and k[1] == method and k[3] == model and k[4] == ds and k[5] == dim
                 )
                 if not sizes:
                     continue
 
-                rates = [
-                    _get_val(agg, engine, method, "model", model, ds, dim, n, "insert_rate_vps")
-                    for n in sizes
-                ]
+                rates = [_get_val(agg, engine, method, "model", model, ds, dim, n, "insert_rate_vps") for n in sizes]
 
                 color = _make_color(engine, method, model_idx, n_models)
                 opacity = _trace_opacity(engine)
@@ -888,7 +896,8 @@ def chart_model_insert_throughput(agg):
 
                 fig.add_trace(
                     go.Scatter(
-                        x=sizes, y=rates,
+                        x=sizes,
+                        y=rates,
                         mode="lines+markers",
                         name=_trace_label(engine, method, model, dim),
                         line={"color": color, "width": line_width},
@@ -926,10 +935,7 @@ def chart_model_db_size(agg):
     if not models_by_dim:
         return
 
-    has_size = any(
-        entry.get("db_size_bytes_mean") is not None
-        for key, entry in agg.items() if key[3] is not None
-    )
+    has_size = any(entry.get("db_size_bytes_mean") is not None for key, entry in agg.items() if key[3] is not None)
     if not has_size:
         log.info("  No db_size data for models, skipping chart")
         return
@@ -944,16 +950,14 @@ def chart_model_db_size(agg):
         for engine, method in ENGINE_METHOD_PAIRS:
             for model_idx, (model, dim) in enumerate(models_by_dim):
                 sizes = sorted(
-                    k[6] for k in agg
+                    k[6]
+                    for k in agg
                     if k[0] == engine and k[1] == method and k[3] == model and k[4] == ds and k[5] == dim
                 )
                 if not sizes:
                     continue
 
-                db_sizes = [
-                    _get_val(agg, engine, method, "model", model, ds, dim, n, "db_size_bytes")
-                    for n in sizes
-                ]
+                db_sizes = [_get_val(agg, engine, method, "model", model, ds, dim, n, "db_size_bytes") for n in sizes]
 
                 if all(v is None for v in db_sizes):
                     continue
@@ -966,7 +970,8 @@ def chart_model_db_size(agg):
 
                 fig.add_trace(
                     go.Scatter(
-                        x=sizes, y=db_sizes_mb,
+                        x=sizes,
+                        y=db_sizes_mb,
                         mode="lines+markers",
                         name=_trace_label(engine, method, model, dim),
                         line={"color": color, "width": line_width},
@@ -1009,10 +1014,10 @@ def chart_dataset_comparison(agg):
         log.info("  Need >=2 datasets for cross-dataset comparison, skipping")
         return
 
-    ds_dash = {ds: dash for ds, dash in zip(datasets, ["solid", "dash", "dot", "dashdot"])}
+    ds_dash = dict(zip(datasets, ["solid", "dash", "dot", "dashdot"], strict=False))
 
     for model in models:
-        dims = sorted(set(k[5] for k in agg if k[3] == model))
+        dims = sorted({k[5] for k in agg if k[3] == model})
         if not dims:
             continue
         dim = dims[0]
@@ -1023,15 +1028,15 @@ def chart_dataset_comparison(agg):
         for engine, method in [("muninn", "hnsw"), ("sqlite_vector", "quantize_scan")]:
             for ds in datasets:
                 sizes = sorted(
-                    k[6] for k in agg
+                    k[6]
+                    for k in agg
                     if k[0] == engine and k[1] == method and k[3] == model and k[4] == ds and k[5] == dim
                 )
                 if not sizes:
                     continue
 
                 latencies = [
-                    _get_val(agg, engine, method, "model", model, ds, dim, n, "search_latency_ms")
-                    for n in sizes
+                    _get_val(agg, engine, method, "model", model, ds, dim, n, "search_latency_ms") for n in sizes
                 ]
 
                 color = _make_color(engine, method)
@@ -1106,7 +1111,7 @@ def chart_saturation(agg):
         horizontal_spacing=0.1,
     )
 
-    sorted_labels = sorted(sat_by_label.keys(), key=lambda l: sat_by_label[l]["dim"])
+    sorted_labels = sorted(sat_by_label.keys(), key=lambda lbl: sat_by_label[lbl]["dim"])
     n_bars = len(sorted_labels)
 
     for bar_idx, label in enumerate(sorted_labels):
@@ -1127,19 +1132,19 @@ def chart_saturation(agg):
 
         fig.add_trace(
             go.Bar(x=[label], y=[rc_mean], name=label, marker_color=color, showlegend=False),
-            row=1, col=1,
+            row=1,
+            col=1,
         )
 
         if cv_mean is not None:
             fig.add_trace(
                 go.Bar(x=[label], y=[cv_mean], name=label, marker_color=color, showlegend=False),
-                row=1, col=2,
+                row=1,
+                col=2,
             )
 
-    fig.add_hline(y=1.0, line_dash="dash", line_color="red", opacity=0.5, row=1, col=1,
-                  annotation_text="saturated")
-    fig.add_hline(y=0.0, line_dash="dash", line_color="red", opacity=0.5, row=1, col=2,
-                  annotation_text="saturated")
+    fig.add_hline(y=1.0, line_dash="dash", line_color="red", opacity=0.5, row=1, col=1, annotation_text="saturated")
+    fig.add_hline(y=0.0, line_dash="dash", line_color="red", opacity=0.5, row=1, col=2, annotation_text="saturated")
 
     fig.update_layout(
         title="Vector Space Saturation by Embedding Model",
@@ -1160,24 +1165,29 @@ def chart_random_tipping_point(agg):
     if not random_keys:
         return
 
-    dims = sorted(set(k[5] for k in random_keys))
-    dim_dash = {32: "solid", 64: "dot", 128: "dash", 256: "dashdot",
-                384: "solid", 512: "dot", 768: "dash", 1024: "dashdot", 1536: "longdash"}
+    dims = sorted({k[5] for k in random_keys})
+    dim_dash = {
+        32: "solid",
+        64: "dot",
+        128: "dash",
+        256: "dashdot",
+        384: "solid",
+        512: "dot",
+        768: "dash",
+        1024: "dashdot",
+        1536: "longdash",
+    }
 
     fig = go.Figure()
 
     for dim in dims:
         for engine, method in ENGINE_METHOD_PAIRS:
-            sizes = sorted(
-                k[6] for k in random_keys
-                if k[0] == engine and k[1] == method and k[5] == dim
-            )
+            sizes = sorted(k[6] for k in random_keys if k[0] == engine and k[1] == method and k[5] == dim)
             if not sizes:
                 continue
 
             latencies = [
-                _get_val(agg, engine, method, "random", None, None, dim, n, "search_latency_ms")
-                for n in sizes
+                _get_val(agg, engine, method, "random", None, None, dim, n, "search_latency_ms") for n in sizes
             ]
 
             color = _make_color(engine, method)
@@ -1187,7 +1197,8 @@ def chart_random_tipping_point(agg):
 
             fig.add_trace(
                 go.Scatter(
-                    x=sizes, y=latencies,
+                    x=sizes,
+                    y=latencies,
                     mode="lines+markers",
                     name=label,
                     line={"color": color, "dash": dash, "width": 2},
@@ -1351,10 +1362,16 @@ def vss_manifest():
                         scenario = make_scenario_name("model", model_label, dataset, dim, n)
                         for engine in ALL_ENGINES:
                             pattern = f"benchmarks/results/{scenario}/*_{engine}.sqlite"
-                            scenarios.append({
-                                "scenario": scenario, "engine": engine, "pattern": pattern,
-                                "source": source_str, "sizes": n, "dataset": dataset,
-                            })
+                            scenarios.append(
+                                {
+                                    "scenario": scenario,
+                                    "engine": engine,
+                                    "pattern": pattern,
+                                    "source": source_str,
+                                    "sizes": n,
+                                    "dataset": dataset,
+                                }
+                            )
         else:
             for dim in profile["dimensions"]:
                 max_n = MAX_N_BY_DIM.get(dim, 100_000)
@@ -1363,10 +1380,16 @@ def vss_manifest():
                     scenario = make_scenario_name(profile["source"], None, None, dim, n)
                     for engine in ALL_ENGINES:
                         pattern = f"benchmarks/results/{scenario}/*_{engine}.sqlite"
-                        scenarios.append({
-                            "scenario": scenario, "engine": engine, "pattern": pattern,
-                            "source": "random", "dim": dim, "sizes": n,
-                        })
+                        scenarios.append(
+                            {
+                                "scenario": scenario,
+                                "engine": engine,
+                                "pattern": pattern,
+                                "source": "random",
+                                "dim": dim,
+                                "sizes": n,
+                            }
+                        )
         manifest[profile_name] = scenarios
     return manifest
 

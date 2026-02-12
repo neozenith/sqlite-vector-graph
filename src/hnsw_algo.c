@@ -50,8 +50,10 @@ HnswNode *ht_find(HnswNode **table, int capacity, int64_t id) {
     int slot = ht_slot(id, capacity);
     for (int i = 0; i < capacity; i++) {
         int idx = (slot + i) & (capacity - 1);
-        if (table[idx] == NULL) return NULL;
-        if (table[idx]->id == id) return table[idx];
+        if (table[idx] == NULL)
+            return NULL;
+        if (table[idx]->id == id)
+            return table[idx];
     }
     return NULL;
 }
@@ -65,16 +67,17 @@ int ht_insert(HnswNode **table, int capacity, HnswNode *node) {
             return 0;
         }
         if (table[idx]->id == node->id) {
-            return -1;  /* duplicate */
+            return -1; /* duplicate */
         }
     }
-    return -1;  /* table full (shouldn't happen with proper load factor) */
+    return -1; /* table full (shouldn't happen with proper load factor) */
 }
 
 int ht_resize(HnswIndex *idx) {
     int new_cap = idx->node_capacity * 2;
     HnswNode **new_table = (HnswNode **)calloc((size_t)new_cap, sizeof(HnswNode *));
-    if (!new_table) return -1;
+    if (!new_table)
+        return -1;
 
     for (int i = 0; i < idx->node_capacity; i++) {
         if (idx->nodes[i] != NULL) {
@@ -91,14 +94,18 @@ int ht_resize(HnswIndex *idx) {
 
 HnswNode *node_create(int64_t id, const float *vector, int dim, int level) {
     HnswNode *node = (HnswNode *)calloc(1, sizeof(HnswNode));
-    if (!node) return NULL;
+    if (!node)
+        return NULL;
 
     node->id = id;
     node->level = level;
     node->deleted = 0;
 
     node->vector = (float *)malloc((size_t)dim * sizeof(float));
-    if (!node->vector) { free(node); return NULL; }
+    if (!node->vector) {
+        free(node);
+        return NULL;
+    }
     memcpy(node->vector, vector, (size_t)dim * sizeof(float));
 
     node->neighbors = (int64_t **)calloc((size_t)(level + 1), sizeof(int64_t *));
@@ -117,7 +124,8 @@ HnswNode *node_create(int64_t id, const float *vector, int dim, int level) {
 }
 
 void node_destroy(HnswNode *node) {
-    if (!node) return;
+    if (!node)
+        return;
     free(node->vector);
     if (node->neighbors) {
         for (int l = 0; l <= node->level; l++) {
@@ -132,19 +140,21 @@ void node_destroy(HnswNode *node) {
 
 /* Add a neighbor to node at the given level. Returns 0 on success. */
 int node_add_neighbor(HnswNode *node, int level, int64_t neighbor_id) {
-    if (level > node->level) return -1;
+    if (level > node->level)
+        return -1;
 
     /* Check if already a neighbor */
     for (int i = 0; i < node->neighbor_count[level]; i++) {
-        if (node->neighbors[level][i] == neighbor_id) return 0;
+        if (node->neighbors[level][i] == neighbor_id)
+            return 0;
     }
 
     /* Grow if needed */
     if (node->neighbor_count[level] >= node->neighbor_cap[level]) {
         int new_cap = node->neighbor_cap[level] == 0 ? 8 : node->neighbor_cap[level] * 2;
-        int64_t *new_arr = (int64_t *)realloc(node->neighbors[level],
-                                               (size_t)new_cap * sizeof(int64_t));
-        if (!new_arr) return -1;
+        int64_t *new_arr = (int64_t *)realloc(node->neighbors[level], (size_t)new_cap * sizeof(int64_t));
+        if (!new_arr)
+            return -1;
         node->neighbors[level] = new_arr;
         node->neighbor_cap[level] = new_cap;
     }
@@ -154,7 +164,8 @@ int node_add_neighbor(HnswNode *node, int level, int64_t neighbor_id) {
 
 /* Remove a specific neighbor from node at level. */
 void node_remove_neighbor(HnswNode *node, int level, int64_t neighbor_id) {
-    if (level > node->level) return;
+    if (level > node->level)
+        return;
     for (int i = 0; i < node->neighbor_count[level]; i++) {
         if (node->neighbors[level][i] == neighbor_id) {
             /* Swap with last and shrink */
@@ -169,11 +180,12 @@ void node_remove_neighbor(HnswNode *node, int level, int64_t neighbor_id) {
 
 HnswIndex *hnsw_create(int dim, VecMetric metric, int M, int ef_construction) {
     HnswIndex *idx = (HnswIndex *)calloc(1, sizeof(HnswIndex));
-    if (!idx) return NULL;
+    if (!idx)
+        return NULL;
 
     idx->dim = dim;
     idx->M = M;
-    idx->M_max0 = 2 * M;  /* standard HNSW: layer 0 gets 2x connections */
+    idx->M_max0 = 2 * M; /* standard HNSW: layer 0 gets 2x connections */
     idx->ef_construction = ef_construction;
     idx->metric = metric;
     idx->dist_func = vec_get_distance_func(metric);
@@ -182,18 +194,22 @@ HnswIndex *hnsw_create(int dim, VecMetric metric, int M, int ef_construction) {
     idx->entry_point = -1;
     idx->max_level = -1;
 
-    idx->node_capacity = 256;  /* initial, grows as needed */
+    idx->node_capacity = 256; /* initial, grows as needed */
     idx->nodes = (HnswNode **)calloc((size_t)idx->node_capacity, sizeof(HnswNode *));
-    if (!idx->nodes) { free(idx); return NULL; }
+    if (!idx->nodes) {
+        free(idx);
+        return NULL;
+    }
     idx->node_count = 0;
 
-    idx->rng_state = 42;  /* default seed */
+    idx->rng_state = 42; /* default seed */
 
     return idx;
 }
 
 void hnsw_destroy(HnswIndex *idx) {
-    if (!idx) return;
+    if (!idx)
+        return;
     for (int i = 0; i < idx->node_capacity; i++) {
         if (idx->nodes[i]) {
             node_destroy(idx->nodes[i]);
@@ -204,12 +220,13 @@ void hnsw_destroy(HnswIndex *idx) {
 }
 
 void hnsw_seed_rng(HnswIndex *idx, unsigned int seed) {
-    idx->rng_state = seed ? seed : 1;  /* xorshift can't have state=0 */
+    idx->rng_state = seed ? seed : 1; /* xorshift can't have state=0 */
 }
 
 HnswNode *hnsw_get_node(HnswIndex *idx, int64_t id) {
     HnswNode *node = ht_find(idx->nodes, idx->node_capacity, id);
-    if (node && node->deleted) return NULL;
+    if (node && node->deleted)
+        return NULL;
     return node;
 }
 
@@ -222,9 +239,11 @@ const float *hnsw_get_vector(HnswIndex *idx, int64_t id) {
 
 static int random_level(HnswIndex *idx) {
     double r = rand_uniform(&idx->rng_state);
-    if (r == 0.0) r = 1e-10;  /* avoid log(0) */
+    if (r == 0.0)
+        r = 1e-10; /* avoid log(0) */
     int level = (int)(-log(r) * idx->level_mult);
-    if (level >= HNSW_MAX_LEVELS) level = HNSW_MAX_LEVELS - 1;
+    if (level >= HNSW_MAX_LEVELS)
+        level = HNSW_MAX_LEVELS - 1;
     return level;
 }
 
@@ -235,10 +254,10 @@ static int random_level(HnswIndex *idx) {
  * Used for greedy descent through upper layers.
  * Returns the ID of the closest node found.
  */
-static int64_t greedy_search_layer(HnswIndex *idx, const float *query,
-                                    int64_t entry_id, int level) {
+static int64_t greedy_search_layer(HnswIndex *idx, const float *query, int64_t entry_id, int level) {
     HnswNode *current = ht_find(idx->nodes, idx->node_capacity, entry_id);
-    if (!current) return entry_id;
+    if (!current)
+        return entry_id;
 
     float cur_dist = idx->dist_func(query, current->vector, idx->dim);
 
@@ -248,7 +267,8 @@ static int64_t greedy_search_layer(HnswIndex *idx, const float *query,
         for (int i = 0; i < current->neighbor_count[level]; i++) {
             int64_t nid = current->neighbors[level][i];
             HnswNode *neighbor = ht_find(idx->nodes, idx->node_capacity, nid);
-            if (!neighbor || neighbor->deleted) continue;
+            if (!neighbor || neighbor->deleted)
+                continue;
 
             float d = idx->dist_func(query, neighbor->vector, idx->dim);
             if (d < cur_dist) {
@@ -284,7 +304,8 @@ typedef struct {
 
 static int visited_init(VisitedSet *vs, int cap) {
     vs->ids = (int64_t *)malloc((size_t)cap * sizeof(int64_t));
-    if (!vs->ids) return -1;
+    if (!vs->ids)
+        return -1;
     vs->count = 0;
     vs->capacity = cap;
     return 0;
@@ -297,7 +318,8 @@ static void visited_destroy(VisitedSet *vs) {
 static int visited_contains(const VisitedSet *vs, int64_t id) {
     /* Linear scan — fine for beam search where visited count ≈ ef */
     for (int i = 0; i < vs->count; i++) {
-        if (vs->ids[i] == id) return 1;
+        if (vs->ids[i] == id)
+            return 1;
     }
     return 0;
 }
@@ -306,7 +328,8 @@ static int visited_add(VisitedSet *vs, int64_t id) {
     if (vs->count >= vs->capacity) {
         int new_cap = vs->capacity * 2;
         int64_t *new_ids = (int64_t *)realloc(vs->ids, (size_t)new_cap * sizeof(int64_t));
-        if (!new_ids) return -1;
+        if (!new_ids)
+            return -1;
         vs->ids = new_ids;
         vs->capacity = new_cap;
     }
@@ -321,12 +344,10 @@ static int visited_add(VisitedSet *vs, int64_t id) {
  * result_ids/result_dists: output arrays (caller allocates, size >= ef).
  * Returns number of results found.
  */
-static int beam_search_layer(HnswIndex *idx, const float *query,
-                             const int64_t *entry_ids, int entry_count,
-                             int level, int ef,
-                             int64_t *result_ids, float *result_dists) {
-    PriorityQueue candidates;  /* min-heap: closest candidate on top */
-    PriorityQueue results;     /* max-heap (negated distances): furthest result on top */
+static int beam_search_layer(HnswIndex *idx, const float *query, const int64_t *entry_ids, int entry_count, int level,
+                             int ef, int64_t *result_ids, float *result_dists) {
+    PriorityQueue candidates; /* min-heap: closest candidate on top */
+    PriorityQueue results;    /* max-heap (negated distances): furthest result on top */
     VisitedSet visited;
 
     pq_init(&candidates, ef * 2);
@@ -336,10 +357,11 @@ static int beam_search_layer(HnswIndex *idx, const float *query,
     /* Seed with entry points */
     for (int i = 0; i < entry_count; i++) {
         HnswNode *node = ht_find(idx->nodes, idx->node_capacity, entry_ids[i]);
-        if (!node || node->deleted) continue;
+        if (!node || node->deleted)
+            continue;
         float d = idx->dist_func(query, node->vector, idx->dim);
         pq_push(&candidates, node->id, d);
-        pq_push(&results, node->id, -d);  /* negated for max-heap */
+        pq_push(&results, node->id, -d); /* negated for max-heap */
         visited_add(&visited, node->id);
     }
 
@@ -348,7 +370,8 @@ static int beam_search_layer(HnswIndex *idx, const float *query,
      * candidate expansions, halt early. This avoids wasted distance
      * computations in regions far from the query. */
     int patience_max = ef / 4;
-    if (patience_max < 10) patience_max = 10;
+    if (patience_max < 10)
+        patience_max = 10;
     int stale_count = 0;
 
     /* Expand candidates */
@@ -357,28 +380,33 @@ static int beam_search_layer(HnswIndex *idx, const float *query,
 
         /* Stop if closest candidate is farther than the worst result */
         if (pq_size(&results) >= ef) {
-            float worst_dist = -pq_peek(&results).distance;  /* un-negate */
-            if (closest.distance > worst_dist) break;
+            float worst_dist = -pq_peek(&results).distance; /* un-negate */
+            if (closest.distance > worst_dist)
+                break;
         }
 
         /* Patience check: halt if no improvement for too long.
          * Only applies when the results set is full (pq_size >= ef).
          * When results aren't full, any new discovery is an improvement. */
-        if (stale_count >= patience_max && pq_size(&results) >= ef) break;
+        if (stale_count >= patience_max && pq_size(&results) >= ef)
+            break;
 
         HnswNode *node = ht_find(idx->nodes, idx->node_capacity, closest.id);
-        if (!node) continue;
+        if (!node)
+            continue;
 
         int improved = 0;
 
         /* Explore neighbors at this level */
         for (int i = 0; i < node->neighbor_count[level]; i++) {
             int64_t nid = node->neighbors[level][i];
-            if (visited_contains(&visited, nid)) continue;
+            if (visited_contains(&visited, nid))
+                continue;
             visited_add(&visited, nid);
 
             HnswNode *neighbor = ht_find(idx->nodes, idx->node_capacity, nid);
-            if (!neighbor || neighbor->deleted) continue;
+            if (!neighbor || neighbor->deleted)
+                continue;
 
             float d = idx->dist_func(query, neighbor->vector, idx->dim);
 
@@ -390,7 +418,7 @@ static int beam_search_layer(HnswIndex *idx, const float *query,
                 float worst_dist = -pq_peek(&results).distance;
                 if (d < worst_dist) {
                     pq_push(&candidates, nid, d);
-                    pq_pop(&results);  /* evict worst */
+                    pq_pop(&results); /* evict worst */
                     pq_push(&results, nid, -d);
                     improved = 1;
                 }
@@ -409,7 +437,7 @@ static int beam_search_layer(HnswIndex *idx, const float *query,
     for (int i = count - 1; i >= 0; i--) {
         PQItem item = pq_pop(&results);
         result_ids[i] = item.id;
-        result_dists[i] = -item.distance;  /* un-negate */
+        result_dists[i] = -item.distance; /* un-negate */
     }
 
     pq_destroy(&candidates);
@@ -430,7 +458,8 @@ static int beam_search_layer(HnswIndex *idx, const float *query,
  * more valuable for graph connectivity and should be preserved during pruning.
  */
 static int count_mutual_neighbors(HnswIndex *idx, HnswNode *a, HnswNode *b, int level) {
-    if (level > a->level || level > b->level) return 0;
+    if (level > a->level || level > b->level)
+        return 0;
     (void)idx;
     int count = 0;
     for (int i = 0; i < a->neighbor_count[level]; i++) {
@@ -465,13 +494,8 @@ static int count_mutual_neighbors(HnswIndex *idx, HnswNode *a, HnswNode *b, int 
  * selected_ids: output (caller allocates, size >= M_max).
  * Returns number of selected neighbors.
  */
-static int select_neighbors_heuristic(HnswIndex *idx,
-                                       const float *target_vec,
-                                       int64_t *candidates_ids,
-                                       float *candidates_dists,
-                                       int candidate_count,
-                                       int M_max,
-                                       int64_t *selected_ids) {
+static int select_neighbors_heuristic(HnswIndex *idx, const float *target_vec, int64_t *candidates_ids,
+                                      float *candidates_dists, int candidate_count, int M_max, int64_t *selected_ids) {
     /*
      * Select closest-M neighbors from the candidate set.
      * Candidates are already sorted by distance from beam_search_layer.
@@ -496,17 +520,19 @@ static int select_neighbors_heuristic(HnswIndex *idx,
 int hnsw_insert(HnswIndex *idx, int64_t id, const float *vector) {
     /* Check for duplicate */
     if (ht_find(idx->nodes, idx->node_capacity, id) != NULL) {
-        return -1;  /* duplicate ID */
+        return -1; /* duplicate ID */
     }
 
     /* Resize hash table if load factor > 0.7 */
     if (idx->node_count * 10 > idx->node_capacity * 7) {
-        if (ht_resize(idx) != 0) return -1;
+        if (ht_resize(idx) != 0)
+            return -1;
     }
 
     int level = random_level(idx);
     HnswNode *new_node = node_create(id, vector, idx->dim, level);
-    if (!new_node) return -1;
+    if (!new_node)
+        return -1;
 
     if (ht_insert(idx->nodes, idx->node_capacity, new_node) != 0) {
         node_destroy(new_node);
@@ -537,7 +563,9 @@ int hnsw_insert(HnswIndex *idx, int64_t id, const float *vector) {
     float *result_dists = (float *)malloc((size_t)ef * sizeof(float));
     int64_t *selected = (int64_t *)malloc((size_t)(idx->M_max0 + 1) * sizeof(int64_t));
     if (!result_ids || !result_dists || !selected) {
-        free(result_ids); free(result_dists); free(selected);
+        free(result_ids);
+        free(result_dists);
+        free(selected);
         return -1;
     }
 
@@ -545,20 +573,18 @@ int hnsw_insert(HnswIndex *idx, int64_t id, const float *vector) {
         int M_max = (l == 0) ? idx->M_max0 : idx->M;
 
         /* Beam search to find candidates */
-        int found = beam_search_layer(idx, vector, &cur_entry, 1, l, ef,
-                                      result_ids, result_dists);
+        int found = beam_search_layer(idx, vector, &cur_entry, 1, l, ef, result_ids, result_dists);
 
         /* Select neighbors via heuristic */
-        int selected_count = select_neighbors_heuristic(idx, vector,
-                                                         result_ids, result_dists,
-                                                         found, M_max, selected);
+        int selected_count = select_neighbors_heuristic(idx, vector, result_ids, result_dists, found, M_max, selected);
 
         /* Connect new node to selected neighbors (bidirectional) */
         for (int i = 0; i < selected_count; i++) {
             node_add_neighbor(new_node, l, selected[i]);
 
             HnswNode *neighbor = ht_find(idx->nodes, idx->node_capacity, selected[i]);
-            if (!neighbor) continue;
+            if (!neighbor)
+                continue;
 
             /* Only add if neighbor's level includes this layer */
             if (l <= neighbor->level) {
@@ -595,15 +621,20 @@ int hnsw_insert(HnswIndex *idx, int64_t id, const float *vector) {
                             int best = a;
                             for (int b = a + 1; b < nc; b++) {
                                 if (n_dists[b] < n_dists[best] ||
-                                    (n_dists[b] == n_dists[best] &&
-                                     n_mn[b] > n_mn[best])) {
+                                    (n_dists[b] == n_dists[best] && n_mn[b] > n_mn[best])) {
                                     best = b;
                                 }
                             }
                             if (best != a) {
-                                float tmp_d = n_dists[a]; n_dists[a] = n_dists[best]; n_dists[best] = tmp_d;
-                                int tmp_m = n_mn[a]; n_mn[a] = n_mn[best]; n_mn[best] = tmp_m;
-                                int64_t tmp_id = n_ids_copy[a]; n_ids_copy[a] = n_ids_copy[best]; n_ids_copy[best] = tmp_id;
+                                float tmp_d = n_dists[a];
+                                n_dists[a] = n_dists[best];
+                                n_dists[best] = tmp_d;
+                                int tmp_m = n_mn[a];
+                                n_mn[a] = n_mn[best];
+                                n_mn[best] = tmp_m;
+                                int64_t tmp_id = n_ids_copy[a];
+                                n_ids_copy[a] = n_ids_copy[best];
+                                n_ids_copy[best] = tmp_id;
                             }
                         }
                         memcpy(neighbor->neighbors[l], n_ids_copy, (size_t)M_max * sizeof(int64_t));
@@ -617,7 +648,8 @@ int hnsw_insert(HnswIndex *idx, int64_t id, const float *vector) {
         }
 
         /* Use closest result as entry point for next layer down */
-        if (found > 0) cur_entry = result_ids[0];
+        if (found > 0)
+            cur_entry = result_ids[0];
     }
 
     free(result_ids);
@@ -635,10 +667,11 @@ int hnsw_insert(HnswIndex *idx, int64_t id, const float *vector) {
 
 /* ─── Public: Search ──────────────────────────────────────── */
 
-int hnsw_search(HnswIndex *idx, const float *query, int k, int ef_search,
-                HnswSearchResult *results) {
-    if (idx->entry_point == -1 || idx->node_count == 0) return 0;
-    if (ef_search < k) ef_search = k;
+int hnsw_search(HnswIndex *idx, const float *query, int k, int ef_search, HnswSearchResult *results) {
+    if (idx->entry_point == -1 || idx->node_count == 0)
+        return 0;
+    if (ef_search < k)
+        ef_search = k;
 
     int64_t cur_entry = idx->entry_point;
 
@@ -651,12 +684,12 @@ int hnsw_search(HnswIndex *idx, const float *query, int k, int ef_search,
     int64_t *result_ids = (int64_t *)malloc((size_t)ef_search * sizeof(int64_t));
     float *result_dists = (float *)malloc((size_t)ef_search * sizeof(float));
     if (!result_ids || !result_dists) {
-        free(result_ids); free(result_dists);
+        free(result_ids);
+        free(result_dists);
         return 0;
     }
 
-    int found = beam_search_layer(idx, query, &cur_entry, 1, 0, ef_search,
-                                  result_ids, result_dists);
+    int found = beam_search_layer(idx, query, &cur_entry, 1, 0, ef_search, result_ids, result_dists);
 
     /* Return top-k (results are already sorted by distance) */
     int count = found < k ? found : k;
@@ -683,7 +716,8 @@ int hnsw_search(HnswIndex *idx, const float *query, int k, int ef_search,
  */
 int hnsw_delete(HnswIndex *idx, int64_t id) {
     HnswNode *node = ht_find(idx->nodes, idx->node_capacity, id);
-    if (!node || node->deleted) return -1;
+    if (!node || node->deleted)
+        return -1;
 
     node->deleted = 1;
     idx->node_count--;
@@ -716,22 +750,31 @@ int hnsw_delete(HnswIndex *idx, int64_t id) {
         if (former) {
             for (int i = 0; i < nc; i++) {
                 HnswNode *orphan = ht_find(idx->nodes, idx->node_capacity, former[i]);
-                if (!orphan || orphan->deleted) continue;
-                if (l > orphan->level) continue;
-                if (orphan->neighbor_count[l] >= min_connections) continue;
+                if (!orphan || orphan->deleted)
+                    continue;
+                if (l > orphan->level)
+                    continue;
+                if (orphan->neighbor_count[l] >= min_connections)
+                    continue;
 
                 /* Try connecting to other former neighbors */
                 for (int j = 0; j < nc && orphan->neighbor_count[l] < min_connections; j++) {
-                    if (i == j) continue;
+                    if (i == j)
+                        continue;
                     int64_t cand_id = former[j];
                     HnswNode *cand = ht_find(idx->nodes, idx->node_capacity, cand_id);
-                    if (!cand || cand->deleted) continue;
-                    if (l > cand->level) continue;
+                    if (!cand || cand->deleted)
+                        continue;
+                    if (l > cand->level)
+                        continue;
 
                     /* Check not already a neighbor */
                     int already = 0;
                     for (int k = 0; k < orphan->neighbor_count[l]; k++) {
-                        if (orphan->neighbors[l][k] == cand_id) { already = 1; break; }
+                        if (orphan->neighbors[l][k] == cand_id) {
+                            already = 1;
+                            break;
+                        }
                     }
                     if (!already) {
                         node_add_neighbor(orphan, l, cand_id);

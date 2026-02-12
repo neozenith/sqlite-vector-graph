@@ -1,16 +1,16 @@
-"""
-sqlite-muninn: HNSW vector search + graph traversal + Node2Vec for SQLite.
+"""sqlite-muninn: HNSW vector search + graph traversal + Node2Vec for SQLite.
 
 Zero-dependency C11 SQLite extension. Three subsystems in one .load:
 HNSW approximate nearest neighbor search, graph traversal TVFs, and Node2Vec.
 """
+
+import importlib.metadata
 import pathlib
 import sqlite3
 
 _PKG_DIR = pathlib.Path(__file__).parent
-_REPO_ROOT = _PKG_DIR.parent
 
-__version__ = (_REPO_ROOT / "VERSION").read_text().strip()
+__version__ = importlib.metadata.version("sqlite-muninn")
 
 
 def loadable_path() -> str:
@@ -25,12 +25,11 @@ def loadable_path() -> str:
         return str(pkg_path)
 
     # Development / git install: binary is at the repo root
-    if any(_REPO_ROOT.glob("muninn.*")):
-        return str(_REPO_ROOT / "muninn")
+    repo_root = _PKG_DIR.parent
+    if any(repo_root.glob("muninn.*")):
+        return str(repo_root / "muninn")
 
-    raise FileNotFoundError(
-        "muninn extension not found. Build it with: make all"
-    )
+    raise FileNotFoundError("muninn extension not found. Build it with: make all")
 
 
 def load(conn: sqlite3.Connection) -> None:

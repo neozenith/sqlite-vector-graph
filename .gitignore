@@ -25,9 +25,20 @@ build/
 sqlite_muninn/muninn.*
 !sqlite_muninn/__init__.py
 
+# Coverage (C, Python)
+*.gcda
+*.gcno
+*.gcov
+htmlcov/
+.coverage
+coverage.xml
+coverage/
+
 # Node.js
 node_modules/
 package-lock.json
+npm/dist/
+npm/node_modules/
 
 # Documentation
 site/
@@ -49,4 +60,3 @@ benchmarks/texts/
 CLAUDE.md
 tmp/
 docs/logo/
-

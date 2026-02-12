@@ -40,16 +40,16 @@ static double n2v_rand(unsigned int *state) {
 /* ─── Adjacency List ─────────────────────────────────────────── */
 
 typedef struct {
-    int *neighbors;   /* indices into the global node array */
+    int *neighbors; /* indices into the global node array */
     int count;
     int capacity;
 } AdjList;
 
 typedef struct {
-    char **node_ids;   /* string IDs, owned */
+    char **node_ids; /* string IDs, owned */
     int node_count;
     int node_capacity;
-    AdjList *adj;      /* adj[i] = neighbors of node i */
+    AdjList *adj; /* adj[i] = neighbors of node i */
 } Graph;
 
 static void graph_init(Graph *g) {
@@ -72,7 +72,8 @@ static void graph_destroy(Graph *g) {
 static int graph_node_index(Graph *g, const char *id) {
     /* Linear scan — fine for graphs up to ~10K nodes */
     for (int i = 0; i < g->node_count; i++) {
-        if (strcmp(g->node_ids[i], id) == 0) return i;
+        if (strcmp(g->node_ids[i], id) == 0)
+            return i;
     }
     /* Insert new node */
     if (g->node_count >= g->node_capacity) {
@@ -96,7 +97,8 @@ static void graph_add_edge(Graph *g, int src_idx, int dst_idx) {
     AdjList *a = &g->adj[src_idx];
     /* Check for duplicate */
     for (int i = 0; i < a->count; i++) {
-        if (a->neighbors[i] == dst_idx) return;
+        if (a->neighbors[i] == dst_idx)
+            return;
     }
     if (a->count >= a->capacity) {
         int new_cap = a->capacity == 0 ? 8 : a->capacity * 2;
@@ -107,23 +109,22 @@ static void graph_add_edge(Graph *g, int src_idx, int dst_idx) {
 }
 
 /* Load edges from SQLite table into Graph */
-static int graph_load_edges(sqlite3 *db, Graph *g,
-                             const char *edge_table,
-                             const char *src_col,
-                             const char *dst_col) {
-    char *sql = sqlite3_mprintf("SELECT \"%w\", \"%w\" FROM \"%w\"",
-                                 src_col, dst_col, edge_table);
-    if (!sql) return SQLITE_NOMEM;
+static int graph_load_edges(sqlite3 *db, Graph *g, const char *edge_table, const char *src_col, const char *dst_col) {
+    char *sql = sqlite3_mprintf("SELECT \"%w\", \"%w\" FROM \"%w\"", src_col, dst_col, edge_table);
+    if (!sql)
+        return SQLITE_NOMEM;
 
     sqlite3_stmt *stmt = NULL;
     int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
     sqlite3_free(sql);
-    if (rc != SQLITE_OK) return rc;
+    if (rc != SQLITE_OK)
+        return rc;
 
     while (sqlite3_step(stmt) == SQLITE_ROW) {
         const char *src = (const char *)sqlite3_column_text(stmt, 0);
         const char *dst = (const char *)sqlite3_column_text(stmt, 1);
-        if (!src || !dst) continue;
+        if (!src || !dst)
+            continue;
 
         int si = graph_node_index(g, src);
         int di = graph_node_index(g, dst);
@@ -153,7 +154,8 @@ static int graph_load_edges(sqlite3 *db, Graph *g,
 static int is_neighbor(const Graph *g, int node, int target) {
     const AdjList *a = &g->adj[node];
     for (int i = 0; i < a->count; i++) {
-        if (a->neighbors[i] == target) return 1;
+        if (a->neighbors[i] == target)
+            return 1;
     }
     return 0;
 }
@@ -163,17 +165,16 @@ static int is_neighbor(const Graph *g, int node, int target) {
  * walk: output array of size walk_length (caller allocates).
  * Returns actual walk length (may be < walk_length if node has no neighbors).
  */
-static int biased_walk(const Graph *g, int start_node,
-                        double p, double q,
-                        int walk_length,
-                        int *walk,
-                        unsigned int *rng) {
+static int biased_walk(const Graph *g, int start_node, double p, double q, int walk_length, int *walk,
+                       unsigned int *rng) {
     walk[0] = start_node;
-    if (g->adj[start_node].count == 0) return 1;
+    if (g->adj[start_node].count == 0)
+        return 1;
 
     /* First step: uniform random */
     int idx = (int)(n2v_rand(rng) * g->adj[start_node].count);
-    if (idx >= g->adj[start_node].count) idx = g->adj[start_node].count - 1;
+    if (idx >= g->adj[start_node].count)
+        idx = g->adj[start_node].count - 1;
     walk[1] = g->adj[start_node].neighbors[idx];
 
     for (int step = 2; step < walk_length; step++) {
@@ -181,7 +182,8 @@ static int biased_walk(const Graph *g, int start_node,
         int prev = walk[step - 2];
         const AdjList *cur_adj = &g->adj[cur];
 
-        if (cur_adj->count == 0) return step;
+        if (cur_adj->count == 0)
+            return step;
 
         /* Compute unnormalized transition weights */
         double total_weight = 0.0;
@@ -189,11 +191,11 @@ static int biased_walk(const Graph *g, int start_node,
             int x = cur_adj->neighbors[i];
             double w;
             if (x == prev) {
-                w = 1.0 / p;       /* return */
+                w = 1.0 / p; /* return */
             } else if (is_neighbor(g, prev, x)) {
-                w = 1.0;           /* stay local */
+                w = 1.0; /* stay local */
             } else {
-                w = 1.0 / q;       /* explore */
+                w = 1.0 / q; /* explore */
             }
             total_weight += w;
         }
@@ -201,7 +203,7 @@ static int biased_walk(const Graph *g, int start_node,
         /* Sample proportional to weights */
         double r = n2v_rand(rng) * total_weight;
         double cumulative = 0.0;
-        int chosen = cur_adj->neighbors[0];  /* fallback */
+        int chosen = cur_adj->neighbors[0]; /* fallback */
         for (int i = 0; i < cur_adj->count; i++) {
             int x = cur_adj->neighbors[i];
             double w;
@@ -246,7 +248,8 @@ static float sigmoid_table[SIGMOID_TABLE_SIZE + 1];
 static int sigmoid_table_initialized = 0;
 
 static void init_sigmoid_table(void) {
-    if (sigmoid_table_initialized) return;
+    if (sigmoid_table_initialized)
+        return;
     for (int i = 0; i <= SIGMOID_TABLE_SIZE; i++) {
         float x = (float)i / (float)SIGMOID_TABLE_SIZE * 2.0f * MAX_SIGMOID - MAX_SIGMOID;
         sigmoid_table[i] = 1.0f / (1.0f + expf(-x));
@@ -255,11 +258,15 @@ static void init_sigmoid_table(void) {
 }
 
 static float fast_sigmoid(float x) {
-    if (x >= MAX_SIGMOID) return 1.0f;
-    if (x <= -MAX_SIGMOID) return 0.0f;
+    if (x >= MAX_SIGMOID)
+        return 1.0f;
+    if (x <= -MAX_SIGMOID)
+        return 0.0f;
     int idx = (int)((x + MAX_SIGMOID) / (2.0f * MAX_SIGMOID) * SIGMOID_TABLE_SIZE);
-    if (idx < 0) idx = 0;
-    if (idx > SIGMOID_TABLE_SIZE) idx = SIGMOID_TABLE_SIZE;
+    if (idx < 0)
+        idx = 0;
+    if (idx > SIGMOID_TABLE_SIZE)
+        idx = SIGMOID_TABLE_SIZE;
     return sigmoid_table[idx];
 }
 
@@ -267,11 +274,11 @@ static float fast_sigmoid(float x) {
 #define NEG_TABLE_SIZE 100000
 
 typedef struct {
-    float *syn0;       /* input embeddings: N * dim */
-    float *syn1neg;    /* output embeddings: N * dim */
-    int *neg_table;    /* negative sampling distribution */
-    int N;             /* number of nodes */
-    int dim;           /* embedding dimension */
+    float *syn0;    /* input embeddings: N * dim */
+    float *syn1neg; /* output embeddings: N * dim */
+    int *neg_table; /* negative sampling distribution */
+    int N;          /* number of nodes */
+    int dim;        /* embedding dimension */
 } SgnsModel;
 
 static void build_neg_table(SgnsModel *model, const Graph *g) {
@@ -295,10 +302,10 @@ static void build_neg_table(SgnsModel *model, const Graph *g) {
     }
 }
 
-static SgnsModel *sgns_create(int N, int dim, const Graph *g,
-                               unsigned int *rng) {
+static SgnsModel *sgns_create(int N, int dim, const Graph *g, unsigned int *rng) {
     SgnsModel *m = (SgnsModel *)calloc(1, sizeof(SgnsModel));
-    if (!m) return NULL;
+    if (!m)
+        return NULL;
     m->N = N;
     m->dim = dim;
 
@@ -306,7 +313,10 @@ static SgnsModel *sgns_create(int N, int dim, const Graph *g,
     m->syn1neg = (float *)calloc((size_t)N * (size_t)dim, sizeof(float));
     m->neg_table = (int *)malloc(NEG_TABLE_SIZE * sizeof(int));
     if (!m->syn0 || !m->syn1neg || !m->neg_table) {
-        free(m->syn0); free(m->syn1neg); free(m->neg_table); free(m);
+        free(m->syn0);
+        free(m->syn1neg);
+        free(m->neg_table);
+        free(m);
         return NULL;
     }
 
@@ -320,7 +330,8 @@ static SgnsModel *sgns_create(int N, int dim, const Graph *g,
 }
 
 static void sgns_destroy(SgnsModel *m) {
-    if (!m) return;
+    if (!m)
+        return;
     free(m->syn0);
     free(m->syn1neg);
     free(m->neg_table);
@@ -331,12 +342,11 @@ static void sgns_destroy(SgnsModel *m) {
  * Train one (center, context) pair with negative sampling.
  * Updates syn0[center] and syn1neg[context + negative samples].
  */
-static void sgns_train_pair(SgnsModel *m, int center, int context,
-                             int neg_samples, float lr,
-                             unsigned int *rng) {
+static void sgns_train_pair(SgnsModel *m, int center, int context, int neg_samples, float lr, unsigned int *rng) {
     float *vec_center = m->syn0 + (size_t)center * (size_t)m->dim;
-    float *neu1e = (float *)calloc((size_t)m->dim, sizeof(float));  /* gradient accumulator */
-    if (!neu1e) return;
+    float *neu1e = (float *)calloc((size_t)m->dim, sizeof(float)); /* gradient accumulator */
+    if (!neu1e)
+        return;
 
     for (int s = 0; s <= neg_samples; s++) {
         int target;
@@ -349,7 +359,8 @@ static void sgns_train_pair(SgnsModel *m, int center, int context,
         } else {
             /* Negative sample */
             target = m->neg_table[n2v_xorshift32(rng) % NEG_TABLE_SIZE];
-            if (target == center || target == context) continue;
+            if (target == center || target == context)
+                continue;
             label = 0.0f;
         }
 
@@ -391,8 +402,7 @@ static void sgns_train_pair(SgnsModel *m, int center, int context,
  *
  * Returns: number of nodes embedded (INTEGER)
  */
-static void node2vec_train_func(sqlite3_context *ctx,
-                                 int argc, sqlite3_value **argv) {
+static void node2vec_train_func(sqlite3_context *ctx, int argc, sqlite3_value **argv) {
     if (argc < 13) {
         sqlite3_result_error(ctx, "node2vec_train: requires 13 arguments", -1);
         return;
@@ -400,18 +410,18 @@ static void node2vec_train_func(sqlite3_context *ctx,
 
     /* Parse arguments */
     const char *edge_table = (const char *)sqlite3_value_text(argv[0]);
-    const char *src_col    = (const char *)sqlite3_value_text(argv[1]);
-    const char *dst_col    = (const char *)sqlite3_value_text(argv[2]);
-    const char *out_table  = (const char *)sqlite3_value_text(argv[3]);
-    int dim         = sqlite3_value_int(argv[4]);
-    double p        = sqlite3_value_double(argv[5]);
-    double q        = sqlite3_value_double(argv[6]);
-    int num_walks   = sqlite3_value_int(argv[7]);
+    const char *src_col = (const char *)sqlite3_value_text(argv[1]);
+    const char *dst_col = (const char *)sqlite3_value_text(argv[2]);
+    const char *out_table = (const char *)sqlite3_value_text(argv[3]);
+    int dim = sqlite3_value_int(argv[4]);
+    double p = sqlite3_value_double(argv[5]);
+    double q = sqlite3_value_double(argv[6]);
+    int num_walks = sqlite3_value_int(argv[7]);
     int walk_length = sqlite3_value_int(argv[8]);
-    int window      = sqlite3_value_int(argv[9]);
+    int window = sqlite3_value_int(argv[9]);
     int neg_samples = sqlite3_value_int(argv[10]);
-    double lr_init  = sqlite3_value_double(argv[11]);
-    int epochs      = sqlite3_value_int(argv[12]);
+    double lr_init = sqlite3_value_double(argv[11]);
+    int epochs = sqlite3_value_int(argv[12]);
 
     /* Validate identifiers (id_validate returns 0 on success) */
     if (!edge_table || id_validate(edge_table) != 0) {
@@ -498,7 +508,8 @@ static void node2vec_train_func(sqlite3_context *ctx,
             for (int n = 0; n < g.node_count; n++) {
                 /* Learning rate decay */
                 float lr = (float)(lr_init * (1.0 - (double)word_count / (double)total_words));
-                if (lr < (float)(lr_init * 0.0001)) lr = (float)(lr_init * 0.0001);
+                if (lr < (float)(lr_init * 0.0001))
+                    lr = (float)(lr_init * 0.0001);
 
                 int wlen = biased_walk(&g, n, p, q, walk_length, walk, &rng);
 
@@ -507,13 +518,15 @@ static void node2vec_train_func(sqlite3_context *ctx,
                     int center = walk[pos];
                     int ctx_start = pos - window;
                     int ctx_end = pos + window;
-                    if (ctx_start < 0) ctx_start = 0;
-                    if (ctx_end >= wlen) ctx_end = wlen - 1;
+                    if (ctx_start < 0)
+                        ctx_start = 0;
+                    if (ctx_end >= wlen)
+                        ctx_end = wlen - 1;
 
                     for (int c = ctx_start; c <= ctx_end; c++) {
-                        if (c == pos) continue;
-                        sgns_train_pair(model, center, walk[c],
-                                        neg_samples, lr, &rng);
+                        if (c == pos)
+                            continue;
+                        sgns_train_pair(model, center, walk[c], neg_samples, lr, &rng);
                     }
                     word_count++;
                 }
@@ -524,8 +537,7 @@ static void node2vec_train_func(sqlite3_context *ctx,
     free(walk);
 
     /* Step 4: Insert embeddings into the output HNSW table */
-    char *insert_sql = sqlite3_mprintf(
-        "INSERT INTO \"%w\" (rowid, vector) VALUES (?, ?)", out_table);
+    char *insert_sql = sqlite3_mprintf("INSERT INTO \"%w\" (rowid, vector) VALUES (?, ?)", out_table);
     if (!insert_sql) {
         sgns_destroy(model);
         graph_destroy(&g);
@@ -539,8 +551,10 @@ static void node2vec_train_func(sqlite3_context *ctx,
     if (rc != SQLITE_OK) {
         sgns_destroy(model);
         graph_destroy(&g);
-        sqlite3_result_error(ctx, "node2vec_train: failed to prepare INSERT "
-                                   "for output table (does it exist?)", -1);
+        sqlite3_result_error(ctx,
+                             "node2vec_train: failed to prepare INSERT "
+                             "for output table (does it exist?)",
+                             -1);
         return;
     }
 
@@ -550,15 +564,16 @@ static void node2vec_train_func(sqlite3_context *ctx,
 
         /* L2-normalize the embedding for cosine similarity */
         float norm = 0.0f;
-        for (int d = 0; d < dim; d++) norm += emb[d] * emb[d];
+        for (int d = 0; d < dim; d++)
+            norm += emb[d] * emb[d];
         norm = sqrtf(norm);
         if (norm > 1e-10f) {
-            for (int d = 0; d < dim; d++) emb[d] /= norm;
+            for (int d = 0; d < dim; d++)
+                emb[d] /= norm;
         }
 
         sqlite3_bind_int64(insert_stmt, 1, (sqlite3_int64)(i + 1));
-        sqlite3_bind_blob(insert_stmt, 2, emb,
-                          dim * (int)sizeof(float), SQLITE_TRANSIENT);
+        sqlite3_bind_blob(insert_stmt, 2, emb, dim * (int)sizeof(float), SQLITE_TRANSIENT);
 
         rc = sqlite3_step(insert_stmt);
         if (rc == SQLITE_DONE) {
@@ -577,11 +592,6 @@ static void node2vec_train_func(sqlite3_context *ctx,
 /* ─── Registration ───────────────────────────────────────────── */
 
 int node2vec_register_functions(sqlite3 *db) {
-    return sqlite3_create_function(
-        db, "node2vec_train", 13,
-        SQLITE_UTF8 | SQLITE_DETERMINISTIC,
-        NULL,
-        node2vec_train_func,
-        NULL, NULL
-    );
+    return sqlite3_create_function(db, "node2vec_train", 13, SQLITE_UTF8 | SQLITE_DETERMINISTIC, NULL,
+                                   node2vec_train_func, NULL, NULL);
 }

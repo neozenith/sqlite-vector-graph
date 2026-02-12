@@ -46,15 +46,15 @@ typedef struct {
 } HnswCursor;
 
 /* Column indices */
-#define COL_VECTOR    0
-#define COL_DISTANCE  1
-#define COL_K         2
+#define COL_VECTOR 0
+#define COL_DISTANCE 1
+#define COL_K 2
 #define COL_EF_SEARCH 3
 
 /* xBestIndex plan IDs */
-#define PLAN_SCAN     0
-#define PLAN_KNN      1
-#define PLAN_POINT    2
+#define PLAN_SCAN 0
+#define PLAN_KNN 1
+#define PLAN_POINT 2
 
 /* ─── Argument Parsing ─────────────────────────────────────── */
 
@@ -96,13 +96,15 @@ static int parse_params(int argc, const char *const *argv, HnswParams *params, c
             int len = (int)strlen(val);
             if (len >= 2 && (val[0] == '\'' || val[0] == '"')) {
                 len -= 2;
-                if (len >= (int)sizeof(metric_buf)) len = (int)sizeof(metric_buf) - 1;
+                if (len >= (int)sizeof(metric_buf))
+                    len = (int)sizeof(metric_buf) - 1;
                 memcpy(metric_buf, val + 1, (size_t)len);
                 metric_buf[len] = '\0';
                 val = metric_buf;
             }
             if (vec_parse_metric(val, &params->metric) != 0) {
-                *errmsg = sqlite3_mprintf("hnsw_index: unknown metric '%s' (use 'l2', 'cosine', or 'inner_product')", val);
+                *errmsg =
+                    sqlite3_mprintf("hnsw_index: unknown metric '%s' (use 'l2', 'cosine', or 'inner_product')", val);
                 return SQLITE_ERROR;
             }
         } else if (strncmp(arg, "m=", 2) == 0) {
@@ -138,70 +140,65 @@ static int create_shadow_tables(sqlite3 *db, const char *name) {
     int rc;
 
     /* Config table */
-    sql = sqlite3_mprintf(
-        "CREATE TABLE IF NOT EXISTS \"%w_config\" (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
-        name);
+    sql = sqlite3_mprintf("CREATE TABLE IF NOT EXISTS \"%w_config\" (key TEXT PRIMARY KEY, value TEXT NOT NULL)", name);
     rc = sqlite3_exec(db, sql, NULL, NULL, NULL);
     sqlite3_free(sql);
-    if (rc != SQLITE_OK) return rc;
+    if (rc != SQLITE_OK)
+        return rc;
 
     /* Nodes table */
-    sql = sqlite3_mprintf(
-        "CREATE TABLE IF NOT EXISTS \"%w_nodes\" ("
-        "  id INTEGER PRIMARY KEY,"
-        "  vector BLOB NOT NULL,"
-        "  level INTEGER NOT NULL,"
-        "  deleted INTEGER NOT NULL DEFAULT 0"
-        ")", name);
+    sql = sqlite3_mprintf("CREATE TABLE IF NOT EXISTS \"%w_nodes\" ("
+                          "  id INTEGER PRIMARY KEY,"
+                          "  vector BLOB NOT NULL,"
+                          "  level INTEGER NOT NULL,"
+                          "  deleted INTEGER NOT NULL DEFAULT 0"
+                          ")",
+                          name);
     rc = sqlite3_exec(db, sql, NULL, NULL, NULL);
     sqlite3_free(sql);
-    if (rc != SQLITE_OK) return rc;
+    if (rc != SQLITE_OK)
+        return rc;
 
     /* Edges table */
-    sql = sqlite3_mprintf(
-        "CREATE TABLE IF NOT EXISTS \"%w_edges\" ("
-        "  source_id INTEGER NOT NULL,"
-        "  target_id INTEGER NOT NULL,"
-        "  level INTEGER NOT NULL,"
-        "  distance REAL NOT NULL,"
-        "  PRIMARY KEY (source_id, level, target_id)"
-        ") WITHOUT ROWID", name);
+    sql = sqlite3_mprintf("CREATE TABLE IF NOT EXISTS \"%w_edges\" ("
+                          "  source_id INTEGER NOT NULL,"
+                          "  target_id INTEGER NOT NULL,"
+                          "  level INTEGER NOT NULL,"
+                          "  distance REAL NOT NULL,"
+                          "  PRIMARY KEY (source_id, level, target_id)"
+                          ") WITHOUT ROWID",
+                          name);
     rc = sqlite3_exec(db, sql, NULL, NULL, NULL);
     sqlite3_free(sql);
-    if (rc != SQLITE_OK) return rc;
+    if (rc != SQLITE_OK)
+        return rc;
 
     /* Reverse index for edge lookups */
-    sql = sqlite3_mprintf(
-        "CREATE INDEX IF NOT EXISTS \"%w_edges_rev\" ON \"%w_edges\"(target_id, level)",
-        name, name);
+    sql = sqlite3_mprintf("CREATE INDEX IF NOT EXISTS \"%w_edges_rev\" ON \"%w_edges\"(target_id, level)", name, name);
     rc = sqlite3_exec(db, sql, NULL, NULL, NULL);
     sqlite3_free(sql);
     return rc;
 }
 
-static int save_config(sqlite3 *db, const char *name, const HnswParams *params,
-                       int64_t entry_point, int max_level) {
+static int save_config(sqlite3 *db, const char *name, const HnswParams *params, int64_t entry_point, int max_level) {
     char *sql;
     int rc;
 
-    sql = sqlite3_mprintf(
-        "INSERT OR REPLACE INTO \"%w_config\" (key, value) VALUES"
-        " ('dimensions', '%d'),"
-        " ('metric', '%d'),"
-        " ('m', '%d'),"
-        " ('ef_construction', '%d'),"
-        " ('entry_point', '%lld'),"
-        " ('max_level', '%d')",
-        name, params->dimensions, (int)params->metric,
-        params->m, params->ef_construction,
-        (long long)entry_point, max_level);
+    sql = sqlite3_mprintf("INSERT OR REPLACE INTO \"%w_config\" (key, value) VALUES"
+                          " ('dimensions', '%d'),"
+                          " ('metric', '%d'),"
+                          " ('m', '%d'),"
+                          " ('ef_construction', '%d'),"
+                          " ('entry_point', '%lld'),"
+                          " ('max_level', '%d')",
+                          name, params->dimensions, (int)params->metric, params->m, params->ef_construction,
+                          (long long)entry_point, max_level);
     rc = sqlite3_exec(db, sql, NULL, NULL, NULL);
     sqlite3_free(sql);
     return rc;
 }
 
-static int load_config(sqlite3 *db, const char *name, HnswParams *params,
-                       int64_t *entry_point, int *max_level) {
+static int load_config(sqlite3 *db, const char *name, HnswParams *params, int64_t *entry_point, int *max_level) {
     sqlite3_stmt *stmt;
     char *sql;
     int rc;
@@ -213,17 +210,24 @@ static int load_config(sqlite3 *db, const char *name, HnswParams *params,
     sql = sqlite3_mprintf("SELECT key, value FROM \"%w_config\"", name);
     rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
     sqlite3_free(sql);
-    if (rc != SQLITE_OK) return rc;
+    if (rc != SQLITE_OK)
+        return rc;
 
     while (sqlite3_step(stmt) == SQLITE_ROW) {
         const char *key = (const char *)sqlite3_column_text(stmt, 0);
         const char *val = (const char *)sqlite3_column_text(stmt, 1);
-        if (strcmp(key, "dimensions") == 0) params->dimensions = atoi(val);
-        else if (strcmp(key, "metric") == 0) params->metric = (VecMetric)atoi(val);
-        else if (strcmp(key, "m") == 0) params->m = atoi(val);
-        else if (strcmp(key, "ef_construction") == 0) params->ef_construction = atoi(val);
-        else if (strcmp(key, "entry_point") == 0) *entry_point = atoll(val);
-        else if (strcmp(key, "max_level") == 0) *max_level = atoi(val);
+        if (strcmp(key, "dimensions") == 0)
+            params->dimensions = atoi(val);
+        else if (strcmp(key, "metric") == 0)
+            params->metric = (VecMetric)atoi(val);
+        else if (strcmp(key, "m") == 0)
+            params->m = atoi(val);
+        else if (strcmp(key, "ef_construction") == 0)
+            params->ef_construction = atoi(val);
+        else if (strcmp(key, "entry_point") == 0)
+            *entry_point = atoll(val);
+        else if (strcmp(key, "max_level") == 0)
+            *max_level = atoi(val);
     }
     sqlite3_finalize(stmt);
     return SQLITE_OK;
@@ -236,12 +240,11 @@ static int persist_node(sqlite3 *db, const char *name, HnswIndex *index, HnswNod
     int rc;
 
     /* Upsert node */
-    sql = sqlite3_mprintf(
-        "INSERT OR REPLACE INTO \"%w_nodes\" (id, vector, level, deleted) VALUES (?, ?, ?, ?)",
-        name);
+    sql = sqlite3_mprintf("INSERT OR REPLACE INTO \"%w_nodes\" (id, vector, level, deleted) VALUES (?, ?, ?, ?)", name);
     rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
     sqlite3_free(sql);
-    if (rc != SQLITE_OK) return rc;
+    if (rc != SQLITE_OK)
+        return rc;
 
     sqlite3_bind_int64(stmt, 1, node->id);
     sqlite3_bind_blob(stmt, 2, node->vector, index->dim * (int)sizeof(float), SQLITE_STATIC);
@@ -249,20 +252,19 @@ static int persist_node(sqlite3 *db, const char *name, HnswIndex *index, HnswNod
     sqlite3_bind_int(stmt, 4, node->deleted);
     rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
-    if (rc != SQLITE_DONE) return SQLITE_ERROR;
+    if (rc != SQLITE_DONE)
+        return SQLITE_ERROR;
 
     /* Delete old edges for this node, then insert current */
-    sql = sqlite3_mprintf("DELETE FROM \"%w_edges\" WHERE source_id = %lld",
-                          name, (long long)node->id);
+    sql = sqlite3_mprintf("DELETE FROM \"%w_edges\" WHERE source_id = %lld", name, (long long)node->id);
     sqlite3_exec(db, sql, NULL, NULL, NULL);
     sqlite3_free(sql);
 
-    sql = sqlite3_mprintf(
-        "INSERT INTO \"%w_edges\" (source_id, target_id, level, distance) VALUES (?, ?, ?, ?)",
-        name);
+    sql = sqlite3_mprintf("INSERT INTO \"%w_edges\" (source_id, target_id, level, distance) VALUES (?, ?, ?, ?)", name);
     rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
     sqlite3_free(sql);
-    if (rc != SQLITE_OK) return rc;
+    if (rc != SQLITE_OK)
+        return rc;
 
     for (int l = 0; l <= node->level; l++) {
         for (int i = 0; i < node->neighbor_count[l]; i++) {
@@ -290,7 +292,8 @@ static int load_index_from_shadow(sqlite3 *db, const char *name, HnswIndex *inde
     sql = sqlite3_mprintf("SELECT id, vector, level, deleted FROM \"%w_nodes\"", name);
     rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
     sqlite3_free(sql);
-    if (rc != SQLITE_OK) return rc;
+    if (rc != SQLITE_OK)
+        return rc;
 
     while (sqlite3_step(stmt) == SQLITE_ROW) {
         int64_t id = sqlite3_column_int64(stmt, 0);
@@ -304,10 +307,14 @@ static int load_index_from_shadow(sqlite3 *db, const char *name, HnswIndex *inde
         }
 
         HnswNode *node = node_create(id, vec, index->dim, level);
-        if (!node) { sqlite3_finalize(stmt); return SQLITE_NOMEM; }
+        if (!node) {
+            sqlite3_finalize(stmt);
+            return SQLITE_NOMEM;
+        }
         node->deleted = deleted;
         ht_insert(index->nodes, index->node_capacity, node);
-        if (!deleted) index->node_count++;
+        if (!deleted)
+            index->node_count++;
     }
     sqlite3_finalize(stmt);
 
@@ -315,7 +322,8 @@ static int load_index_from_shadow(sqlite3 *db, const char *name, HnswIndex *inde
     sql = sqlite3_mprintf("SELECT source_id, target_id, level FROM \"%w_edges\"", name);
     rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
     sqlite3_free(sql);
-    if (rc != SQLITE_OK) return rc;
+    if (rc != SQLITE_OK)
+        return rc;
 
     while (sqlite3_step(stmt) == SQLITE_ROW) {
         int64_t src = sqlite3_column_int64(stmt, 0);
@@ -346,18 +354,19 @@ static int load_index_from_shadow(sqlite3 *db, const char *name, HnswIndex *inde
 
 /* ─── Virtual Table Methods ────────────────────────────────── */
 
-static int hnsw_vtab_create(sqlite3 *db, void *pAux, int argc,
-                             const char *const *argv,
-                             sqlite3_vtab **ppVTab, char **pzErr) {
+static int hnsw_vtab_create(sqlite3 *db, void *pAux, int argc, const char *const *argv, sqlite3_vtab **ppVTab,
+                            char **pzErr) {
     (void)pAux;
     HnswParams params;
     int rc = parse_params(argc, argv, &params, pzErr);
-    if (rc != SQLITE_OK) return rc;
+    if (rc != SQLITE_OK)
+        return rc;
 
     /* Declare the virtual table schema */
     rc = sqlite3_declare_vtab(db,
-        "CREATE TABLE x(vector BLOB, distance REAL, k INTEGER HIDDEN, ef_search INTEGER HIDDEN)");
-    if (rc != SQLITE_OK) return rc;
+                              "CREATE TABLE x(vector BLOB, distance REAL, k INTEGER HIDDEN, ef_search INTEGER HIDDEN)");
+    if (rc != SQLITE_OK)
+        return rc;
 
     /* Create shadow tables */
     rc = create_shadow_tables(db, argv[2]);
@@ -367,8 +376,7 @@ static int hnsw_vtab_create(sqlite3 *db, void *pAux, int argc,
     }
 
     /* Create the HNSW index */
-    HnswIndex *index = hnsw_create(params.dimensions, params.metric,
-                                    params.m, params.ef_construction);
+    HnswIndex *index = hnsw_create(params.dimensions, params.metric, params.m, params.ef_construction);
     if (!index) {
         *pzErr = sqlite3_mprintf("hnsw_index: failed to allocate index");
         return SQLITE_NOMEM;
@@ -379,7 +387,10 @@ static int hnsw_vtab_create(sqlite3 *db, void *pAux, int argc,
 
     /* Allocate vtab */
     HnswVtab *vtab = (HnswVtab *)sqlite3_malloc(sizeof(HnswVtab));
-    if (!vtab) { hnsw_destroy(index); return SQLITE_NOMEM; }
+    if (!vtab) {
+        hnsw_destroy(index);
+        return SQLITE_NOMEM;
+    }
     memset(vtab, 0, sizeof(HnswVtab));
 
     vtab->db = db;
@@ -391,9 +402,8 @@ static int hnsw_vtab_create(sqlite3 *db, void *pAux, int argc,
     return SQLITE_OK;
 }
 
-static int hnsw_vtab_connect(sqlite3 *db, void *pAux, int argc,
-                              const char *const *argv,
-                              sqlite3_vtab **ppVTab, char **pzErr) {
+static int hnsw_vtab_connect(sqlite3 *db, void *pAux, int argc, const char *const *argv, sqlite3_vtab **ppVTab,
+                             char **pzErr) {
     (void)pAux;
     (void)argc;
     /* Load existing index from shadow tables */
@@ -413,11 +423,11 @@ static int hnsw_vtab_connect(sqlite3 *db, void *pAux, int argc,
     }
 
     rc = sqlite3_declare_vtab(db,
-        "CREATE TABLE x(vector BLOB, distance REAL, k INTEGER HIDDEN, ef_search INTEGER HIDDEN)");
-    if (rc != SQLITE_OK) return rc;
+                              "CREATE TABLE x(vector BLOB, distance REAL, k INTEGER HIDDEN, ef_search INTEGER HIDDEN)");
+    if (rc != SQLITE_OK)
+        return rc;
 
-    HnswIndex *index = hnsw_create(params.dimensions, params.metric,
-                                    params.m, params.ef_construction);
+    HnswIndex *index = hnsw_create(params.dimensions, params.metric, params.m, params.ef_construction);
     if (!index) {
         *pzErr = sqlite3_mprintf("hnsw_index: failed to allocate index");
         return SQLITE_NOMEM;
@@ -436,7 +446,10 @@ static int hnsw_vtab_connect(sqlite3 *db, void *pAux, int argc,
     }
 
     HnswVtab *vtab = (HnswVtab *)sqlite3_malloc(sizeof(HnswVtab));
-    if (!vtab) { hnsw_destroy(index); return SQLITE_NOMEM; }
+    if (!vtab) {
+        hnsw_destroy(index);
+        return SQLITE_NOMEM;
+    }
     memset(vtab, 0, sizeof(HnswVtab));
 
     vtab->db = db;
@@ -488,7 +501,8 @@ static int hnsw_vtab_best_index(sqlite3_vtab *pVTab, sqlite3_index_info *pInfo) 
     int arg_idx = 1;
 
     for (int i = 0; i < pInfo->nConstraint; i++) {
-        if (!pInfo->aConstraint[i].usable) continue;
+        if (!pInfo->aConstraint[i].usable)
+            continue;
 
         int col = pInfo->aConstraint[i].iColumn;
         int op = pInfo->aConstraint[i].op;
@@ -539,7 +553,8 @@ static int hnsw_vtab_best_index(sqlite3_vtab *pVTab, sqlite3_index_info *pInfo) 
 
 static int hnsw_vtab_open(sqlite3_vtab *pVTab, sqlite3_vtab_cursor **ppCursor) {
     HnswCursor *cur = (HnswCursor *)sqlite3_malloc(sizeof(HnswCursor));
-    if (!cur) return SQLITE_NOMEM;
+    if (!cur)
+        return SQLITE_NOMEM;
     memset(cur, 0, sizeof(HnswCursor));
     cur->vtab = (HnswVtab *)pVTab;
     cur->eof = 1;
@@ -554,8 +569,8 @@ static int hnsw_vtab_close(sqlite3_vtab_cursor *pCursor) {
     return SQLITE_OK;
 }
 
-static int hnsw_vtab_filter(sqlite3_vtab_cursor *pCursor, int idxNum,
-                             const char *idxStr, int argc, sqlite3_value **argv) {
+static int hnsw_vtab_filter(sqlite3_vtab_cursor *pCursor, int idxNum, const char *idxStr, int argc,
+                            sqlite3_value **argv) {
     (void)idxStr;
     HnswCursor *cur = (HnswCursor *)pCursor;
     HnswVtab *vtab = cur->vtab;
@@ -577,14 +592,14 @@ static int hnsw_vtab_filter(sqlite3_vtab_cursor *pCursor, int idxNum,
 
         int expected_bytes = vtab->dim * (int)sizeof(float);
         if (query_bytes != expected_bytes) {
-            vtab->base.zErrMsg = sqlite3_mprintf(
-                "hnsw_index: expected %d-dim vector (%d bytes), got %d bytes",
-                vtab->dim, expected_bytes, query_bytes);
+            vtab->base.zErrMsg = sqlite3_mprintf("hnsw_index: expected %d-dim vector (%d bytes), got %d bytes",
+                                                 vtab->dim, expected_bytes, query_bytes);
             return SQLITE_ERROR;
         }
 
         cur->results = (HnswSearchResult *)malloc((size_t)k * sizeof(HnswSearchResult));
-        if (!cur->results) return SQLITE_NOMEM;
+        if (!cur->results)
+            return SQLITE_NOMEM;
 
         cur->result_count = hnsw_search(vtab->index, query, k, ef_search, cur->results);
         cur->current = 0;
@@ -610,7 +625,8 @@ static int hnsw_vtab_next(sqlite3_vtab_cursor *pCursor) {
         cur->eof = 1;
     } else {
         cur->current++;
-        if (cur->current >= cur->result_count) cur->eof = 1;
+        if (cur->current >= cur->result_count)
+            cur->eof = 1;
     }
     return SQLITE_OK;
 }
@@ -641,34 +657,33 @@ static int hnsw_vtab_column(sqlite3_vtab_cursor *pCursor, sqlite3_context *ctx, 
     }
 
     switch (col) {
-        case COL_VECTOR: {
-            const float *vec = hnsw_get_vector(vtab->index, id);
-            if (vec) {
-                sqlite3_result_blob(ctx, vec, vtab->dim * (int)sizeof(float), SQLITE_TRANSIENT);
-            } else {
-                sqlite3_result_null(ctx);
-            }
-            break;
-        }
-        case COL_DISTANCE:
-            if (cur->is_point_lookup) {
-                sqlite3_result_double(ctx, 0.0);
-            } else {
-                sqlite3_result_double(ctx, (double)cur->results[cur->current].distance);
-            }
-            break;
-        case COL_K:
-        case COL_EF_SEARCH:
+    case COL_VECTOR: {
+        const float *vec = hnsw_get_vector(vtab->index, id);
+        if (vec) {
+            sqlite3_result_blob(ctx, vec, vtab->dim * (int)sizeof(float), SQLITE_TRANSIENT);
+        } else {
             sqlite3_result_null(ctx);
-            break;
+        }
+        break;
+    }
+    case COL_DISTANCE:
+        if (cur->is_point_lookup) {
+            sqlite3_result_double(ctx, 0.0);
+        } else {
+            sqlite3_result_double(ctx, (double)cur->results[cur->current].distance);
+        }
+        break;
+    case COL_K:
+    case COL_EF_SEARCH:
+        sqlite3_result_null(ctx);
+        break;
     }
     return SQLITE_OK;
 }
 
 /* ─── xUpdate (INSERT / DELETE) ────────────────────────────── */
 
-static int hnsw_vtab_update(sqlite3_vtab *pVTab, int argc, sqlite3_value **argv,
-                             sqlite3_int64 *pRowid) {
+static int hnsw_vtab_update(sqlite3_vtab *pVTab, int argc, sqlite3_value **argv, sqlite3_int64 *pRowid) {
     HnswVtab *vtab = (HnswVtab *)pVTab;
     int rc;
 
@@ -681,22 +696,22 @@ static int hnsw_vtab_update(sqlite3_vtab *pVTab, int argc, sqlite3_value **argv,
             return SQLITE_ERROR;
         }
         rc = hnsw_delete(vtab->index, id);
-        if (rc != 0) return SQLITE_ERROR;
+        if (rc != 0)
+            return SQLITE_ERROR;
 
         /* Persist delete to shadow tables */
-        char *sql = sqlite3_mprintf(
-            "UPDATE \"%w_nodes\" SET deleted = 1 WHERE id = %lld",
-            vtab->table_name, (long long)id);
+        char *sql =
+            sqlite3_mprintf("UPDATE \"%w_nodes\" SET deleted = 1 WHERE id = %lld", vtab->table_name, (long long)id);
         sqlite3_exec(vtab->db, sql, NULL, NULL, NULL);
         sqlite3_free(sql);
 
         /* Update config */
-        save_config(vtab->db, vtab->table_name, &(HnswParams){
-            .dimensions = vtab->dim,
-            .metric = vtab->index->metric,
-            .m = vtab->index->M,
-            .ef_construction = vtab->index->ef_construction
-        }, vtab->index->entry_point, vtab->index->max_level);
+        save_config(vtab->db, vtab->table_name,
+                    &(HnswParams){.dimensions = vtab->dim,
+                                  .metric = vtab->index->metric,
+                                  .m = vtab->index->M,
+                                  .ef_construction = vtab->index->ef_construction},
+                    vtab->index->entry_point, vtab->index->max_level);
 
         return SQLITE_OK;
     }
@@ -708,7 +723,8 @@ static int hnsw_vtab_update(sqlite3_vtab *pVTab, int argc, sqlite3_value **argv,
             /* Auto-generate rowid — use node_count + 1 as simple strategy */
             id = vtab->index->node_count + 1;
             /* Find unused ID */
-            while (hnsw_get_node(vtab->index, id) != NULL) id++;
+            while (hnsw_get_node(vtab->index, id) != NULL)
+                id++;
         } else {
             id = sqlite3_value_int64(argv[1]);
         }
@@ -724,16 +740,14 @@ static int hnsw_vtab_update(sqlite3_vtab *pVTab, int argc, sqlite3_value **argv,
         int expected_bytes = vtab->dim * (int)sizeof(float);
 
         if (vec_bytes != expected_bytes) {
-            vtab->base.zErrMsg = sqlite3_mprintf(
-                "hnsw_index: expected %d-dim vector (%d bytes), got %d bytes",
-                vtab->dim, expected_bytes, vec_bytes);
+            vtab->base.zErrMsg = sqlite3_mprintf("hnsw_index: expected %d-dim vector (%d bytes), got %d bytes",
+                                                 vtab->dim, expected_bytes, vec_bytes);
             return SQLITE_ERROR;
         }
 
         rc = hnsw_insert(vtab->index, id, vec);
         if (rc != 0) {
-            vtab->base.zErrMsg = sqlite3_mprintf("hnsw_index: insert failed (duplicate rowid %lld?)",
-                                                  (long long)id);
+            vtab->base.zErrMsg = sqlite3_mprintf("hnsw_index: insert failed (duplicate rowid %lld?)", (long long)id);
             return SQLITE_ERROR;
         }
 
@@ -754,12 +768,12 @@ static int hnsw_vtab_update(sqlite3_vtab *pVTab, int argc, sqlite3_value **argv,
         }
 
         /* Update config */
-        save_config(vtab->db, vtab->table_name, &(HnswParams){
-            .dimensions = vtab->dim,
-            .metric = vtab->index->metric,
-            .m = vtab->index->M,
-            .ef_construction = vtab->index->ef_construction
-        }, vtab->index->entry_point, vtab->index->max_level);
+        save_config(vtab->db, vtab->table_name,
+                    &(HnswParams){.dimensions = vtab->dim,
+                                  .metric = vtab->index->metric,
+                                  .m = vtab->index->M,
+                                  .ef_construction = vtab->index->ef_construction},
+                    vtab->index->entry_point, vtab->index->max_level);
 
         *pRowid = id;
         return SQLITE_OK;

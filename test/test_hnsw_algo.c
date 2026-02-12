@@ -7,9 +7,8 @@
 #include <string.h>
 
 /* Helper: brute force KNN for comparison */
-static void brute_force_knn(const float *query, const float *vectors, int n, int dim,
-                             VecDistanceFunc dist_func, int k,
-                             int64_t *out_ids, float *out_dists) {
+static void brute_force_knn(const float *query, const float *vectors, int n, int dim, VecDistanceFunc dist_func, int k,
+                            int64_t *out_ids, float *out_dists) {
     /* Simple O(nk) selection */
     float *dists = (float *)malloc((size_t)n * sizeof(float));
     int *used = (int *)calloc((size_t)n, sizeof(int));
@@ -19,8 +18,10 @@ static void brute_force_knn(const float *query, const float *vectors, int n, int
     for (int j = 0; j < k && j < n; j++) {
         int best = -1;
         for (int i = 0; i < n; i++) {
-            if (used[i]) continue;
-            if (best < 0 || dists[i] < dists[best]) best = i;
+            if (used[i])
+                continue;
+            if (best < 0 || dists[i] < dists[best])
+                best = i;
         }
         if (best >= 0) {
             out_ids[j] = best;
@@ -63,7 +64,7 @@ TEST(test_hnsw_insert_duplicate) {
     float v[] = {1.0f, 2.0f, 3.0f};
 
     ASSERT_EQ_INT(hnsw_insert(idx, 1, v), 0);
-    ASSERT_EQ_INT(hnsw_insert(idx, 1, v), -1);  /* duplicate should fail */
+    ASSERT_EQ_INT(hnsw_insert(idx, 1, v), -1); /* duplicate should fail */
 
     hnsw_destroy(idx);
 }
@@ -131,10 +132,13 @@ TEST(test_hnsw_knn_recall_small) {
     int recall = 0;
     for (int i = 0; i < k; i++) {
         for (int j = 0; j < k; j++) {
-            if (hnsw_results[i].id == bf_ids[j]) { recall++; break; }
+            if (hnsw_results[i].id == bf_ids[j]) {
+                recall++;
+                break;
+            }
         }
     }
-    ASSERT(recall >= 4);  /* at least 80% recall */
+    ASSERT(recall >= 4); /* at least 80% recall */
 
     free(vectors);
     hnsw_destroy(idx);
@@ -152,10 +156,10 @@ TEST(test_hnsw_delete) {
     hnsw_insert(idx, 2, v2);
 
     ASSERT_EQ_INT(hnsw_delete(idx, 1), 0);
-    ASSERT(hnsw_get_node(idx, 1) == NULL);  /* deleted */
+    ASSERT(hnsw_get_node(idx, 1) == NULL); /* deleted */
 
     /* Search should not return deleted node */
-    float query[] = {1.0f, 0.0f};  /* closest to deleted v1 */
+    float query[] = {1.0f, 0.0f}; /* closest to deleted v1 */
     HnswSearchResult results[2];
     int found = hnsw_search(idx, query, 2, 10, results);
     ASSERT_EQ_INT(found, 2);
@@ -180,9 +184,9 @@ TEST(test_hnsw_cosine_metric) {
     hnsw_seed_rng(idx, 55);
 
     /* Insert unit-ish vectors in different directions */
-    float v0[] = {1.0f, 0.0f};   /* right */
-    float v1[] = {0.0f, 1.0f};   /* up */
-    float v2[] = {-1.0f, 0.0f};  /* left (opposite of right) */
+    float v0[] = {1.0f, 0.0f};  /* right */
+    float v1[] = {0.0f, 1.0f};  /* up */
+    float v2[] = {-1.0f, 0.0f}; /* left (opposite of right) */
     hnsw_insert(idx, 0, v0);
     hnsw_insert(idx, 1, v1);
     hnsw_insert(idx, 2, v2);
@@ -192,7 +196,7 @@ TEST(test_hnsw_cosine_metric) {
     HnswSearchResult results[3];
     int found = hnsw_search(idx, query, 3, 10, results);
     ASSERT_EQ_INT(found, 3);
-    ASSERT(results[0].id == 0);  /* right is closest direction */
+    ASSERT(results[0].id == 0); /* right is closest direction */
 
     hnsw_destroy(idx);
 }

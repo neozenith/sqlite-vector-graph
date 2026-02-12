@@ -19,8 +19,7 @@ SQLITE_EXTENSION_INIT1
 #ifdef _WIN32
 __declspec(dllexport)
 #endif
-int sqlite3_muninn_init(sqlite3 *db, char **pzErrMsg,
-                           const sqlite3_api_routines *pApi) {
+int sqlite3_muninn_init(sqlite3 *db, char **pzErrMsg, const sqlite3_api_routines *pApi) {
     SQLITE_EXTENSION_INIT2(pApi);
     int rc;
 

@@ -1,5 +1,5 @@
 CC ?= cc
-CFLAGS_BASE = -O2 -Wall -Wextra -Wpedantic -std=c11 -fPIC
+CFLAGS_BASE = -O2 -Wall -Wextra -Wpedantic -Werror -std=c11 -fPIC
 CFLAGS_EXTRA ?=
 LDFLAGS = -lm
 
@@ -46,9 +46,13 @@ HEADERS = src/vec_math.h src/priority_queue.h src/hnsw_algo.h \
 TEST_SRC = test/test_main.c test/test_vec_math.c test/test_priority_queue.c \
            test/test_hnsw_algo.c test/test_id_validate.c test/test_graph_load.c
 
-.PHONY: all debug test test-python test-all clean help \
-        amalgamation install uninstall skill version \
-        docs-serve docs-build docs-clean
+.PHONY: all debug test test-python test-js test-install test-all clean help \
+        amalgamation install uninstall version version-stamp \
+        docs-serve docs-build docs-clean \
+        format format-c format-python format-js \
+        lint lint-c lint-python lint-js \
+        typecheck typecheck-python typecheck-js \
+        ci
 
 help:                                          ## Show this help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -74,16 +78,72 @@ debug: muninn$(EXT)                            ## Build with ASan + UBSan
 # TEST
 ######################################################################
 
-test: test_runner                              ## Run C unit tests
+test: test_runner                              ## Run C unit tests + coverage
 	./test_runner
+	@GCOVR=$$(command -v gcovr 2>/dev/null || echo .venv/bin/gcovr); \
+	if [ -x "$$GCOVR" ]; then \
+		$$GCOVR --root . --filter 'src/' --exclude 'src/sqlite3' \
+			--fail-under-line 50 --print-summary; \
+	else \
+		echo "gcovr not installed — skipping C coverage report"; \
+	fi
 
 test_runner: $(TEST_SRC) src/vec_math.c src/priority_queue.c src/hnsw_algo.c src/id_validate.c src/graph_load.c
-	$(CC) $(CFLAGS_BASE) $(CFLAGS_EXTRA) -Isrc -o $@ $^ $(LDFLAGS_TEST)
+	$(CC) $(CFLAGS_BASE) $(CFLAGS_EXTRA) --coverage -Isrc -o $@ $^ $(LDFLAGS_TEST)
 
-test-python: muninn$(EXT)                      ## Run Python integration tests
+test-python: muninn$(EXT)                      ## Run Python integration tests + coverage
 	.venv/bin/python -m pytest pytests/ -v
 
-test-all: test test-python docs-build                     ## Run all tests
+test-js:                                       ## Run TypeScript tests + coverage
+	npm --prefix npm test
+
+test-all: test test-python test-js docs-build  ## Run all tests
+
+######################################################################
+# CODE QUALITY
+######################################################################
+
+format: format-c format-python format-js       ## Format all code
+
+format-c:                                      ## Format C code with clang-format
+	@if command -v clang-format >/dev/null 2>&1; then \
+		clang-format -i src/*.c src/*.h test/*.c test/*.h 2>/dev/null; \
+		echo "C code formatted"; \
+	else \
+		echo "clang-format not installed — skipping C formatting"; \
+	fi
+
+format-python:                                 ## Format Python code with ruff
+	.venv/bin/ruff format .
+	.venv/bin/ruff check --fix-only .
+
+format-js:                                     ## Format TypeScript code with biome
+	npm --prefix npm run format
+
+lint: lint-c lint-python lint-js               ## Lint all code
+
+lint-c:                                        ## Lint C code with clang-format (check mode)
+	@if command -v clang-format >/dev/null 2>&1; then \
+		clang-format --dry-run --Werror src/*.c src/*.h test/*.c test/*.h 2>/dev/null; \
+		echo "C lint passed"; \
+	else \
+		echo "clang-format not installed — skipping C lint"; \
+	fi
+
+lint-python:                                   ## Lint Python code with ruff
+	.venv/bin/ruff check .
+	.venv/bin/ruff format --check .
+
+lint-js:                                       ## Lint TypeScript code with biome
+	npm --prefix npm run lint
+
+typecheck: typecheck-python typecheck-js       ## Type-check all code
+
+typecheck-python:                              ## Type-check Python with mypy
+	.venv/bin/mypy sqlite_muninn/
+
+typecheck-js:                                  ## Type-check TypeScript with tsc
+	npm --prefix npm run typecheck
 
 ######################################################################
 # PACKAGING
@@ -94,12 +154,8 @@ amalgamation: dist/muninn.c dist/muninn.h      ## Create single-file amalgamatio
 dist/muninn.c dist/muninn.h: $(SRC) $(HEADERS)
 	bash scripts/amalgamate.sh
 
-skill:                                         ## Stamp version into skill files
-	@VERSION=$$(cat VERSION); \
-	mkdir -p dist/skills/muninn/references; \
-	for f in skills/muninn/SKILL.md skills/muninn/references/*.md; do \
-	    [ -f "$$f" ] && sed "s/{{VERSION}}/$$VERSION/g" "$$f" > "dist/$$f"; \
-	done
+version-stamp:                                 ## Stamp VERSION into skill files + package.json
+	.venv/bin/python scripts/version_stamp.py
 
 ######################################################################
 # INSTALL
@@ -117,6 +173,9 @@ uninstall:                                     ## Remove installed files
 	rm -f $(DESTDIR)$(PREFIX)/lib/muninn$(EXT)
 	rm -f $(DESTDIR)$(PREFIX)/include/muninn.h
 
+test-install: muninn$(EXT)                     ## Run install integration tests (pip + npm)
+	.venv/bin/python -m pytest pytests/test_install.py -v -m integration --no-cov
+
 ######################################################################
 # DOCUMENTATION
 ######################################################################
@@ -124,7 +183,7 @@ uninstall:                                     ## Remove installed files
 docs-serve: docs-build                         ## Serve docs locally with live reload
 	uv run mkdocs serve
 
-docs-build:                                    ## Build documentation site
+docs-build: version-stamp                      ## Build documentation site
 	uv sync --all-groups
 	make -C benchmarks analyze
 	uv run mkdocs build --strict
@@ -133,9 +192,16 @@ docs-clean:                                    ## Clean documentation build
 	rm -rf site/
 
 ######################################################################
+# CI
+######################################################################
+
+ci: lint typecheck test test-python test-js    ## Full CI pipeline
+
+######################################################################
 # CLEAN
 ######################################################################
 
 clean: docs-clean                              ## Clean build artifacts
 	rm -f muninn$(EXT) test_runner
 	rm -rf dist/
+	rm -f *.gcda *.gcno src/*.gcda src/*.gcno test/*.gcda test/*.gcno

@@ -7,6 +7,46 @@ on:
     branches: [main]
 
 jobs:
+  # ── Code Quality ───────────────────────────────────────
+  quality:
+    runs-on: ubuntu-22.04
+    name: Code Quality
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Python dev tools
+        run: pip install ruff mypy
+
+      - name: Install Node.js dependencies
+        run: npm --prefix npm ci
+
+      - name: Lint C (clang-format)
+        run: |
+          sudo apt-get install -y clang-format
+          make lint-c
+
+      - name: Lint Python (ruff)
+        run: |
+          ruff check .
+          ruff format --check .
+
+      - name: Lint TypeScript (biome)
+        run: make lint-js
+
+      - name: Type-check Python (mypy)
+        run: mypy sqlite_muninn/
+
+      - name: Type-check TypeScript (tsc)
+        run: make typecheck-js
+
   # ── Build & Test (All Platforms) ─────────────────────────
   build:
     strategy:
@@ -65,8 +105,20 @@ jobs:
       - name: Python integration tests
         if: runner.os != 'Windows'
         run: |
-          pip install pytest
+          pip install pytest pytest-cov
           python -m pytest pytests/ -v
+
+      # ── Node.js tests ──────────────────────────────────
+      - uses: actions/setup-node@v4
+        if: runner.os != 'Windows'
+        with:
+          node-version: "22"
+
+      - name: TypeScript tests
+        if: runner.os != 'Windows'
+        run: |
+          npm --prefix npm ci
+          npm --prefix npm test
 
       # ── Upload artifact ─────────────────────────────────
       - uses: actions/upload-artifact@v4
@@ -162,26 +214,19 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Test pip install from source
-        run: |
-          pip install .
-          python -c "
-          import sqlite_muninn
-          print(f'Version: {sqlite_muninn.__version__}')
-          print(f'Path: {sqlite_muninn.loadable_path()}')
-          "
-
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
 
-      - name: Test Node.js module loads
+      - name: Build npm package
         run: |
-          node -e "
-          const m = require('./index.cjs');
-          console.log('Version:', m.version);
-          console.log('Path:', m.getLoadablePath());
-          "
+          npm --prefix npm ci
+          npm --prefix npm run build
+
+      - name: Run install integration tests
+        run: |
+          pip install pytest
+          python -m pytest pytests/test_install.py -v -m integration --override-ini="addopts="
 
   # ── WASM Build ───────────────────────────────────────────
   wasm:

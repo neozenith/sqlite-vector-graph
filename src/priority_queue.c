@@ -18,7 +18,8 @@ static void swap(PQItem *a, PQItem *b) {
 static void sift_up(PQItem *items, int idx) {
     while (idx > 1) {
         int parent = idx / 2;
-        if (items[parent].distance <= items[idx].distance) break;
+        if (items[parent].distance <= items[idx].distance)
+            break;
         swap(&items[parent], &items[idx]);
         idx = parent;
     }
@@ -33,17 +34,20 @@ static void sift_down(PQItem *items, int size, int idx) {
             smallest = left;
         if (right <= size && items[right].distance < items[smallest].distance)
             smallest = right;
-        if (smallest == idx) break;
+        if (smallest == idx)
+            break;
         swap(&items[idx], &items[smallest]);
         idx = smallest;
     }
 }
 
 int pq_init(PriorityQueue *pq, int initial_capacity) {
-    if (initial_capacity < 4) initial_capacity = 4;
+    if (initial_capacity < 4)
+        initial_capacity = 4;
     /* +1 because index 0 is unused (1-based indexing) */
     pq->items = (PQItem *)malloc((size_t)(initial_capacity + 1) * sizeof(PQItem));
-    if (!pq->items) return -1;
+    if (!pq->items)
+        return -1;
     pq->size = 0;
     pq->capacity = initial_capacity;
     return 0;
@@ -53,7 +57,8 @@ int pq_push(PriorityQueue *pq, int64_t id, float distance) {
     if (pq->size >= pq->capacity) {
         int new_cap = pq->capacity * 2;
         PQItem *new_items = (PQItem *)realloc(pq->items, (size_t)(new_cap + 1) * sizeof(PQItem));
-        if (!new_items) return -1;
+        if (!new_items)
+            return -1;
         pq->items = new_items;
         pq->capacity = new_cap;
     }

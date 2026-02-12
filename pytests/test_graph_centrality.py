@@ -3,7 +3,6 @@ Integration tests for graph centrality table-valued functions.
 
 Tests graph_degree, graph_betweenness, and graph_closeness on synthetic graphs.
 """
-import pytest
 
 
 def create_line_graph(conn):
@@ -25,10 +24,14 @@ def create_line_graph_bidir(conn):
     conn.executemany(
         "INSERT INTO bidir_edges VALUES (?, ?)",
         [
-            ("A", "B"), ("B", "A"),
-            ("B", "C"), ("C", "B"),
-            ("C", "D"), ("D", "C"),
-            ("D", "E"), ("E", "D"),
+            ("A", "B"),
+            ("B", "A"),
+            ("B", "C"),
+            ("C", "B"),
+            ("C", "D"),
+            ("D", "C"),
+            ("D", "E"),
+            ("E", "D"),
         ],
     )
 
@@ -41,10 +44,14 @@ def create_star_graph(conn):
     conn.executemany(
         "INSERT INTO star_edges VALUES (?, ?)",
         [
-            ("H", "I"), ("I", "H"),
-            ("H", "J"), ("J", "H"),
-            ("H", "K"), ("K", "H"),
-            ("H", "L"), ("L", "H"),
+            ("H", "I"),
+            ("I", "H"),
+            ("H", "J"),
+            ("J", "H"),
+            ("H", "K"),
+            ("K", "H"),
+            ("H", "L"),
+            ("L", "H"),
         ],
     )
 
@@ -62,9 +69,12 @@ def create_weighted_triangle(conn):
     conn.executemany(
         "INSERT INTO wtri VALUES (?, ?, ?)",
         [
-            ("A", "B", 2.0), ("B", "A", 2.0),
-            ("A", "C", 1.0), ("C", "A", 1.0),
-            ("B", "C", 3.0), ("C", "B", 3.0),
+            ("A", "B", 2.0),
+            ("B", "A", 2.0),
+            ("A", "C", 1.0),
+            ("C", "A", 1.0),
+            ("B", "C", 3.0),
+            ("C", "B", 3.0),
         ],
     )
 

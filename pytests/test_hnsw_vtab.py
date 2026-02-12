@@ -4,7 +4,7 @@ Integration tests for the HNSW virtual table.
 Tests the full stack: extension loading → CREATE VIRTUAL TABLE →
 INSERT → KNN search → persistence → DELETE.
 """
-import math
+
 import random
 import struct
 
@@ -29,7 +29,7 @@ def brute_force_knn(
     """Brute-force KNN using L2 squared distance."""
     dists = []
     for vid, vec in vectors.items():
-        d = sum((a - b) ** 2 for a, b in zip(query, vec))
+        d = sum((a - b) ** 2 for a, b in zip(query, vec, strict=False))
         dists.append((vid, d))
     dists.sort(key=lambda x: x[1])
     return dists[:k]
@@ -37,16 +37,9 @@ def brute_force_knn(
 
 class TestHnswVtabCreate:
     def test_create_basic(self, conn):
-        conn.execute(
-            "CREATE VIRTUAL TABLE test_vec USING hnsw_index(dimensions=4, metric='l2')"
-        )
+        conn.execute("CREATE VIRTUAL TABLE test_vec USING hnsw_index(dimensions=4, metric='l2')")
         # Shadow tables should exist
-        tables = {
-            row[0]
-            for row in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            ).fetchall()
-        }
+        tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
         assert "test_vec_config" in tables
         assert "test_vec_nodes" in tables
         assert "test_vec_edges" in tables
@@ -57,28 +50,20 @@ class TestHnswVtabCreate:
 
     def test_create_invalid_metric(self, conn):
         with pytest.raises(Exception, match="unknown metric"):
-            conn.execute(
-                "CREATE VIRTUAL TABLE bad USING hnsw_index(dimensions=4, metric='hamming')"
-            )
+            conn.execute("CREATE VIRTUAL TABLE bad USING hnsw_index(dimensions=4, metric='hamming')")
 
     def test_create_invalid_dimensions(self, conn):
         with pytest.raises(Exception, match="dimensions must be > 0"):
-            conn.execute(
-                "CREATE VIRTUAL TABLE bad USING hnsw_index(dimensions=0)"
-            )
+            conn.execute("CREATE VIRTUAL TABLE bad USING hnsw_index(dimensions=0)")
 
     def test_create_unknown_param(self, conn):
         with pytest.raises(Exception, match="unknown parameter"):
-            conn.execute(
-                "CREATE VIRTUAL TABLE bad USING hnsw_index(dimensions=4, foobar=1)"
-            )
+            conn.execute("CREATE VIRTUAL TABLE bad USING hnsw_index(dimensions=4, foobar=1)")
 
 
 class TestHnswInsert:
     def test_insert_single(self, conn):
-        conn.execute(
-            "CREATE VIRTUAL TABLE vec USING hnsw_index(dimensions=3, metric='l2')"
-        )
+        conn.execute("CREATE VIRTUAL TABLE vec USING hnsw_index(dimensions=3, metric='l2')")
         vec = make_vector([1.0, 2.0, 3.0])
         conn.execute("INSERT INTO vec (rowid, vector) VALUES (1, ?)", (vec,))
 
@@ -88,17 +73,13 @@ class TestHnswInsert:
         assert row[0] == 1
 
     def test_insert_wrong_size(self, conn):
-        conn.execute(
-            "CREATE VIRTUAL TABLE vec USING hnsw_index(dimensions=3, metric='l2')"
-        )
+        conn.execute("CREATE VIRTUAL TABLE vec USING hnsw_index(dimensions=3, metric='l2')")
         bad_vec = make_vector([1.0, 2.0])  # 2-dim instead of 3
         with pytest.raises(Exception, match="expected 3-dim"):
             conn.execute("INSERT INTO vec (rowid, vector) VALUES (1, ?)", (bad_vec,))
 
     def test_insert_multiple(self, conn):
-        conn.execute(
-            "CREATE VIRTUAL TABLE vec USING hnsw_index(dimensions=4, metric='l2', m=4)"
-        )
+        conn.execute("CREATE VIRTUAL TABLE vec USING hnsw_index(dimensions=4, metric='l2', m=4)")
         for i in range(20):
             vec = make_vector([float(i), float(i + 1), float(i + 2), float(i + 3)])
             conn.execute("INSERT INTO vec (rowid, vector) VALUES (?, ?)", (i, vec))
@@ -110,9 +91,7 @@ class TestHnswInsert:
 class TestHnswSearch:
     def test_knn_basic(self, conn):
         """Insert 3 known points, search for nearest to one of them."""
-        conn.execute(
-            "CREATE VIRTUAL TABLE vec USING hnsw_index(dimensions=2, metric='l2')"
-        )
+        conn.execute("CREATE VIRTUAL TABLE vec USING hnsw_index(dimensions=2, metric='l2')")
         conn.execute(
             "INSERT INTO vec (rowid, vector) VALUES (1, ?)",
             (make_vector([0.0, 0.0]),),
@@ -144,9 +123,7 @@ class TestHnswSearch:
         random.seed(42)
 
         conn.execute(
-            f"CREATE VIRTUAL TABLE vec USING hnsw_index("
-            f"dimensions={dim}, metric='l2', m=16, ef_construction=200"
-            f")"
+            f"CREATE VIRTUAL TABLE vec USING hnsw_index(dimensions={dim}, metric='l2', m=16, ef_construction=200)"
         )
 
         vectors = {}
@@ -179,9 +156,7 @@ class TestHnswSearch:
 
     def test_knn_cosine(self, conn):
         """Verify cosine metric works correctly."""
-        conn.execute(
-            "CREATE VIRTUAL TABLE vec USING hnsw_index(dimensions=2, metric='cosine')"
-        )
+        conn.execute("CREATE VIRTUAL TABLE vec USING hnsw_index(dimensions=2, metric='cosine')")
         # Insert vectors in different directions
         conn.execute(
             "INSERT INTO vec (rowid, vector) VALUES (1, ?)",
@@ -206,9 +181,7 @@ class TestHnswSearch:
         assert results[0][0] == 1  # right is closest by cosine
 
     def test_search_empty_table(self, conn):
-        conn.execute(
-            "CREATE VIRTUAL TABLE vec USING hnsw_index(dimensions=2, metric='l2')"
-        )
+        conn.execute("CREATE VIRTUAL TABLE vec USING hnsw_index(dimensions=2, metric='l2')")
         query = make_vector([0.0, 0.0])
         results = conn.execute(
             "SELECT rowid, distance FROM vec WHERE vector MATCH ? AND k = 5",
@@ -219,9 +192,7 @@ class TestHnswSearch:
 
 class TestHnswDelete:
     def test_delete_basic(self, conn):
-        conn.execute(
-            "CREATE VIRTUAL TABLE vec USING hnsw_index(dimensions=2, metric='l2')"
-        )
+        conn.execute("CREATE VIRTUAL TABLE vec USING hnsw_index(dimensions=2, metric='l2')")
         conn.execute(
             "INSERT INTO vec (rowid, vector) VALUES (1, ?)",
             (make_vector([0.0, 0.0]),),
@@ -251,21 +222,17 @@ class TestHnswDelete:
 
 class TestHnswPointLookup:
     def test_lookup_existing(self, conn):
-        conn.execute(
-            "CREATE VIRTUAL TABLE vec USING hnsw_index(dimensions=3, metric='l2')"
-        )
+        conn.execute("CREATE VIRTUAL TABLE vec USING hnsw_index(dimensions=3, metric='l2')")
         original = [1.5, 2.5, 3.5]
         conn.execute(
             "INSERT INTO vec (rowid, vector) VALUES (42, ?)",
             (make_vector(original),),
         )
 
-        row = conn.execute(
-            "SELECT vector FROM vec WHERE rowid = 42"
-        ).fetchone()
+        row = conn.execute("SELECT vector FROM vec WHERE rowid = 42").fetchone()
         assert row is not None
         retrieved = unpack_vector(row[0], 3)
-        for a, b in zip(original, retrieved):
+        for a, b in zip(original, retrieved, strict=False):
             assert abs(a - b) < 1e-6
 
 
@@ -284,9 +251,7 @@ class TestHnswPersistence:
         conn1 = sqlite3.connect(db_path)
         conn1.enable_load_extension(True)
         conn1.load_extension(ext_path)
-        conn1.execute(
-            "CREATE VIRTUAL TABLE vec USING hnsw_index(dimensions=3, metric='l2', m=4)"
-        )
+        conn1.execute("CREATE VIRTUAL TABLE vec USING hnsw_index(dimensions=3, metric='l2', m=4)")
         for i in range(10):
             v = make_vector([float(i), float(i * 2), float(i * 3)])
             conn1.execute("INSERT INTO vec (rowid, vector) VALUES (?, ?)", (i, v))
@@ -311,9 +276,7 @@ class TestHnswPersistence:
 
 class TestHnswDrop:
     def test_drop_cleans_shadow_tables(self, conn):
-        conn.execute(
-            "CREATE VIRTUAL TABLE vec USING hnsw_index(dimensions=2, metric='l2')"
-        )
+        conn.execute("CREATE VIRTUAL TABLE vec USING hnsw_index(dimensions=2, metric='l2')")
         conn.execute(
             "INSERT INTO vec (rowid, vector) VALUES (1, ?)",
             (make_vector([1.0, 2.0]),),
@@ -321,12 +284,7 @@ class TestHnswDrop:
 
         conn.execute("DROP TABLE vec")
 
-        tables = {
-            row[0]
-            for row in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            ).fetchall()
-        }
+        tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
         assert "vec_config" not in tables
         assert "vec_nodes" not in tables
         assert "vec_edges" not in tables

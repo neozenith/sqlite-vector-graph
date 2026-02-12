@@ -1,8 +1,11 @@
 # sqlite-muninn
 
 <div align="center">
-    <img src="docs/assets/munnin_logo.png" alt="Muninn Raven Logo" width=320px/>
+    <img src="docs/assets/muninn_logo_transparent.png" alt="Muninn Raven Logo" width=480px/>
+    <p><i>Odin's mythic <a href="https://en.wikipedia.org/wiki/Huginn_and_Muninn">raven of Memory</a>.</i></p>
 </div>
+
+
 
 A zero-dependency C extension for SQLite to add an advanced collection of knowledge graph primitives like Vector Similarity Search, HNSW Indexes, Graph database, Community Detection, Node2Vec capabilities.
 

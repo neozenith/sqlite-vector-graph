@@ -5,9 +5,9 @@ Tests the full pipeline: edge table → biased walks → SGNS → HNSW embedding
 Verifies on Zachary's Karate Club graph that structurally similar nodes
 get similar embeddings.
 """
-import struct
+
 import math
-import pytest
+import struct
 
 
 def cosine_similarity(a, b):
@@ -15,7 +15,7 @@ def cosine_similarity(a, b):
     dim = len(a) // 4
     va = struct.unpack(f"{dim}f", a)
     vb = struct.unpack(f"{dim}f", b)
-    dot = sum(x * y for x, y in zip(va, vb))
+    dot = sum(x * y for x, y in zip(va, vb, strict=False))
     na = math.sqrt(sum(x * x for x in va))
     nb = math.sqrt(sum(x * x for x in vb))
     if na < 1e-10 or nb < 1e-10:
@@ -34,11 +34,19 @@ def create_two_cliques(conn):
     conn.execute("CREATE TABLE clique_edges (src TEXT, dst TEXT)")
     edges = [
         # Clique A
-        ("1", "2"), ("1", "3"), ("1", "4"),
-        ("2", "3"), ("2", "4"), ("3", "4"),
+        ("1", "2"),
+        ("1", "3"),
+        ("1", "4"),
+        ("2", "3"),
+        ("2", "4"),
+        ("3", "4"),
         # Clique B
-        ("5", "6"), ("5", "7"), ("5", "8"),
-        ("6", "7"), ("6", "8"), ("7", "8"),
+        ("5", "6"),
+        ("5", "7"),
+        ("5", "8"),
+        ("6", "7"),
+        ("6", "8"),
+        ("7", "8"),
         # Bridge
         ("4", "5"),
     ]
@@ -46,32 +54,82 @@ def create_two_cliques(conn):
 
 
 KARATE_EDGES = [
-    (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7), (1, 8), (1, 9),
-    (1, 11), (1, 12), (1, 13), (1, 14), (1, 18), (1, 20), (1, 22), (1, 32),
-    (2, 3), (2, 4), (2, 8), (2, 14), (2, 18), (2, 20), (2, 22), (2, 31),
-    (3, 4), (3, 8), (3, 9), (3, 10), (3, 14), (3, 28), (3, 29), (3, 33),
-    (4, 8), (4, 13), (4, 14),
-    (5, 7), (5, 11),
-    (6, 7), (6, 11), (6, 17),
+    (1, 2),
+    (1, 3),
+    (1, 4),
+    (1, 5),
+    (1, 6),
+    (1, 7),
+    (1, 8),
+    (1, 9),
+    (1, 11),
+    (1, 12),
+    (1, 13),
+    (1, 14),
+    (1, 18),
+    (1, 20),
+    (1, 22),
+    (1, 32),
+    (2, 3),
+    (2, 4),
+    (2, 8),
+    (2, 14),
+    (2, 18),
+    (2, 20),
+    (2, 22),
+    (2, 31),
+    (3, 4),
+    (3, 8),
+    (3, 9),
+    (3, 10),
+    (3, 14),
+    (3, 28),
+    (3, 29),
+    (3, 33),
+    (4, 8),
+    (4, 13),
+    (4, 14),
+    (5, 7),
+    (5, 11),
+    (6, 7),
+    (6, 11),
+    (6, 17),
     (7, 17),
-    (9, 31), (9, 33), (9, 34),
+    (9, 31),
+    (9, 33),
+    (9, 34),
     (10, 34),
     (14, 34),
-    (15, 33), (15, 34),
-    (16, 33), (16, 34),
-    (19, 33), (19, 34),
+    (15, 33),
+    (15, 34),
+    (16, 33),
+    (16, 34),
+    (19, 33),
+    (19, 34),
     (20, 34),
-    (21, 33), (21, 34),
+    (21, 33),
+    (21, 34),
     (23, 33),
-    (24, 26), (24, 28), (24, 30), (24, 33), (24, 34),
-    (25, 26), (25, 28), (25, 32),
+    (24, 26),
+    (24, 28),
+    (24, 30),
+    (24, 33),
+    (24, 34),
+    (25, 26),
+    (25, 28),
+    (25, 32),
     (26, 32),
-    (27, 30), (27, 34),
+    (27, 30),
+    (27, 34),
     (28, 34),
-    (29, 32), (29, 34),
-    (30, 33), (30, 34),
-    (31, 33), (31, 34),
-    (32, 33), (32, 34),
+    (29, 32),
+    (29, 34),
+    (30, 33),
+    (30, 34),
+    (31, 33),
+    (31, 34),
+    (32, 33),
+    (32, 34),
     (33, 34),
 ]
 
@@ -95,14 +153,11 @@ class TestNode2VecBasic:
 
         # Create HNSW output table
         conn.execute(
-            "CREATE VIRTUAL TABLE emb USING hnsw_index("
-            "dimensions=16, metric='cosine', m=4, ef_construction=20)"
+            "CREATE VIRTUAL TABLE emb USING hnsw_index(dimensions=16, metric='cosine', m=4, ef_construction=20)"
         )
 
         result = conn.execute(
-            "SELECT node2vec_train("
-            "'clique_edges', 'src', 'dst', 'emb', "
-            "16, 1.0, 1.0, 5, 20, 3, 3, 0.025, 3)"
+            "SELECT node2vec_train('clique_edges', 'src', 'dst', 'emb', 16, 1.0, 1.0, 5, 20, 3, 3, 0.025, 3)"
         ).fetchone()
 
         assert result[0] == 8  # 8 nodes in the two-clique graph
@@ -111,20 +166,13 @@ class TestNode2VecBasic:
         """After training, embeddings should be retrievable from the HNSW table."""
         create_two_cliques(conn)
         conn.execute(
-            "CREATE VIRTUAL TABLE emb USING hnsw_index("
-            "dimensions=16, metric='cosine', m=4, ef_construction=20)"
+            "CREATE VIRTUAL TABLE emb USING hnsw_index(dimensions=16, metric='cosine', m=4, ef_construction=20)"
         )
-        conn.execute(
-            "SELECT node2vec_train("
-            "'clique_edges', 'src', 'dst', 'emb', "
-            "16, 1.0, 1.0, 5, 20, 3, 3, 0.025, 3)"
-        )
+        conn.execute("SELECT node2vec_train('clique_edges', 'src', 'dst', 'emb', 16, 1.0, 1.0, 5, 20, 3, 3, 0.025, 3)")
 
         # Check we can look up each embedding
         for rowid in range(1, 9):
-            row = conn.execute(
-                "SELECT vector FROM emb WHERE rowid = ?", (rowid,)
-            ).fetchone()
+            row = conn.execute("SELECT vector FROM emb WHERE rowid = ?", (rowid,)).fetchone()
             assert row is not None
             assert len(row[0]) == 16 * 4  # 16 floats * 4 bytes
 
@@ -132,14 +180,11 @@ class TestNode2VecBasic:
         """Training on an empty graph should return 0."""
         conn.execute("CREATE TABLE empty_edges (src TEXT, dst TEXT)")
         conn.execute(
-            "CREATE VIRTUAL TABLE emb USING hnsw_index("
-            "dimensions=8, metric='cosine', m=4, ef_construction=10)"
+            "CREATE VIRTUAL TABLE emb USING hnsw_index(dimensions=8, metric='cosine', m=4, ef_construction=10)"
         )
 
         result = conn.execute(
-            "SELECT node2vec_train("
-            "'empty_edges', 'src', 'dst', 'emb', "
-            "8, 1.0, 1.0, 5, 10, 3, 3, 0.025, 1)"
+            "SELECT node2vec_train('empty_edges', 'src', 'dst', 'emb', 8, 1.0, 1.0, 5, 10, 3, 3, 0.025, 1)"
         ).fetchone()
 
         assert result[0] == 0
@@ -153,21 +198,14 @@ class TestNode2VecCommunityDetection:
         """
         create_two_cliques(conn)
         conn.execute(
-            "CREATE VIRTUAL TABLE emb USING hnsw_index("
-            "dimensions=32, metric='cosine', m=8, ef_construction=50)"
+            "CREATE VIRTUAL TABLE emb USING hnsw_index(dimensions=32, metric='cosine', m=8, ef_construction=50)"
         )
-        conn.execute(
-            "SELECT node2vec_train("
-            "'clique_edges', 'src', 'dst', 'emb', "
-            "32, 1.0, 1.0, 10, 40, 5, 5, 0.025, 5)"
-        )
+        conn.execute("SELECT node2vec_train('clique_edges', 'src', 'dst', 'emb', 32, 1.0, 1.0, 10, 40, 5, 5, 0.025, 5)")
 
         # Get embeddings for nodes 1 (clique A) and 5 (clique B)
         emb = {}
         for rowid in range(1, 9):
-            row = conn.execute(
-                "SELECT vector FROM emb WHERE rowid = ?", (rowid,)
-            ).fetchone()
+            row = conn.execute("SELECT vector FROM emb WHERE rowid = ?", (rowid,)).fetchone()
             emb[rowid] = row[0]
 
         # Within-clique similarity (nodes 1 and 2, both in clique A)
@@ -178,8 +216,7 @@ class TestNode2VecCommunityDetection:
 
         # Within-clique should be higher than between-clique
         assert within_sim > between_sim, (
-            f"Within-clique similarity ({within_sim:.4f}) should be > "
-            f"between-clique similarity ({between_sim:.4f})"
+            f"Within-clique similarity ({within_sim:.4f}) should be > between-clique similarity ({between_sim:.4f})"
         )
 
     def test_karate_club_communities(self, conn):
@@ -193,17 +230,13 @@ class TestNode2VecCommunityDetection:
             "dimensions=64, metric='cosine', m=16, ef_construction=100)"
         )
         conn.execute(
-            "SELECT node2vec_train("
-            "'karate_edges', 'src', 'dst', 'karate_emb', "
-            "64, 1.0, 1.0, 10, 80, 5, 5, 0.025, 5)"
+            "SELECT node2vec_train('karate_edges', 'src', 'dst', 'karate_emb', 64, 1.0, 1.0, 10, 80, 5, 5, 0.025, 5)"
         )
 
         # Get all embeddings
         emb = {}
         for rowid in range(1, 35):
-            row = conn.execute(
-                "SELECT vector FROM karate_emb WHERE rowid = ?", (rowid,)
-            ).fetchone()
+            row = conn.execute("SELECT vector FROM karate_emb WHERE rowid = ?", (rowid,)).fetchone()
             if row:
                 emb[rowid] = row[0]
 

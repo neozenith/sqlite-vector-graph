@@ -18,7 +18,7 @@ const sqlite3_api_routines *sqlite3_api = NULL;
 /* Test result tracking */
 static int total_passed = 0;
 static int total_failed = 0;
-static int cur_failed = 0;  /* tracks if current test has failed */
+static int cur_failed = 0; /* tracks if current test has failed */
 static const char *current_test = NULL;
 
 void test_begin(const char *name) {
@@ -68,8 +68,7 @@ int main(void) {
     printf("\n[graph_load]\n");
     test_graph_load();
 
-    printf("\n=== Results: %d passed, %d failed ===\n",
-           total_passed, total_failed);
+    printf("\n=== Results: %d passed, %d failed ===\n", total_passed, total_failed);
 
     return total_failed > 0 ? 1 : 0;
 }

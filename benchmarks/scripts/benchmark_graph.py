@@ -23,6 +23,7 @@ Run:
     python python/benchmark_graph.py --nodes 100 --avg-degree 5
     python python/benchmark_graph.py --nodes 1000 --avg-degree 20 --engine muninn
 """
+
 import argparse
 import collections
 import datetime
@@ -52,8 +53,15 @@ RESULTS_DIR = PROJECT_ROOT / "benchmarks" / "results"
 N_PER_QUERY_OPS = 50  # random start nodes for per-query operations
 
 ALL_OPERATIONS = [
-    "bfs", "dfs", "shortest_path", "components", "pagerank",
-    "degree", "betweenness", "closeness", "leiden",
+    "bfs",
+    "dfs",
+    "shortest_path",
+    "components",
+    "pagerank",
+    "degree",
+    "betweenness",
+    "closeness",
+    "leiden",
 ]
 
 # Profile definitions (mirrors Makefile targets for manifest tracking)
@@ -65,26 +73,43 @@ GRAPH_PROFILES = {
     "medium": {
         "graph_model": "erdos_renyi",
         "configs": [
-            (1000, 5), (1000, 20), (1000, 50),
-            (5000, 5), (5000, 20), (5000, 50),
-            (10000, 5), (10000, 20), (10000, 50),
+            (1000, 5),
+            (1000, 20),
+            (1000, 50),
+            (5000, 5),
+            (5000, 20),
+            (5000, 50),
+            (10000, 5),
+            (10000, 20),
+            (10000, 50),
         ],
     },
     "large": {
         "graph_model": "erdos_renyi",
         "configs": [
-            (10000, 5), (10000, 20),
-            (50000, 5), (50000, 20),
-            (100000, 5), (100000, 20),
+            (10000, 5),
+            (10000, 20),
+            (50000, 5),
+            (50000, 20),
+            (100000, 5),
+            (100000, 20),
         ],
     },
     "scale_free": {
         "graph_model": "barabasi_albert",
         "configs": [
-            (1000, 3), (1000, 5), (1000, 10),
-            (5000, 3), (5000, 5), (5000, 10),
-            (10000, 3), (10000, 5), (10000, 10),
-            (50000, 3), (50000, 5), (50000, 10),
+            (1000, 3),
+            (1000, 5),
+            (1000, 10),
+            (5000, 3),
+            (5000, 5),
+            (5000, 10),
+            (10000, 3),
+            (10000, 5),
+            (10000, 10),
+            (50000, 3),
+            (50000, 5),
+            (50000, 10),
         ],
     },
 }
@@ -271,7 +296,7 @@ def python_dijkstra(adj, start, end):
 def python_components(adj):
     """Connected components via Union-Find. Returns {node: component_id}."""
     parent = {n: n for n in adj}
-    rank = {n: 0 for n in adj}
+    rank = dict.fromkeys(adj, 0)
 
     def find(x):
         while parent[x] != x:
@@ -311,7 +336,7 @@ def python_pagerank(adj, damping=0.85, iterations=100):
     if n == 0:
         return {}
 
-    rank = {node: 1.0 / n for node in adj}
+    rank = dict.fromkeys(adj, 1.0 / n)
     out_degree = {node: len(neighbors) for node, neighbors in adj.items()}
 
     for _ in range(iterations):
@@ -375,7 +400,7 @@ def run_graph_muninn(conn, operation, adj, start_nodes, end_nodes=None):
     if operation == "shortest_path":
         times = []
         results = []
-        for start, end in zip(start_nodes, end_nodes):
+        for start, end in zip(start_nodes, end_nodes, strict=False):
             t0 = time.perf_counter()
             rows = conn.execute(
                 "SELECT node, distance, path_order FROM graph_shortest_path"
@@ -450,7 +475,7 @@ def run_graph_muninn(conn, operation, adj, start_nodes, end_nodes=None):
         elapsed = time.perf_counter() - t0
         result = {int(r[0]): r[1] for r in rows}
         modularity = rows[0][2] if rows else None
-        return result, [elapsed], {"modularity": modularity, "n_communities": len(set(r[1] for r in rows))}
+        return result, [elapsed], {"modularity": modularity, "n_communities": len({r[1] for r in rows})}
 
     log.error("Unknown operation: %s", operation)
     return None, []
@@ -495,7 +520,7 @@ def run_graph_cte(conn, operation, adj, start_nodes, end_nodes=None):
     if operation == "shortest_path":
         times = []
         results = []
-        for start, end in zip(start_nodes, end_nodes):
+        for start, end in zip(start_nodes, end_nodes, strict=False):
             t0 = time.perf_counter()
             rows = conn.execute(
                 """
@@ -597,7 +622,7 @@ def run_graph_graphqlite(adj, edges, operation, n_nodes, start_nodes, end_nodes=
     if operation == "shortest_path":
         times = []
         results = []
-        for start, end in zip(start_nodes, end_nodes):
+        for start, end in zip(start_nodes, end_nodes, strict=False):
             t0 = time.perf_counter()
             result = g.shortest_path(source_id=str(start), target_id=str(end))
             times.append(time.perf_counter() - t0)
@@ -645,7 +670,7 @@ def verify_components(engine_result, truth):
         groups = collections.defaultdict(set)
         for node, comp in comp_map.items():
             groups[comp].add(node)
-        return set(frozenset(g) for g in groups.values())
+        return {frozenset(g) for g in groups.values()}
 
     return to_groups(engine_result) == to_groups(truth_result)
 
@@ -661,16 +686,26 @@ def write_jsonl_record(filepath, record):
 
 
 def make_graph_record(
-    engine, operation, graph_model, n_nodes, n_edges, avg_degree,
-    weighted, setup_time_s, query_times, correct, nodes_visited_mean,
-    storage="memory", engine_params=None,
+    engine,
+    operation,
+    graph_model,
+    n_nodes,
+    n_edges,
+    avg_degree,
+    weighted,
+    setup_time_s,
+    query_times,
+    correct,
+    nodes_visited_mean,
+    storage="memory",
+    engine_params=None,
 ):
     """Build a JSONL record for graph benchmark results."""
     n_queries = len(query_times)
     mean_time_ms = (sum(query_times) / n_queries * 1000) if n_queries > 0 else 0
 
     return {
-        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
         "benchmark_type": "graph",
         "engine": engine,
         "operation": operation,
@@ -696,8 +731,14 @@ def make_graph_record(
 
 
 def run_graph_benchmark(
-    graph_model, n_nodes, avg_degree_or_m, engines, output_path,
-    weighted=False, storage="memory", operations=None,
+    graph_model,
+    n_nodes,
+    avg_degree_or_m,
+    engines,
+    output_path,
+    weighted=False,
+    storage="memory",
+    operations=None,
 ):
     """Run graph traversal benchmarks for a single graph configuration."""
     operations = operations or ALL_OPERATIONS
@@ -753,7 +794,7 @@ def run_graph_benchmark(
                 correct = True
                 nodes_visited = None
                 if op == "bfs" and isinstance(results, list):
-                    correct = all(verify_bfs(r, adj, s) for r, s in zip(results, start_nodes))
+                    correct = all(verify_bfs(r, adj, s) for r, s in zip(results, start_nodes, strict=False))
                     nodes_visited = sum(len(r) for r in results) / len(results) if results else 0
                 elif op == "components":
                     correct = verify_components(results, adj)
@@ -764,11 +805,18 @@ def run_graph_benchmark(
                     nodes_visited = len(results)
 
                 record = make_graph_record(
-                    engine="muninn", operation=op, graph_model=graph_model,
-                    n_nodes=n_nodes, n_edges=n_edges, avg_degree=actual_avg_degree,
-                    weighted=weighted, setup_time_s=setup_time,
-                    query_times=times, correct=correct,
-                    nodes_visited_mean=nodes_visited, storage=storage,
+                    engine="muninn",
+                    operation=op,
+                    graph_model=graph_model,
+                    n_nodes=n_nodes,
+                    n_edges=n_edges,
+                    avg_degree=actual_avg_degree,
+                    weighted=weighted,
+                    setup_time_s=setup_time,
+                    query_times=times,
+                    correct=correct,
+                    nodes_visited_mean=nodes_visited,
+                    storage=storage,
                     engine_params=extra_metrics if extra_metrics else None,
                 )
                 write_jsonl_record(output_path, record)
@@ -792,18 +840,25 @@ def run_graph_benchmark(
                 correct = True
                 nodes_visited = None
                 if op == "bfs" and isinstance(results, list):
-                    correct = all(verify_bfs(r, adj, s) for r, s in zip(results, start_nodes))
+                    correct = all(verify_bfs(r, adj, s) for r, s in zip(results, start_nodes, strict=False))
                     nodes_visited = sum(len(r) for r in results) / len(results) if results else 0
                 elif op == "components":
                     correct = verify_components(results, adj)
                     nodes_visited = len(results)
 
                 record = make_graph_record(
-                    engine="cte", operation=op, graph_model=graph_model,
-                    n_nodes=n_nodes, n_edges=n_edges, avg_degree=actual_avg_degree,
-                    weighted=weighted, setup_time_s=setup_time,
-                    query_times=times, correct=correct,
-                    nodes_visited_mean=nodes_visited, storage=storage,
+                    engine="cte",
+                    operation=op,
+                    graph_model=graph_model,
+                    n_nodes=n_nodes,
+                    n_edges=n_edges,
+                    avg_degree=actual_avg_degree,
+                    weighted=weighted,
+                    setup_time_s=setup_time,
+                    query_times=times,
+                    correct=correct,
+                    nodes_visited_mean=nodes_visited,
+                    storage=storage,
                 )
                 write_jsonl_record(output_path, record)
                 log.info("      %s: %.3fms (correct=%s)", op, record["query_time_ms"], correct)
@@ -830,7 +885,7 @@ def run_graph_benchmark(
                 correct = True
                 nodes_visited = None
                 if op == "bfs" and isinstance(results, list):
-                    correct = all(verify_bfs(r, adj, s) for r, s in zip(results, start_nodes))
+                    correct = all(verify_bfs(r, adj, s) for r, s in zip(results, start_nodes, strict=False))
                     nodes_visited = sum(len(r) for r in results) / len(results) if results else 0
                 elif op == "components":
                     correct = verify_components(results, adj)
@@ -839,11 +894,18 @@ def run_graph_benchmark(
                     nodes_visited = sum(len(r) for r in results) / len(results) if results else 0
 
                 record = make_graph_record(
-                    engine="graphqlite", operation=op, graph_model=graph_model,
-                    n_nodes=n_nodes, n_edges=n_edges, avg_degree=actual_avg_degree,
-                    weighted=weighted, setup_time_s=setup_time,
-                    query_times=times, correct=correct,
-                    nodes_visited_mean=nodes_visited, storage=storage,
+                    engine="graphqlite",
+                    operation=op,
+                    graph_model=graph_model,
+                    n_nodes=n_nodes,
+                    n_edges=n_edges,
+                    avg_degree=actual_avg_degree,
+                    weighted=weighted,
+                    setup_time_s=setup_time,
+                    query_times=times,
+                    correct=correct,
+                    nodes_visited_mean=nodes_visited,
+                    storage=storage,
                 )
                 write_jsonl_record(output_path, record)
                 log.info("      %s: %.3fms (correct=%s)", op, record["query_time_ms"], correct)

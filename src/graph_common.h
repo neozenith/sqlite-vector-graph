@@ -32,14 +32,16 @@ extern const sqlite3_api_routines *sqlite3_api;
 
 static GRAPH_UNUSED unsigned int graph_str_hash(const char *s) {
     unsigned int h = 5381;
-    for (; *s; s++) h = h * 33 + (unsigned char)*s;
+    for (; *s; s++)
+        h = h * 33 + (unsigned char)*s;
     return h;
 }
 
 /* ── Safe text extraction from sqlite3_value ─────────────── */
 
 static GRAPH_UNUSED const char *graph_safe_text(sqlite3_value *v) {
-    if (!v || sqlite3_value_type(v) == SQLITE_NULL) return NULL;
+    if (!v || sqlite3_value_type(v) == SQLITE_NULL)
+        return NULL;
     return (const char *)sqlite3_value_text(v);
 }
 
@@ -57,18 +59,20 @@ static GRAPH_UNUSED const char *graph_safe_text(sqlite3_value *v) {
  *
  * good_cost: estimatedCost when required columns are present.
  */
-static GRAPH_UNUSED int graph_best_index_common(sqlite3_index_info *pIdxInfo,
-                                   int first_hidden, int last_hidden,
-                                   int required_mask, double good_cost) {
+static GRAPH_UNUSED int graph_best_index_common(sqlite3_index_info *pIdxInfo, int first_hidden, int last_hidden,
+                                                int required_mask, double good_cost) {
     int n_cols = last_hidden - first_hidden + 1;
 
     /* Pass 1: map each hidden column to its constraint index (or -1) */
-    int constraint_for[32];  /* max 32 hidden columns */
-    for (int j = 0; j < n_cols && j < 32; j++) constraint_for[j] = -1;
+    int constraint_for[32]; /* max 32 hidden columns */
+    for (int j = 0; j < n_cols && j < 32; j++)
+        constraint_for[j] = -1;
 
     for (int i = 0; i < pIdxInfo->nConstraint; i++) {
-        if (!pIdxInfo->aConstraint[i].usable) continue;
-        if (pIdxInfo->aConstraint[i].op != SQLITE_INDEX_CONSTRAINT_EQ) continue;
+        if (!pIdxInfo->aConstraint[i].usable)
+            continue;
+        if (pIdxInfo->aConstraint[i].op != SQLITE_INDEX_CONSTRAINT_EQ)
+            continue;
         int col = pIdxInfo->aConstraint[i].iColumn;
         if (col >= first_hidden && col <= last_hidden) {
             constraint_for[col - first_hidden] = i;
@@ -87,9 +91,7 @@ static GRAPH_UNUSED int graph_best_index_common(sqlite3_index_info *pIdxInfo,
     }
 
     pIdxInfo->idxNum = idx_num;
-    pIdxInfo->estimatedCost = ((idx_num & required_mask) == required_mask)
-                                  ? good_cost
-                                  : 1e12;
+    pIdxInfo->estimatedCost = ((idx_num & required_mask) == required_mask) ? good_cost : 1e12;
     return SQLITE_OK;
 }
 

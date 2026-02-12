@@ -12,8 +12,8 @@
 
 /* A single edge in an adjacency list */
 typedef struct {
-    int target;      /* index into GraphData.ids[] */
-    double weight;   /* 1.0 for unweighted graphs */
+    int target;    /* index into GraphData.ids[] */
+    double weight; /* 1.0 for unweighted graphs */
 } GraphEdge;
 
 /* Adjacency list for one node */
@@ -25,13 +25,13 @@ typedef struct {
 
 /* Complete in-memory graph with hash-map-based node lookup */
 typedef struct {
-    char **ids;            /* ids[i] = string ID of node i */
+    char **ids; /* ids[i] = string ID of node i */
     int node_count;
     int node_capacity;
-    int *map_indices;      /* open-addressing hash: slot -> node index, -1 = empty */
-    int map_capacity;      /* always power of 2 */
-    GraphAdjList *out;     /* forward adjacency: out[i] = neighbors of node i */
-    GraphAdjList *in;      /* reverse adjacency: in[i] = predecessors of node i */
+    int *map_indices;  /* open-addressing hash: slot -> node index, -1 = empty */
+    int map_capacity;  /* always power of 2 */
+    GraphAdjList *out; /* forward adjacency: out[i] = neighbors of node i */
+    GraphAdjList *in;  /* reverse adjacency: in[i] = predecessors of node i */
     int has_weights;
     int edge_count;
 } GraphData;
@@ -41,11 +41,11 @@ typedef struct {
     const char *edge_table;
     const char *src_col;
     const char *dst_col;
-    const char *weight_col;      /* NULL = unweighted (all edges weight 1.0) */
-    const char *direction;       /* "forward", "reverse", or "both" */
-    const char *timestamp_col;   /* NULL = no temporal filter */
-    sqlite3_value *time_start;   /* NULL = no lower bound */
-    sqlite3_value *time_end;     /* NULL = no upper bound */
+    const char *weight_col;    /* NULL = unweighted (all edges weight 1.0) */
+    const char *direction;     /* "forward", "reverse", or "both" */
+    const char *timestamp_col; /* NULL = no temporal filter */
+    sqlite3_value *time_start; /* NULL = no lower bound */
+    sqlite3_value *time_end;   /* NULL = no upper bound */
 } GraphLoadConfig;
 
 /* Initialize an empty graph. Must be called before any other operations. */
@@ -68,7 +68,6 @@ int graph_data_find_or_add(GraphData *g, const char *id);
  * Returns SQLITE_OK on success, or an error code.
  * On error, sets *pzErrMsg (caller must sqlite3_free it).
  */
-int graph_data_load(sqlite3 *db, const GraphLoadConfig *config,
-                    GraphData *g, char **pzErrMsg);
+int graph_data_load(sqlite3 *db, const GraphLoadConfig *config, GraphData *g, char **pzErrMsg);
 
 #endif /* GRAPH_LOAD_H */

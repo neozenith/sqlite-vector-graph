@@ -9,6 +9,7 @@ and HNSW vector IDs.
 edges. Node2Vec learns embeddings from graph structure, then HNSW enables
 "find movies similar to X" queries.
 """
+
 import sqlite3
 import struct
 from pathlib import Path
@@ -88,9 +89,7 @@ def build_rowid_mapping(db: sqlite3.Connection) -> dict[str, int]:
 
     We replicate this by iterating the same SELECT and tracking first appearances.
     """
-    rows = db.execute(
-        'SELECT src, dst FROM co_prefs'
-    ).fetchall()
+    rows = db.execute("SELECT src, dst FROM co_prefs").fetchall()
 
     name_to_idx: dict[str, int] = {}
     for src, dst in rows:
@@ -119,8 +118,10 @@ def main() -> None:
         edges.append((a, b))
         edges.append((b, a))
     db.executemany("INSERT INTO co_prefs VALUES (?, ?)", edges)
-    print(f"Created co-preference graph: {len(MOVIES)} movies, "
-          f"{len(CO_PREFERENCES)} undirected edges ({len(edges)} directed).\n")
+    print(
+        f"Created co-preference graph: {len(MOVIES)} movies, "
+        f"{len(CO_PREFERENCES)} undirected edges ({len(edges)} directed).\n"
+    )
 
     # ── Step 2: Create HNSW table for embeddings ─────────────────────
     dim = 32
@@ -155,9 +156,7 @@ def main() -> None:
     num_embedded = result[0]
     print(f"  Embedded {num_embedded} movie nodes.\n")
 
-    assert num_embedded == len(MOVIES), (
-        f"Expected {len(MOVIES)} embeddings, got {num_embedded}"
-    )
+    assert num_embedded == len(MOVIES), f"Expected {len(MOVIES)} embeddings, got {num_embedded}"
 
     # ── Step 4: Build rowid ↔ name mapping ───────────────────────────
     rowid_map = build_rowid_mapping(db)
@@ -170,9 +169,7 @@ def main() -> None:
 
     # ── Step 5: KNN search for "The Matrix" ──────────────────────────
     matrix_rowid = rowid_map["The Matrix"]
-    matrix_vec = db.execute(
-        "SELECT vector FROM movie_emb WHERE rowid = ?", (matrix_rowid,)
-    ).fetchone()
+    matrix_vec = db.execute("SELECT vector FROM movie_emb WHERE rowid = ?", (matrix_rowid,)).fetchone()
     assert matrix_vec is not None, "Could not retrieve The Matrix embedding"
 
     print('--- KNN Search: "Find movies similar to The Matrix" ---')
@@ -196,16 +193,12 @@ def main() -> None:
             matrix_genre_count += 1
 
     # At least 2 of top-7 neighbors should be sci-fi (excluding self)
-    assert matrix_genre_count >= 2, (
-        f"Expected at least 2 sci-fi movies near The Matrix, got {matrix_genre_count}"
-    )
+    assert matrix_genre_count >= 2, f"Expected at least 2 sci-fi movies near The Matrix, got {matrix_genre_count}"
     print(f"\n  {matrix_genre_count} sci-fi movies in top-7 neighbors.\n")
 
     # ── Step 6: KNN search for "Die Hard" ────────────────────────────
     diehard_rowid = rowid_map["Die Hard"]
-    diehard_vec = db.execute(
-        "SELECT vector FROM movie_emb WHERE rowid = ?", (diehard_rowid,)
-    ).fetchone()
+    diehard_vec = db.execute("SELECT vector FROM movie_emb WHERE rowid = ?", (diehard_rowid,)).fetchone()
     assert diehard_vec is not None, "Could not retrieve Die Hard embedding"
 
     print('--- KNN Search: "Find movies similar to Die Hard" ---')
@@ -228,9 +221,7 @@ def main() -> None:
         if genre == "action" and name != "Die Hard":
             action_genre_count += 1
 
-    assert action_genre_count >= 2, (
-        f"Expected at least 2 action movies near Die Hard, got {action_genre_count}"
-    )
+    assert action_genre_count >= 2, f"Expected at least 2 action movies near Die Hard, got {action_genre_count}"
     print(f"\n  {action_genre_count} action movies in top-7 neighbors.\n")
 
     db.close()

@@ -3,7 +3,6 @@ Integration tests for graph table-valued functions.
 
 Tests BFS, DFS, and shortest path on synthetic edge tables.
 """
-import pytest
 
 
 def create_tree_graph(conn):
@@ -277,8 +276,7 @@ def create_star_graph(conn):
     conn.execute("CREATE TABLE star_edges (src TEXT, dst TEXT)")
     conn.executemany(
         "INSERT INTO star_edges VALUES (?, ?)",
-        [("H", "I"), ("H", "J"), ("H", "K"), ("H", "L"),
-         ("I", "H"), ("J", "H"), ("K", "H"), ("L", "H")],
+        [("H", "I"), ("H", "J"), ("H", "K"), ("H", "L"), ("I", "H"), ("J", "H"), ("K", "H"), ("L", "H")],
     )
 
 
@@ -319,7 +317,7 @@ class TestGraphComponents:
 
         # Group nodes by component_id
         components = {}
-        for node, comp_id, comp_size in results:
+        for node, comp_id, _comp_size in results:
             components.setdefault(comp_id, set()).add(node)
 
         assert len(components) == 3

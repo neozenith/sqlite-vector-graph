@@ -61,3 +61,18 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["pytests"]
+addopts = "--cov=sqlite_muninn --cov=pytests --cov-report=term-missing --cov-fail-under=90 -m 'not integration'"
+markers = [
+    "integration: slow install tests that create throwaway projects (deselected by default)",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "C4", "UP"]
+
+[tool.mypy]
+strict = true
+python_version = "3.12"

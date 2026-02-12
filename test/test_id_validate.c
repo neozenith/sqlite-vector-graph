@@ -17,13 +17,13 @@ TEST(test_valid_identifiers) {
 TEST(test_invalid_identifiers) {
     ASSERT_EQ_INT(id_validate(NULL), -1);
     ASSERT_EQ_INT(id_validate(""), -1);
-    ASSERT_EQ_INT(id_validate("drop table"), -1);       /* space */
-    ASSERT_EQ_INT(id_validate("my-table"), -1);          /* hyphen */
-    ASSERT_EQ_INT(id_validate("tab;le"), -1);            /* semicolon */
-    ASSERT_EQ_INT(id_validate("x' OR 1=1--"), -1);      /* SQL injection */
-    ASSERT_EQ_INT(id_validate("\"quoted\""), -1);        /* quotes */
-    ASSERT_EQ_INT(id_validate("table.column"), -1);      /* dot */
-    ASSERT_EQ_INT(id_validate("func()"), -1);            /* parens */
+    ASSERT_EQ_INT(id_validate("drop table"), -1);   /* space */
+    ASSERT_EQ_INT(id_validate("my-table"), -1);     /* hyphen */
+    ASSERT_EQ_INT(id_validate("tab;le"), -1);       /* semicolon */
+    ASSERT_EQ_INT(id_validate("x' OR 1=1--"), -1);  /* SQL injection */
+    ASSERT_EQ_INT(id_validate("\"quoted\""), -1);   /* quotes */
+    ASSERT_EQ_INT(id_validate("table.column"), -1); /* dot */
+    ASSERT_EQ_INT(id_validate("func()"), -1);       /* parens */
 }
 
 void test_id_validate(void) {

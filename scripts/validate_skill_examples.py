@@ -9,11 +9,10 @@ Usage:
 
 Exit code 0 if all examples pass, 1 if any fail.
 """
+
 import logging
 import re
 import sqlite3
-import struct
-import subprocess
 import sys
 import textwrap
 from pathlib import Path
@@ -31,12 +30,12 @@ CODE_BLOCK_RE = re.compile(
 
 # SQL blocks that are informational only (contain placeholders)
 SQL_SKIP_PATTERNS = [
-    "MATCH ?",          # Requires blob parameter
-    "VALUES (?, ?)",    # Requires bound parameters
-    "WHERE vector",     # Requires blob parameter
+    "MATCH ?",  # Requires blob parameter
+    "VALUES (?, ?)",  # Requires bound parameters
+    "WHERE vector",  # Requires blob parameter
     "node2vec_train(",  # Needs populated edge table
-    "zeroblob",         # Example placeholder
-    "DELETE FROM",      # DML depends on prior CREATE context
+    "zeroblob",  # Example placeholder
+    "DELETE FROM",  # DML depends on prior CREATE context
 ]
 
 # Python blocks that require external deps

@@ -6,6 +6,7 @@ Demonstrates: graph_shortest_path with unweighted (BFS) and weighted (Dijkstra).
 A transit network where the fewest-stops path and the fastest-time path differ,
 showing why weighted shortest paths matter for real routing problems.
 """
+
 import sqlite3
 from pathlib import Path
 
@@ -86,7 +87,7 @@ def main() -> None:
             "SELECT travel_time FROM routes WHERE src = ? AND dst = ?",
             (unw_path[i], unw_path[i + 1]),
         ).fetchone()
-        assert row is not None, f"No route from {unw_path[i]} to {unw_path[i+1]}"
+        assert row is not None, f"No route from {unw_path[i]} to {unw_path[i + 1]}"
         unw_time += row[0]
     print(f"  Total travel time: {unw_time:.0f} min\n")
 

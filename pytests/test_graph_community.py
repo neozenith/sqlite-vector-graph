@@ -3,7 +3,6 @@ Integration tests for graph community detection table-valued functions.
 
 Tests graph_leiden on synthetic graphs with known community structure.
 """
-import pytest
 
 
 def create_barbell_graph(conn):
@@ -16,15 +15,22 @@ def create_barbell_graph(conn):
     conn.execute("CREATE TABLE barbell (src TEXT, dst TEXT)")
     edges = [
         # Clique 1: A, B, C
-        ("A", "B"), ("B", "A"),
-        ("A", "C"), ("C", "A"),
-        ("B", "C"), ("C", "B"),
+        ("A", "B"),
+        ("B", "A"),
+        ("A", "C"),
+        ("C", "A"),
+        ("B", "C"),
+        ("C", "B"),
         # Clique 2: D, E, F
-        ("D", "E"), ("E", "D"),
-        ("D", "F"), ("F", "D"),
-        ("E", "F"), ("F", "E"),
+        ("D", "E"),
+        ("E", "D"),
+        ("D", "F"),
+        ("F", "D"),
+        ("E", "F"),
+        ("F", "E"),
         # Bridge
-        ("C", "D"), ("D", "C"),
+        ("C", "D"),
+        ("D", "C"),
     ]
     conn.executemany("INSERT INTO barbell VALUES (?, ?)", edges)
 
@@ -33,9 +39,12 @@ def create_triangle_graph(conn):
     """A single triangle: should be one community."""
     conn.execute("CREATE TABLE tri (src TEXT, dst TEXT)")
     edges = [
-        ("A", "B"), ("B", "A"),
-        ("A", "C"), ("C", "A"),
-        ("B", "C"), ("C", "B"),
+        ("A", "B"),
+        ("B", "A"),
+        ("A", "C"),
+        ("C", "A"),
+        ("B", "C"),
+        ("C", "B"),
     ]
     conn.executemany("INSERT INTO tri VALUES (?, ?)", edges)
 
@@ -48,13 +57,19 @@ def create_disconnected_communities(conn):
     conn.execute("CREATE TABLE disc_comm (src TEXT, dst TEXT)")
     edges = [
         # Community 1
-        ("A", "B"), ("B", "A"),
-        ("A", "C"), ("C", "A"),
-        ("B", "C"), ("C", "B"),
+        ("A", "B"),
+        ("B", "A"),
+        ("A", "C"),
+        ("C", "A"),
+        ("B", "C"),
+        ("C", "B"),
         # Community 2
-        ("X", "Y"), ("Y", "X"),
-        ("X", "Z"), ("Z", "X"),
-        ("Y", "Z"), ("Z", "Y"),
+        ("X", "Y"),
+        ("Y", "X"),
+        ("X", "Z"),
+        ("Z", "X"),
+        ("Y", "Z"),
+        ("Z", "Y"),
     ]
     conn.executemany("INSERT INTO disc_comm VALUES (?, ?)", edges)
 
@@ -66,15 +81,22 @@ def create_weighted_communities(conn):
     conn.execute("CREATE TABLE wcomm (src TEXT, dst TEXT, weight REAL)")
     edges = [
         # Strong clique 1
-        ("A", "B", 10.0), ("B", "A", 10.0),
-        ("A", "C", 10.0), ("C", "A", 10.0),
-        ("B", "C", 10.0), ("C", "B", 10.0),
+        ("A", "B", 10.0),
+        ("B", "A", 10.0),
+        ("A", "C", 10.0),
+        ("C", "A", 10.0),
+        ("B", "C", 10.0),
+        ("C", "B", 10.0),
         # Strong clique 2
-        ("D", "E", 10.0), ("E", "D", 10.0),
-        ("D", "F", 10.0), ("F", "D", 10.0),
-        ("E", "F", 10.0), ("F", "E", 10.0),
+        ("D", "E", 10.0),
+        ("E", "D", 10.0),
+        ("D", "F", 10.0),
+        ("F", "D", 10.0),
+        ("E", "F", 10.0),
+        ("F", "E", 10.0),
         # Weak bridge
-        ("C", "D", 0.1), ("D", "C", 0.1),
+        ("C", "D", 0.1),
+        ("D", "C", 0.1),
     ]
     conn.executemany("INSERT INTO wcomm VALUES (?, ?, ?)", edges)
 
@@ -84,15 +106,22 @@ def create_temporal_communities(conn):
     conn.execute("CREATE TABLE tcomm (src TEXT, dst TEXT, ts TEXT)")
     edges = [
         # Early edges form one group
-        ("A", "B", "2024-01-01"), ("B", "A", "2024-01-01"),
-        ("A", "C", "2024-02-01"), ("C", "A", "2024-02-01"),
-        ("B", "C", "2024-03-01"), ("C", "B", "2024-03-01"),
+        ("A", "B", "2024-01-01"),
+        ("B", "A", "2024-01-01"),
+        ("A", "C", "2024-02-01"),
+        ("C", "A", "2024-02-01"),
+        ("B", "C", "2024-03-01"),
+        ("C", "B", "2024-03-01"),
         # Late edges form another group
-        ("D", "E", "2024-07-01"), ("E", "D", "2024-07-01"),
-        ("D", "F", "2024-08-01"), ("F", "D", "2024-08-01"),
-        ("E", "F", "2024-09-01"), ("F", "E", "2024-09-01"),
+        ("D", "E", "2024-07-01"),
+        ("E", "D", "2024-07-01"),
+        ("D", "F", "2024-08-01"),
+        ("F", "D", "2024-08-01"),
+        ("E", "F", "2024-09-01"),
+        ("F", "E", "2024-09-01"),
         # Bridge connecting the groups (mid-year)
-        ("C", "D", "2024-05-01"), ("D", "C", "2024-05-01"),
+        ("C", "D", "2024-05-01"),
+        ("D", "C", "2024-05-01"),
     ]
     conn.executemany("INSERT INTO tcomm VALUES (?, ?, ?)", edges)
 
@@ -237,10 +266,7 @@ class TestGraphLeiden:
         """Every node in the graph should get a community assignment."""
         create_barbell_graph(conn)
         results = conn.execute(
-            "SELECT node FROM graph_leiden"
-            " WHERE edge_table = 'barbell'"
-            "   AND src_col = 'src'"
-            "   AND dst_col = 'dst'"
+            "SELECT node FROM graph_leiden WHERE edge_table = 'barbell'   AND src_col = 'src'   AND dst_col = 'dst'"
         ).fetchall()
 
         nodes = {r[0] for r in results}

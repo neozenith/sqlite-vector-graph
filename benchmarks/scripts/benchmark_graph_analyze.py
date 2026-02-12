@@ -12,6 +12,7 @@ Usage:
     python python/benchmark_graph_analyze.py --filter-operation bfs
     python python/benchmark_graph_analyze.py --filter-engine muninn
 """
+
 import argparse
 import json
 import logging
@@ -22,7 +23,6 @@ from pathlib import Path
 
 import jinja2
 import plotly.graph_objects as go
-
 from benchmark_graph import ALL_GRAPH_ENGINES, ALL_OPERATIONS, GRAPH_PROFILES
 
 log = logging.getLogger(__name__)
@@ -40,8 +40,8 @@ ENGINE_LABELS = {
 }
 
 ENGINE_HUES = {
-    "muninn": 270,      # purple
-    "graphqlite": 340,     # pink
+    "muninn": 270,  # purple
+    "graphqlite": 340,  # pink
 }
 
 ENGINE_ORDER = ["muninn", "graphqlite"]
@@ -91,8 +91,8 @@ def _make_color(engine, variant_idx=0, n_variants=1):
         sat, lum = 75, 45
     else:
         t = variant_idx / (n_variants - 1)
-        sat = 85 - int(t * 15)   # 85% -> 70%
-        lum = 58 - int(t * 23)   # 58% -> 35%
+        sat = 85 - int(t * 15)  # 85% -> 70%
+        lum = 58 - int(t * 23)  # 58% -> 35%
     return f"hsl({hue}, {sat}%, {lum}%)"
 
 
@@ -194,11 +194,11 @@ def _aggregate_group(records):
 
 
 def _get_operations(agg):
-    return sorted(set(k[1] for k in agg))
+    return sorted({k[1] for k in agg})
 
 
 def _get_engines(agg):
-    engines = set(k[0] for k in agg)
+    engines = {k[0] for k in agg}
     return sorted(engines, key=lambda e: ENGINE_ORDER.index(e) if e in ENGINE_ORDER else 999)
 
 
@@ -255,7 +255,7 @@ def print_tables(agg):
     """Print all text summary tables."""
     operations = _get_operations(agg)
     engines = _get_engines(agg)
-    graph_models = sorted(set(k[2] for k in agg))
+    graph_models = sorted({k[2] for k in agg})
 
     for gm in graph_models:
         for op in operations:
@@ -287,7 +287,7 @@ def print_operation_table(agg, operation, graph_model, engines):
             header += f" | {_engine_label(engine):>{col_w}}"
         header += f" | {'correct':>8}"
         print(header)
-        print(f"  {'-'*10}" + f"-+-{'-'*col_w}" * len(engines) + f"-+-{'-'*8}")
+        print(f"  {'-' * 10}" + f"-+-{'-' * col_w}" * len(engines) + f"-+-{'-' * 8}")
 
         for n in node_counts:
             row = f"  {n:>10,}"
@@ -314,7 +314,7 @@ def print_setup_time_table(agg, engines):
     # Group by graph_model and avg_degree, take the first operation's setup_time
     seen = set()
     rows = []
-    for k, v in sorted(agg.items(), key=lambda x: (x[0][2], x[0][4], x[0][3])):
+    for k, _v in sorted(agg.items(), key=lambda x: (x[0][2], x[0][4], x[0][3])):
         group_key = (k[2], k[3], k[4])
         if group_key in seen:
             continue
@@ -328,7 +328,7 @@ def print_setup_time_table(agg, engines):
     for engine in engines:
         header += f" | {_engine_label(engine):>{col_w}}"
     print(header)
-    print(f"  {'-'*15} {'-'*8} {'-'*5}" + f"-+-{'-'*col_w}" * len(engines))
+    print(f"  {'-' * 15} {'-' * 8} {'-' * 5}" + f"-+-{'-' * col_w}" * len(engines))
 
     for gm, n, deg in rows:
         row = f"  {gm:>15} {n:>8,} {deg:>5}"
@@ -391,7 +391,8 @@ def chart_query_time_by_operation(agg):
 
                 fig.add_trace(
                     go.Scatter(
-                        x=nodes, y=times,
+                        x=nodes,
+                        y=times,
                         mode="lines+markers",
                         name=_trace_label(engine, gm, deg),
                         line={"color": color, "width": line_width},
@@ -416,8 +417,14 @@ def chart_query_time_by_operation(agg):
             height=500,
             width=900,
             template="plotly_white",
-            legend={"orientation": "v", "yanchor": "top", "y": 0.99, "xanchor": "left", "x": 1.02,
-                    "groupclick": "togglegroup"},
+            legend={
+                "orientation": "v",
+                "yanchor": "top",
+                "y": 0.99,
+                "xanchor": "left",
+                "x": 1.02,
+                "groupclick": "togglegroup",
+            },
         )
 
         _save_chart(fig, f"graph_query_time_{op}")
@@ -468,7 +475,8 @@ def chart_setup_time(agg):
 
             fig.add_trace(
                 go.Scatter(
-                    x=edge_counts, y=throughputs,
+                    x=edge_counts,
+                    y=throughputs,
                     mode="lines+markers",
                     name=_trace_label(engine, gm, deg),
                     line={"color": color, "width": line_width},
@@ -492,8 +500,14 @@ def chart_setup_time(agg):
         height=500,
         width=900,
         template="plotly_white",
-        legend={"orientation": "v", "yanchor": "top", "y": 0.99, "xanchor": "left", "x": 1.02,
-                "groupclick": "togglegroup"},
+        legend={
+            "orientation": "v",
+            "yanchor": "top",
+            "y": 0.99,
+            "xanchor": "left",
+            "x": 1.02,
+            "groupclick": "togglegroup",
+        },
     )
 
     _save_chart(fig, "graph_setup_time")
@@ -534,10 +548,7 @@ def generate_docs():
         "closeness": "Closeness Centrality",
         "leiden": "Leiden Community Detection",
     }
-    operations = [
-        {"key": op, "label": operation_labels.get(op, op.replace("_", " ").title())}
-        for op in ALL_OPERATIONS
-    ]
+    operations = [{"key": op, "label": operation_labels.get(op, op.replace("_", " ").title())} for op in ALL_OPERATIONS]
     output = template.render(operations=operations)
     out_path = DOCS_DIR / "graph.md"
     out_path.write_text(output, encoding="utf-8")

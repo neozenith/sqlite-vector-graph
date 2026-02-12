@@ -6,6 +6,7 @@ Demonstrates: graph_bfs (direction='both', max_depth), graph_dfs.
 8 people in two clusters connected by a bridge node. BFS with
 direction='both' traverses undirected edges stored in one direction.
 """
+
 import sqlite3
 from pathlib import Path
 

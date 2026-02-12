@@ -10,11 +10,7 @@
 
 #include <stdint.h>
 
-typedef enum {
-    VEC_METRIC_L2 = 0,
-    VEC_METRIC_COSINE = 1,
-    VEC_METRIC_INNER_PRODUCT = 2
-} VecMetric;
+typedef enum { VEC_METRIC_L2 = 0, VEC_METRIC_COSINE = 1, VEC_METRIC_INNER_PRODUCT = 2 } VecMetric;
 
 /* Distance function signature: (a, b, dimensions) -> distance */
 typedef float (*VecDistanceFunc)(const float *a, const float *b, int dim);

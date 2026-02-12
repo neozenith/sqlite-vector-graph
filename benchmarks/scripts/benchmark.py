@@ -4,14 +4,13 @@ Performance benchmarks for sqlite-muninn.
 Measures insert rate, search latency, and recall at various dataset sizes.
 Run: python python/benchmark.py
 """
+
+import math
 import os
+import random
 import sqlite3
 import struct
 import time
-import random
-import math
-import sys
-
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 EXTENSION_PATH = os.path.join(PROJECT_ROOT, "muninn")
@@ -42,7 +41,7 @@ def brute_force_knn(query, vectors, k):
     """Brute force KNN by L2 distance."""
     dists = []
     for rowid, v in vectors.items():
-        d = sum((a - b) ** 2 for a, b in zip(query, v))
+        d = sum((a - b) ** 2 for a, b in zip(query, v, strict=False))
         dists.append((d, rowid))
     dists.sort()
     return [rowid for _, rowid in dists[:k]]
@@ -50,11 +49,11 @@ def brute_force_knn(query, vectors, k):
 
 def benchmark_hnsw(n_values, dim=64, k=10, m=16, ef_construction=100, ef_search=64):
     """Benchmark HNSW insert and search at various N."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"HNSW Benchmark: dim={dim}, k={k}, M={m}, ef_c={ef_construction}, ef_s={ef_search}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"{'N':>8} | {'Insert (vec/s)':>14} | {'Search (ms)':>11} | {'Recall@{k}':>10}")
-    print(f"{'-'*8}-+-{'-'*14}-+-{'-'*11}-+-{'-'*10}")
+    print(f"{'-' * 8}-+-{'-' * 14}-+-{'-' * 11}-+-{'-' * 10}")
 
     for n in n_values:
         conn = sqlite3.connect(":memory:")
@@ -91,11 +90,10 @@ def benchmark_hnsw(n_values, dim=64, k=10, m=16, ef_construction=100, ef_search=
         for qid in query_ids:
             q = vectors[qid]
             rows = conn.execute(
-                "SELECT rowid, distance FROM bench_vec"
-                " WHERE vector MATCH ? AND k = ? AND ef_search = ?",
+                "SELECT rowid, distance FROM bench_vec WHERE vector MATCH ? AND k = ? AND ef_search = ?",
                 (pack_vector(q), k, ef_search),
             ).fetchall()
-            hnsw_results.append(set(r[0] for r in rows))
+            hnsw_results.append({r[0] for r in rows})
         t_search = time.perf_counter() - t0
         avg_search_ms = (t_search / n_queries) * 1000
 
@@ -115,9 +113,9 @@ def benchmark_hnsw(n_values, dim=64, k=10, m=16, ef_construction=100, ef_search=
 
 def benchmark_graph_tvfs():
     """Benchmark graph TVFs on synthetic graphs."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("Graph TVF Benchmark")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     conn = sqlite3.connect(":memory:")
     conn.enable_load_extension(True)
@@ -160,7 +158,7 @@ def benchmark_graph_tvfs():
             "   AND src_col = 'src' AND dst_col = 'dst'"
         ).fetchall()
         t_comp = (time.perf_counter() - t0) * 1000
-        n_components = len(set(r[1] for r in rows))
+        n_components = len({r[1] for r in rows})
         print(f"    Components: {t_comp:8.2f} ms  ({n_components} components)")
 
         # PageRank
@@ -188,7 +186,7 @@ def main():
     # Graph TVF benchmarks
     benchmark_graph_tvfs()
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("Benchmark complete.")
 
 

@@ -6,6 +6,7 @@ Demonstrates: CREATE VIRTUAL TABLE, INSERT, KNN MATCH, point lookup, DELETE.
 12 tech articles across 3 topics (AI, Web, Database) with hand-crafted
 8-dimensional topic-aligned vectors and cosine similarity search.
 """
+
 import sqlite3
 import struct
 from pathlib import Path
@@ -93,13 +94,13 @@ def main() -> None:
         (query_vec,),
     ).fetchall()
 
-    for rowid, distance, title, topic in results:
+    for _rowid, distance, title, topic in results:
         print(f"  [{topic:3s}] {title:<45s}  dist={distance:.4f}")
 
     # Assert: top results should all be AI docs
     top_topics = [r[3] for r in results[:3]]
     assert all(t == "ai" for t in top_topics), f"Expected top-3 to be AI docs, got {top_topics}"
-    print(f"\n  Top 3 results are all AI articles.\n")
+    print("\n  Top 3 results are all AI articles.\n")
 
     # ── Step 4: Point lookup ─────────────────────────────────────────
     print("--- Point Lookup (rowid=3: 'Transformer Models Explained') ---")
@@ -109,9 +110,7 @@ def main() -> None:
     expected = [0.7, 0.6, 0.9, 0.1, 0.0, 0.1, 0.0, 0.1]
     print(f"  Stored vector: [{', '.join(f'{v:.1f}' for v in stored_vec)}]")
     # float32 round-trip means we compare approximately
-    assert all(
-        abs(a - b) < 1e-5 for a, b in zip(stored_vec, expected)
-    ), f"Vector mismatch: {stored_vec}"
+    assert all(abs(a - b) < 1e-5 for a, b in zip(stored_vec, expected, strict=False)), f"Vector mismatch: {stored_vec}"
     print("  Matches original vector.\n")
 
     # ── Step 5: Delete and re-search ─────────────────────────────────
@@ -132,9 +131,9 @@ def main() -> None:
     result_ids = {r[0] for r in results_after}
     assert 2 not in result_ids, "Deleted document should not appear in results"
     print("  Re-search results (k=5):")
-    for rowid, title, topic in results_after:
+    for _rowid, title, topic in results_after:
         print(f"    [{topic:3s}] {title}")
-    print(f"\n  Doc #2 correctly absent from results.\n")
+    print("\n  Doc #2 correctly absent from results.\n")
 
     db.close()
     print("All assertions passed.")

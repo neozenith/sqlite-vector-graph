@@ -16,14 +16,14 @@
 /* A single node in the HNSW graph */
 typedef struct HnswNode {
     int64_t id;
-    float *vector;       /* owned: float[dim], allocated by caller */
-    int level;           /* max level this node participates in */
-    int deleted;         /* soft-delete flag */
+    float *vector; /* owned: float[dim], allocated by caller */
+    int level;     /* max level this node participates in */
+    int deleted;   /* soft-delete flag */
 
     /* Per-level neighbor lists */
-    int64_t **neighbors;  /* neighbors[l] = array of node IDs at level l */
-    int *neighbor_count;  /* neighbor_count[l] = count at level l */
-    int *neighbor_cap;    /* neighbor_cap[l] = allocated capacity at level l */
+    int64_t **neighbors; /* neighbors[l] = array of node IDs at level l */
+    int *neighbor_count; /* neighbor_count[l] = count at level l */
+    int *neighbor_cap;   /* neighbor_cap[l] = allocated capacity at level l */
 } HnswNode;
 
 /* Search result: (id, distance) pair */
@@ -34,21 +34,21 @@ typedef struct {
 
 /* The HNSW index */
 typedef struct {
-    int dim;               /* vector dimensionality */
-    int M;                 /* max connections per node per layer (M_max) */
-    int M_max0;            /* max connections at layer 0 (typically 2*M) */
-    int ef_construction;   /* beam width during insert */
+    int dim;             /* vector dimensionality */
+    int M;               /* max connections per node per layer (M_max) */
+    int M_max0;          /* max connections at layer 0 (typically 2*M) */
+    int ef_construction; /* beam width during insert */
     VecMetric metric;
     VecDistanceFunc dist_func;
-    double level_mult;     /* 1/ln(M), for random level generation */
+    double level_mult; /* 1/ln(M), for random level generation */
 
-    int64_t entry_point;   /* node ID of entry point (-1 if empty) */
-    int max_level;         /* current max level in graph */
+    int64_t entry_point; /* node ID of entry point (-1 if empty) */
+    int max_level;       /* current max level in graph */
 
     /* Node storage: hash map (id -> node) via simple open-addressing */
-    HnswNode **nodes;      /* hash table buckets */
+    HnswNode **nodes; /* hash table buckets */
     int node_count;
-    int node_capacity;     /* must be power of 2 */
+    int node_capacity;      /* must be power of 2 */
     unsigned int rng_state; /* xorshift32 PRNG state */
 } HnswIndex;
 
@@ -70,8 +70,7 @@ int hnsw_insert(HnswIndex *idx, int64_t id, const float *vector);
  * ef_search controls beam width (higher = better recall, slower).
  * Returns the number of results found (may be < k if index has fewer nodes).
  */
-int hnsw_search(HnswIndex *idx, const float *query, int k, int ef_search,
-                HnswSearchResult *results);
+int hnsw_search(HnswIndex *idx, const float *query, int k, int ef_search, HnswSearchResult *results);
 
 /*
  * Delete a node by ID (soft delete + neighbor reconnection).

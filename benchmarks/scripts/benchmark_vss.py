@@ -30,6 +30,7 @@ Run:
     python python/benchmark_vss.py --source random --dim 384 --sizes 1000,5000
     python python/benchmark_vss.py --source model:all-MiniLM-L6-v2 --sizes 1000 --dataset ag_news
 """
+
 import argparse
 import datetime
 import importlib.resources
@@ -329,7 +330,13 @@ def load_dataset_texts(dataset_key, max_n):
         raw_text = re.sub(r"\n{3,}", "\n\n", raw_text)
         chunks = chunk_fixed_tokens(raw_text, window=ds_config["chunk_tokens"], overlap=ds_config["chunk_overlap"])
         texts = chunks[:max_n]
-        log.info("    %s: %d chunks (window=%d, overlap=%d)", dataset_key, len(texts), ds_config["chunk_tokens"], ds_config["chunk_overlap"])
+        log.info(
+            "    %s: %d chunks (window=%d, overlap=%d)",
+            dataset_key,
+            len(texts),
+            ds_config["chunk_tokens"],
+            ds_config["chunk_overlap"],
+        )
         return texts
 
     log.error("Unknown dataset source_type: %s", ds_config["source_type"])
@@ -355,7 +362,7 @@ def compute_saturation_metrics(vectors, dim, n_sample_pairs=SATURATION_SAMPLE_PA
     pairwise_dists = []
     for _ in range(n_pairs):
         i, j = random.sample(ids, 2)
-        d = math.sqrt(sum((a - b) ** 2 for a, b in zip(vectors[i], vectors[j])))
+        d = math.sqrt(sum((a - b) ** 2 for a, b in zip(vectors[i], vectors[j], strict=False)))
         pairwise_dists.append(d)
 
     mean_pairwise = sum(pairwise_dists) / len(pairwise_dists)
@@ -376,7 +383,7 @@ def compute_saturation_metrics(vectors, dim, n_sample_pairs=SATURATION_SAMPLE_PA
         for tid in sample_targets:
             if tid == qid:
                 continue
-            d = math.sqrt(sum((a - b) ** 2 for a, b in zip(q, vectors[tid])))
+            d = math.sqrt(sum((a - b) ** 2 for a, b in zip(q, vectors[tid], strict=False)))
             dists_to_targets.append(d)
 
         if dists_to_targets:
@@ -411,10 +418,10 @@ def brute_force_knn(query, vectors, k):
     """Brute force KNN by L2 distance. Returns set of rowids."""
     dists = []
     for rowid, v in vectors.items():
-        d = sum((a - b) ** 2 for a, b in zip(query, v))
+        d = sum((a - b) ** 2 for a, b in zip(query, v, strict=False))
         dists.append((d, rowid))
     dists.sort()
-    return set(rowid for _, rowid in dists[:k])
+    return {rowid for _, rowid in dists[:k]}
 
 
 def compute_ground_truth_python(vectors, query_ids, k):
@@ -440,7 +447,7 @@ def compute_ground_truth_sqlite_vector(vectors, query_ids, k, dim):
             "SELECT rowid, distance FROM vector_full_scan('gt', 'embedding', ?, ?)",
             (pack_vector(vectors[qid]), k),
         ).fetchall()
-        results.append(set(r[0] for r in rows))
+        results.append({r[0] for r in rows})
 
     conn.close()
     return results
@@ -462,7 +469,7 @@ def compute_ground_truth(vectors, query_ids, k, dim):
 def compute_recall(search_results, ground_truth):
     """Average recall of search_results vs ground_truth (list of sets)."""
     recalls = []
-    for sr, gt in zip(search_results, ground_truth):
+    for sr, gt in zip(search_results, ground_truth, strict=False):
         if len(gt) > 0:
             recalls.append(len(sr & gt) / len(gt))
     return sum(recalls) / len(recalls) if recalls else 0.0
@@ -500,11 +507,10 @@ def run_muninn(vectors, query_ids, dim, db_path=":memory:"):
     results = []
     for qid in query_ids:
         rows = conn.execute(
-            "SELECT rowid, distance FROM bench_vec"
-            " WHERE vector MATCH ? AND k = ? AND ef_search = ?",
+            "SELECT rowid, distance FROM bench_vec WHERE vector MATCH ? AND k = ? AND ef_search = ?",
             (pack_vector(vectors[qid]), K, HNSW_EF_SEARCH),
         ).fetchall()
-        results.append(set(r[0] for r in rows))
+        results.append({r[0] for r in rows})
     t_search = time.perf_counter() - t0
 
     conn.commit()
@@ -565,7 +571,7 @@ def run_sqlite_vector(vectors, query_ids, dim, db_path=":memory:"):
             "SELECT rowid, distance FROM vector_quantize_scan('bench', 'embedding', ?, ?)",
             (pack_vector(vectors[qid]), K),
         ).fetchall()
-        approx_results.append(set(r[0] for r in rows))
+        approx_results.append({r[0] for r in rows})
     t_approx = time.perf_counter() - t0
 
     # Full scan
@@ -576,7 +582,7 @@ def run_sqlite_vector(vectors, query_ids, dim, db_path=":memory:"):
             "SELECT rowid, distance FROM vector_full_scan('bench', 'embedding', ?, ?)",
             (pack_vector(vectors[qid]), K),
         ).fetchall()
-        full_results.append(set(r[0] for r in rows))
+        full_results.append({r[0] for r in rows})
     t_full = time.perf_counter() - t0
 
     conn.commit()
@@ -640,11 +646,13 @@ def run_vectorlite(vectors, query_ids, dim, db_path=":memory:"):
     t0 = time.perf_counter()
     results = []
     for qid in query_ids:
-        rows = list(cursor.execute(
-            "SELECT rowid, distance FROM bench_vl WHERE knn_search(embedding, knn_param(?, ?, ?))",
-            (pack_vector(vectors[qid]), K, HNSW_EF_SEARCH),
-        ))
-        results.append(set(r[0] for r in rows))
+        rows = list(
+            cursor.execute(
+                "SELECT rowid, distance FROM bench_vl WHERE knn_search(embedding, knn_param(?, ?, ?))",
+                (pack_vector(vectors[qid]), K, HNSW_EF_SEARCH),
+            )
+        )
+        results.append({r[0] for r in rows})
     t_search = time.perf_counter() - t0
 
     conn.close()
@@ -699,7 +707,7 @@ def run_sqlite_vec(vectors, query_ids, dim, db_path=":memory:"):
             "SELECT rowid, distance FROM bench_sv WHERE embedding MATCH ? ORDER BY distance LIMIT ?",
             (pack_vector(vectors[qid]), K),
         ).fetchall()
-        results.append(set(r[0] for r in rows))
+        results.append({r[0] for r in rows})
     t_search = time.perf_counter() - t0
 
     conn.commit()
@@ -731,13 +739,22 @@ def write_jsonl_record(filepath, record):
 
 
 def make_record(
-    engine, search_method, vector_source, model_name, dim, n, metrics,
-    saturation, storage="memory", engine_params=None, dataset=None,
+    engine,
+    search_method,
+    vector_source,
+    model_name,
+    dim,
+    n,
+    metrics,
+    saturation,
+    storage="memory",
+    engine_params=None,
+    dataset=None,
 ):
     """Build a JSONL record from benchmark metrics."""
     info = platform_info()
     return {
-        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
         "engine": engine,
         "search_method": search_method,
         "vector_source": vector_source,
@@ -840,7 +857,12 @@ def prep_model_vectors(only_model=None, only_dataset=None):
     if only_model:
         models_to_prep = {only_model: EMBEDDING_MODELS[only_model]}
 
-    log.info("Pre-building model vector caches (max N=%d, datasets=%s, models=%s)", max_n, datasets_to_prep, list(models_to_prep))
+    log.info(
+        "Pre-building model vector caches (max N=%d, datasets=%s, models=%s)",
+        max_n,
+        datasets_to_prep,
+        list(models_to_prep),
+    )
 
     VECTORS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -856,7 +878,13 @@ def prep_model_vectors(only_model=None, only_dataset=None):
             if cache_path.exists():
                 arr = np.load(cache_path)
                 if len(arr) >= n:
-                    log.info("  %s/%s: cached (%d vectors, %s)", model_label, dataset_key, len(arr), _fmt_bytes(cache_path.stat().st_size))
+                    log.info(
+                        "  %s/%s: cached (%d vectors, %s)",
+                        model_label,
+                        dataset_key,
+                        len(arr),
+                        _fmt_bytes(cache_path.stat().st_size),
+                    )
                     continue
                 log.info("  %s/%s: cache has %d vectors, need %d — regenerating", model_label, dataset_key, len(arr), n)
 
@@ -867,7 +895,14 @@ def prep_model_vectors(only_model=None, only_dataset=None):
             embeddings = model.encode(texts[:n], show_progress_bar=True, batch_size=256, normalize_embeddings=True)
 
             np.save(cache_path, embeddings)
-            log.info("  %s/%s: cached %d embeddings to %s (%s)", model_label, dataset_key, n, cache_path, _fmt_bytes(cache_path.stat().st_size))
+            log.info(
+                "  %s/%s: cached %d embeddings to %s (%s)",
+                model_label,
+                dataset_key,
+                n,
+                cache_path,
+                _fmt_bytes(cache_path.stat().st_size),
+            )
 
             # Free model memory before loading the next one
             del model
@@ -950,8 +985,15 @@ def verify_extensions():
 
 
 def run_benchmark(
-    vector_source, model_name, dim, sizes, engines, output_path,
-    storage="memory", run_timestamp=None, dataset=None,
+    vector_source,
+    model_name,
+    dim,
+    sizes,
+    engines,
+    output_path,
+    storage="memory",
+    run_timestamp=None,
+    dataset=None,
 ):
     """Run the benchmark for a single dimension and vector source."""
     total_configs = len(sizes) * len(engines)
@@ -971,7 +1013,11 @@ def run_benchmark(
                 log.error("Unknown model: %s", model_name)
                 continue
             vectors = load_or_generate_model_vectors(
-                model_name, model_info["model_id"], dim, n, dataset=dataset or "ag_news",
+                model_name,
+                model_info["model_id"],
+                dim,
+                n,
+                dataset=dataset or "ag_news",
             )
             n = len(vectors)  # may be clamped by dataset size
 

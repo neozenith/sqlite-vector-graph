@@ -131,6 +131,7 @@ STARTER_PROMPTS = {
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def make_client() -> genai.Client:
     """Create a GenAI client. Config comes from env vars set above (or overridden by caller)."""
     log.info(
@@ -151,12 +152,18 @@ def save_image(image: Image.Image, prompt: str, model: str, index: int = 0) -> P
     meta_path = OUTPUT_DIR / f"{stem}.json"
 
     image.save(img_path)
-    meta_path.write_text(json.dumps({
-        "prompt": prompt,
-        "model": model,
-        "timestamp": ts,
-        "size": f"{image.width}x{image.height}",
-    }, indent=2), encoding="utf-8")
+    meta_path.write_text(
+        json.dumps(
+            {
+                "prompt": prompt,
+                "model": model,
+                "timestamp": ts,
+                "size": f"{image.width}x{image.height}",
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
 
     log.info("Saved %s (%dx%d)", img_path, image.width, image.height)
     return img_path
@@ -204,9 +211,15 @@ def _build_image_config(aspect: str | None, size: str | None) -> types.ImageConf
 # Gemini backend — supports multi-turn chat for iterative refinement
 # ---------------------------------------------------------------------------
 
-def gemini_generate(client: genai.Client, prompt: str, model: str,
-                    aspect: str | None, size: str | None,
-                    ref_images: list[Path] | None = None) -> list[Path]:
+
+def gemini_generate(
+    client: genai.Client,
+    prompt: str,
+    model: str,
+    aspect: str | None,
+    size: str | None,
+    ref_images: list[Path] | None = None,
+) -> list[Path]:
     """Generate image(s) with a Gemini model (single turn)."""
     contents: list = [prompt]
     if ref_images:
@@ -238,7 +251,7 @@ def gemini_generate(client: genai.Client, prompt: str, model: str,
 
 def gemini_chat(client: genai.Client, model: str, aspect: str | None, size: str | None):
     """Interactive multi-turn chat for iterative logo refinement."""
-    sys.stdout.write(f"\n--- Muninn Logo Studio (chat mode) ---\n")
+    sys.stdout.write("\n--- Muninn Logo Studio (chat mode) ---\n")
     sys.stdout.write(f"Model: {model}\n")
     sys.stdout.write("Type your prompt, or use these commands:\n")
     sys.stdout.write("  /starters     — show pre-built prompts\n")
@@ -354,8 +367,10 @@ def gemini_chat(client: genai.Client, model: str, aspect: str | None, size: str 
 # Imagen backend — high-fidelity standalone generation
 # ---------------------------------------------------------------------------
 
-def imagen_generate(client: genai.Client, prompt: str, model: str,
-                    count: int, aspect: str | None, size: str | None) -> list[Path]:
+
+def imagen_generate(
+    client: genai.Client, prompt: str, model: str, count: int, aspect: str | None, size: str | None
+) -> list[Path]:
     """Generate image(s) with an Imagen 4 model."""
     config_kwargs: dict = {"number_of_images": count}
     if aspect:
@@ -387,6 +402,7 @@ def imagen_generate(client: genai.Client, prompt: str, model: str,
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description="Muninn logo explorer — iterate on raven logos with Google GenAI",
@@ -407,30 +423,31 @@ Prompt file workflow:
   4. Refine prompt, re-run. Lines starting with # are ignored.
         """,
     )
-    p.add_argument("--backend", choices=["gemini", "imagen"], default="gemini",
-                   help="Generation backend (default: gemini)")
-    p.add_argument("--model", default=None,
-                   help="Model alias (flash/pro for gemini, standard/ultra/fast for imagen) or raw model ID")
-    p.add_argument("--prompt", default=None,
-                   help="Text prompt (if omitted, enters interactive chat mode for gemini)")
-    p.add_argument("--prompt-file", default=None, type=Path,
-                   help="Load prompt from a markdown file (default: scripts/prompt.md if it exists)")
-    p.add_argument("--starter", default=None, choices=list(STARTER_PROMPTS),
-                   help="Use a pre-built starter prompt")
-    p.add_argument("--list-starters", action="store_true",
-                   help="List available starter prompts and exit")
-    p.add_argument("--ref", action="append", default=[], type=Path,
-                   help="Reference image path (can be repeated, gemini only)")
-    p.add_argument("--count", type=int, default=1,
-                   help="Number of images to generate (imagen only, 1-4)")
-    p.add_argument("--aspect", default="1:1", choices=ASPECT_RATIOS,
-                   help="Aspect ratio (default: 1:1)")
-    p.add_argument("--size", default=None, choices=IMAGE_SIZES,
-                   help="Image resolution (1K, 2K, 4K)")
-    p.add_argument("-v", "--verbose", action="store_true",
-                   help="Debug logging")
-    p.add_argument("-q", "--quiet", action="store_true",
-                   help="Errors only")
+    p.add_argument(
+        "--backend", choices=["gemini", "imagen"], default="gemini", help="Generation backend (default: gemini)"
+    )
+    p.add_argument(
+        "--model",
+        default=None,
+        help="Model alias (flash/pro for gemini, standard/ultra/fast for imagen) or raw model ID",
+    )
+    p.add_argument("--prompt", default=None, help="Text prompt (if omitted, enters interactive chat mode for gemini)")
+    p.add_argument(
+        "--prompt-file",
+        default=None,
+        type=Path,
+        help="Load prompt from a markdown file (default: scripts/prompt.md if it exists)",
+    )
+    p.add_argument("--starter", default=None, choices=list(STARTER_PROMPTS), help="Use a pre-built starter prompt")
+    p.add_argument("--list-starters", action="store_true", help="List available starter prompts and exit")
+    p.add_argument(
+        "--ref", action="append", default=[], type=Path, help="Reference image path (can be repeated, gemini only)"
+    )
+    p.add_argument("--count", type=int, default=1, help="Number of images to generate (imagen only, 1-4)")
+    p.add_argument("--aspect", default="1:1", choices=ASPECT_RATIOS, help="Aspect ratio (default: 1:1)")
+    p.add_argument("--size", default=None, choices=IMAGE_SIZES, help="Image resolution (1K, 2K, 4K)")
+    p.add_argument("-v", "--verbose", action="store_true", help="Debug logging")
+    p.add_argument("-q", "--quiet", action="store_true", help="Errors only")
     return p.parse_args()
 
 
@@ -486,8 +503,7 @@ def main():
 
     if args.backend == "gemini":
         if prompt:
-            gemini_generate(client, prompt, model, args.aspect, args.size,
-                            ref_images=args.ref or None)
+            gemini_generate(client, prompt, model, args.aspect, args.size, ref_images=args.ref or None)
         else:
             gemini_chat(client, model, args.aspect, args.size)
     else:

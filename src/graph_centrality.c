@@ -27,9 +27,9 @@ SQLITE_EXTENSION_INIT3
 typedef struct {
     char *node;
     double centrality;
-    double in_degree;    /* only used by degree TVF */
-    double out_degree;   /* only used by degree TVF */
-    double degree;       /* only used by degree TVF */
+    double in_degree;  /* only used by degree TVF */
+    double out_degree; /* only used by degree TVF */
+    double degree;     /* only used by degree TVF */
 } CentralityRow;
 
 typedef struct {
@@ -45,18 +45,18 @@ static void cr_init(CentralityResults *r) {
 }
 
 static void cr_destroy(CentralityResults *r) {
-    for (int i = 0; i < r->count; i++) free(r->rows[i].node);
+    for (int i = 0; i < r->count; i++)
+        free(r->rows[i].node);
     free(r->rows);
     r->rows = NULL;
     r->count = 0;
 }
 
-static void cr_add(CentralityResults *r, const char *node, double centrality,
-                   double in_deg, double out_deg, double deg) {
+static void cr_add(CentralityResults *r, const char *node, double centrality, double in_deg, double out_deg,
+                   double deg) {
     if (r->count >= r->capacity) {
         r->capacity *= 2;
-        r->rows = (CentralityRow *)realloc(r->rows,
-                    (size_t)r->capacity * sizeof(CentralityRow));
+        r->rows = (CentralityRow *)realloc(r->rows, (size_t)r->capacity * sizeof(CentralityRow));
     }
     CentralityRow *row = &r->rows[r->count++];
     row->node = strdup(node);
@@ -123,8 +123,7 @@ static void dpq_destroy(DoublePQ *pq) {
 static void dpq_push(DoublePQ *pq, int node, double dist) {
     if (pq->size >= pq->capacity) {
         pq->capacity *= 2;
-        pq->entries = (DPQEntry *)realloc(pq->entries,
-                        (size_t)pq->capacity * sizeof(DPQEntry));
+        pq->entries = (DPQEntry *)realloc(pq->entries, (size_t)pq->capacity * sizeof(DPQEntry));
     }
     int i = pq->size++;
     pq->entries[i].node = node;
@@ -132,7 +131,8 @@ static void dpq_push(DoublePQ *pq, int node, double dist) {
     /* Sift up */
     while (i > 0) {
         int parent = (i - 1) / 2;
-        if (pq->entries[parent].dist <= pq->entries[i].dist) break;
+        if (pq->entries[parent].dist <= pq->entries[i].dist)
+            break;
         DPQEntry tmp = pq->entries[parent];
         pq->entries[parent] = pq->entries[i];
         pq->entries[i] = tmp;
@@ -152,7 +152,8 @@ static DPQEntry dpq_pop(DoublePQ *pq) {
                 smallest = left;
             if (right < pq->size && pq->entries[right].dist < pq->entries[smallest].dist)
                 smallest = right;
-            if (smallest == i) break;
+            if (smallest == i)
+                break;
             DPQEntry tmp = pq->entries[i];
             pq->entries[i] = pq->entries[smallest];
             pq->entries[smallest] = tmp;
@@ -212,10 +213,8 @@ static void intlist_destroy(IntList *l) {
  * shortest paths, and pred[v] = predecessor list. Also fills stack
  * in order of non-decreasing distance (for Brandes back-propagation).
  */
-static void sssp_bfs(const GraphData *g, int source,
-                     double *dist, double *sigma, IntList *pred,
-                     int *stack, int *stack_size,
-                     const char *direction) {
+static void sssp_bfs(const GraphData *g, int source, double *dist, double *sigma, IntList *pred, int *stack,
+                     int *stack_size, const char *direction) {
     int N = g->node_count;
     for (int i = 0; i < N; i++) {
         dist[i] = -1.0;
@@ -232,8 +231,7 @@ static void sssp_bfs(const GraphData *g, int source,
     queue[qtail++] = source;
 
     int use_out = !direction || strcmp(direction, "reverse") != 0;
-    int use_in  = direction && (strcmp(direction, "reverse") == 0 ||
-                                strcmp(direction, "both") == 0);
+    int use_in = direction && (strcmp(direction, "reverse") == 0 || strcmp(direction, "both") == 0);
 
     while (qhead < qtail) {
         int v = queue[qhead++];
@@ -241,10 +239,9 @@ static void sssp_bfs(const GraphData *g, int source,
 
         /* Expand neighbors */
         for (int pass = 0; pass < 2; pass++) {
-            const GraphAdjList *adj = (pass == 0) ?
-                (use_out ? &g->out[v] : NULL) :
-                (use_in  ? &g->in[v]  : NULL);
-            if (!adj) continue;
+            const GraphAdjList *adj = (pass == 0) ? (use_out ? &g->out[v] : NULL) : (use_in ? &g->in[v] : NULL);
+            if (!adj)
+                continue;
 
             for (int e = 0; e < adj->count; e++) {
                 int w = adj->edges[e].target;
@@ -257,8 +254,7 @@ static void sssp_bfs(const GraphData *g, int source,
                  * Skip if v is already a predecessor of w (duplicate
                  * edge from traversing both out[] and in[]). */
                 if (double_eq(dist[w], dist[v] + 1.0)) {
-                    if (pred[w].count == 0 ||
-                        pred[w].items[pred[w].count - 1] != v) {
+                    if (pred[w].count == 0 || pred[w].items[pred[w].count - 1] != v) {
                         sigma[w] += sigma[v];
                         intlist_push(&pred[w], v);
                     }
@@ -273,10 +269,8 @@ static void sssp_bfs(const GraphData *g, int source,
  * Dijkstra-based SSSP (weighted graphs).
  * Same interface as sssp_bfs.
  */
-static void sssp_dijkstra(const GraphData *g, int source,
-                          double *dist, double *sigma, IntList *pred,
-                          int *stack, int *stack_size,
-                          const char *direction) {
+static void sssp_dijkstra(const GraphData *g, int source, double *dist, double *sigma, IntList *pred, int *stack,
+                          int *stack_size, const char *direction) {
     int N = g->node_count;
     for (int i = 0; i < N; i++) {
         dist[i] = -1.0;
@@ -288,8 +282,7 @@ static void sssp_dijkstra(const GraphData *g, int source,
     *stack_size = 0;
 
     int use_out = !direction || strcmp(direction, "reverse") != 0;
-    int use_in  = direction && (strcmp(direction, "reverse") == 0 ||
-                                strcmp(direction, "both") == 0);
+    int use_in = direction && (strcmp(direction, "reverse") == 0 || strcmp(direction, "both") == 0);
 
     DoublePQ pq;
     dpq_init(&pq, N > 16 ? N : 16);
@@ -303,16 +296,16 @@ static void sssp_dijkstra(const GraphData *g, int source,
         DPQEntry top = dpq_pop(&pq);
         int v = top.node;
 
-        if (settled[v]) continue;
+        if (settled[v])
+            continue;
         settled[v] = 1;
 
         stack[(*stack_size)++] = v;
 
         for (int pass = 0; pass < 2; pass++) {
-            const GraphAdjList *adj = (pass == 0) ?
-                (use_out ? &g->out[v] : NULL) :
-                (use_in  ? &g->in[v]  : NULL);
-            if (!adj) continue;
+            const GraphAdjList *adj = (pass == 0) ? (use_out ? &g->out[v] : NULL) : (use_in ? &g->in[v] : NULL);
+            if (!adj)
+                continue;
 
             for (int e = 0; e < adj->count; e++) {
                 int w = adj->edges[e].target;
@@ -328,8 +321,7 @@ static void sssp_dijkstra(const GraphData *g, int source,
                 } else if (double_eq(new_dist, dist[w])) {
                     /* Equally short path — skip if v is already a
                      * predecessor of w (duplicate from out[]+in[]). */
-                    if (pred[w].count == 0 ||
-                        pred[w].items[pred[w].count - 1] != v) {
+                    if (pred[w].count == 0 || pred[w].items[pred[w].count - 1] != v) {
                         sigma[w] += sigma[v];
                         intlist_push(&pred[w], v);
                     }
@@ -371,21 +363,25 @@ typedef struct {
     int eof;
 } DegreeCursor;
 
-static int deg_connect(sqlite3 *db, void *pAux, int argc, const char *const *argv,
-                       sqlite3_vtab **ppVtab, char **pzErr) {
-    (void)pAux; (void)argc; (void)argv; (void)pzErr;
-    int rc = sqlite3_declare_vtab(db,
-        "CREATE TABLE x("
-        "  node TEXT, in_degree REAL, out_degree REAL, degree REAL, centrality REAL,"
-        "  edge_table TEXT HIDDEN, src_col TEXT HIDDEN, dst_col TEXT HIDDEN,"
-        "  weight_col TEXT HIDDEN, normalized INTEGER HIDDEN,"
-        "  direction TEXT HIDDEN, timestamp_col TEXT HIDDEN,"
-        "  time_start HIDDEN, time_end HIDDEN"
-        ")");
-    if (rc != SQLITE_OK) return rc;
+static int deg_connect(sqlite3 *db, void *pAux, int argc, const char *const *argv, sqlite3_vtab **ppVtab,
+                       char **pzErr) {
+    (void)pAux;
+    (void)argc;
+    (void)argv;
+    (void)pzErr;
+    int rc = sqlite3_declare_vtab(db, "CREATE TABLE x("
+                                      "  node TEXT, in_degree REAL, out_degree REAL, degree REAL, centrality REAL,"
+                                      "  edge_table TEXT HIDDEN, src_col TEXT HIDDEN, dst_col TEXT HIDDEN,"
+                                      "  weight_col TEXT HIDDEN, normalized INTEGER HIDDEN,"
+                                      "  direction TEXT HIDDEN, timestamp_col TEXT HIDDEN,"
+                                      "  time_start HIDDEN, time_end HIDDEN"
+                                      ")");
+    if (rc != SQLITE_OK)
+        return rc;
 
     CentralityVtab *vtab = (CentralityVtab *)sqlite3_malloc(sizeof(CentralityVtab));
-    if (!vtab) return SQLITE_NOMEM;
+    if (!vtab)
+        return SQLITE_NOMEM;
     memset(vtab, 0, sizeof(CentralityVtab));
     vtab->db = db;
     *ppVtab = &vtab->base;
@@ -400,7 +396,8 @@ static int deg_best_index(sqlite3_vtab *pVTab, sqlite3_index_info *pIdxInfo) {
 static int deg_open(sqlite3_vtab *pVTab, sqlite3_vtab_cursor **ppCursor) {
     (void)pVTab;
     DegreeCursor *cur = (DegreeCursor *)calloc(1, sizeof(DegreeCursor));
-    if (!cur) return SQLITE_NOMEM;
+    if (!cur)
+        return SQLITE_NOMEM;
     cur->eof = 1;
     *ppCursor = &cur->base;
     return SQLITE_OK;
@@ -413,8 +410,7 @@ static int deg_close(sqlite3_vtab_cursor *pCursor) {
     return SQLITE_OK;
 }
 
-static int deg_filter(sqlite3_vtab_cursor *pCursor, int idxNum,
-                      const char *idxStr, int argc, sqlite3_value **argv) {
+static int deg_filter(sqlite3_vtab_cursor *pCursor, int idxNum, const char *idxStr, int argc, sqlite3_value **argv) {
     (void)idxStr;
     DegreeCursor *cur = (DegreeCursor *)pCursor;
     CentralityVtab *vtab = (CentralityVtab *)pCursor->pVtab;
@@ -422,7 +418,10 @@ static int deg_filter(sqlite3_vtab_cursor *pCursor, int idxNum,
     cr_destroy(&cur->results);
     memset(&cur->results, 0, sizeof(CentralityResults));
 
-    if (argc < 3) { cur->eof = 1; return SQLITE_OK; }
+    if (argc < 3) {
+        cur->eof = 1;
+        return SQLITE_OK;
+    }
 
     /* Decode argv using idxNum bitmask — argv is in column order */
     GraphLoadConfig config;
@@ -430,32 +429,51 @@ static int deg_filter(sqlite3_vtab_cursor *pCursor, int idxNum,
     int normalized = 0;
     int pos = 0;
 
-    #define DEG_N_HIDDEN (DEG_COL_TIME_END - DEG_COL_EDGE_TABLE + 1)
+#define DEG_N_HIDDEN (DEG_COL_TIME_END - DEG_COL_EDGE_TABLE + 1)
     for (int bit = 0; bit < DEG_N_HIDDEN && pos < argc; bit++) {
-        if (!(idxNum & (1 << bit))) continue;
+        if (!(idxNum & (1 << bit)))
+            continue;
         switch (bit + DEG_COL_EDGE_TABLE) {
-            case DEG_COL_EDGE_TABLE:    config.edge_table    = graph_safe_text(argv[pos]); break;
-            case DEG_COL_SRC_COL:       config.src_col       = graph_safe_text(argv[pos]); break;
-            case DEG_COL_DST_COL:       config.dst_col       = graph_safe_text(argv[pos]); break;
-            case DEG_COL_WEIGHT_COL:    config.weight_col    = graph_safe_text(argv[pos]); break;
-            case DEG_COL_NORMALIZED:    normalized = sqlite3_value_int(argv[pos]); break;
-            case DEG_COL_DIRECTION:     config.direction     = graph_safe_text(argv[pos]); break;
-            case DEG_COL_TIMESTAMP_COL: config.timestamp_col = graph_safe_text(argv[pos]); break;
-            case DEG_COL_TIME_START:    config.time_start    = argv[pos]; break;
-            case DEG_COL_TIME_END:      config.time_end      = argv[pos]; break;
+        case DEG_COL_EDGE_TABLE:
+            config.edge_table = graph_safe_text(argv[pos]);
+            break;
+        case DEG_COL_SRC_COL:
+            config.src_col = graph_safe_text(argv[pos]);
+            break;
+        case DEG_COL_DST_COL:
+            config.dst_col = graph_safe_text(argv[pos]);
+            break;
+        case DEG_COL_WEIGHT_COL:
+            config.weight_col = graph_safe_text(argv[pos]);
+            break;
+        case DEG_COL_NORMALIZED:
+            normalized = sqlite3_value_int(argv[pos]);
+            break;
+        case DEG_COL_DIRECTION:
+            config.direction = graph_safe_text(argv[pos]);
+            break;
+        case DEG_COL_TIMESTAMP_COL:
+            config.timestamp_col = graph_safe_text(argv[pos]);
+            break;
+        case DEG_COL_TIME_START:
+            config.time_start = argv[pos];
+            break;
+        case DEG_COL_TIME_END:
+            config.time_end = argv[pos];
+            break;
         }
         pos++;
     }
 
-    if (!config.direction) config.direction = "both";
+    if (!config.direction)
+        config.direction = "both";
 
     GraphData g;
     graph_data_init(&g);
     char *errmsg = NULL;
     int rc = graph_data_load(vtab->db, &config, &g, &errmsg);
     if (rc != SQLITE_OK) {
-        vtab->base.zErrMsg = errmsg ? errmsg
-            : sqlite3_mprintf("graph_degree: failed to load graph");
+        vtab->base.zErrMsg = errmsg ? errmsg : sqlite3_mprintf("graph_degree: failed to load graph");
         graph_data_destroy(&g);
         return SQLITE_ERROR;
     }
@@ -472,7 +490,8 @@ static int deg_filter(sqlite3_vtab_cursor *pCursor, int idxNum,
         double total = in_deg + out_deg;
 
         double cent = total;
-        if (normalized && N > 1) cent = total / (double)(N - 1);
+        if (normalized && N > 1)
+            cent = total / (double)(N - 1);
 
         cr_add(&cur->results, g.ids[i], cent, in_deg, out_deg, total);
     }
@@ -498,18 +517,24 @@ static int deg_column(sqlite3_vtab_cursor *p, sqlite3_context *ctx, int col) {
     DegreeCursor *cur = (DegreeCursor *)p;
     CentralityRow *row = &cur->results.rows[cur->current];
     switch (col) {
-        case DEG_COL_NODE:
-            sqlite3_result_text(ctx, row->node, -1, SQLITE_TRANSIENT); break;
-        case DEG_COL_IN_DEGREE:
-            sqlite3_result_double(ctx, row->in_degree); break;
-        case DEG_COL_OUT_DEGREE:
-            sqlite3_result_double(ctx, row->out_degree); break;
-        case DEG_COL_DEGREE:
-            sqlite3_result_double(ctx, row->degree); break;
-        case DEG_COL_CENTRALITY:
-            sqlite3_result_double(ctx, row->centrality); break;
-        default:
-            sqlite3_result_null(ctx); break;
+    case DEG_COL_NODE:
+        sqlite3_result_text(ctx, row->node, -1, SQLITE_TRANSIENT);
+        break;
+    case DEG_COL_IN_DEGREE:
+        sqlite3_result_double(ctx, row->in_degree);
+        break;
+    case DEG_COL_OUT_DEGREE:
+        sqlite3_result_double(ctx, row->out_degree);
+        break;
+    case DEG_COL_DEGREE:
+        sqlite3_result_double(ctx, row->degree);
+        break;
+    case DEG_COL_CENTRALITY:
+        sqlite3_result_double(ctx, row->centrality);
+        break;
+    default:
+        sqlite3_result_null(ctx);
+        break;
     }
     return SQLITE_OK;
 }
@@ -521,7 +546,7 @@ static int deg_rowid(sqlite3_vtab_cursor *p, sqlite3_int64 *pRowid) {
 
 static sqlite3_module graph_degree_module = {
     .iVersion = 0,
-    .xCreate = NULL,  /* eponymous-only */
+    .xCreate = NULL, /* eponymous-only */
     .xConnect = deg_connect,
     .xBestIndex = deg_best_index,
     .xDisconnect = cent_disconnect,
@@ -564,21 +589,25 @@ typedef struct {
     int eof;
 } BetweennessCursor;
 
-static int bet_connect(sqlite3 *db, void *pAux, int argc, const char *const *argv,
-                       sqlite3_vtab **ppVtab, char **pzErr) {
-    (void)pAux; (void)argc; (void)argv; (void)pzErr;
-    int rc = sqlite3_declare_vtab(db,
-        "CREATE TABLE x("
-        "  node TEXT, centrality REAL,"
-        "  edge_table TEXT HIDDEN, src_col TEXT HIDDEN, dst_col TEXT HIDDEN,"
-        "  weight_col TEXT HIDDEN, normalized INTEGER HIDDEN,"
-        "  direction TEXT HIDDEN, auto_approx_threshold INTEGER HIDDEN,"
-        "  timestamp_col TEXT HIDDEN, time_start HIDDEN, time_end HIDDEN"
-        ")");
-    if (rc != SQLITE_OK) return rc;
+static int bet_connect(sqlite3 *db, void *pAux, int argc, const char *const *argv, sqlite3_vtab **ppVtab,
+                       char **pzErr) {
+    (void)pAux;
+    (void)argc;
+    (void)argv;
+    (void)pzErr;
+    int rc = sqlite3_declare_vtab(db, "CREATE TABLE x("
+                                      "  node TEXT, centrality REAL,"
+                                      "  edge_table TEXT HIDDEN, src_col TEXT HIDDEN, dst_col TEXT HIDDEN,"
+                                      "  weight_col TEXT HIDDEN, normalized INTEGER HIDDEN,"
+                                      "  direction TEXT HIDDEN, auto_approx_threshold INTEGER HIDDEN,"
+                                      "  timestamp_col TEXT HIDDEN, time_start HIDDEN, time_end HIDDEN"
+                                      ")");
+    if (rc != SQLITE_OK)
+        return rc;
 
     CentralityVtab *vtab = (CentralityVtab *)sqlite3_malloc(sizeof(CentralityVtab));
-    if (!vtab) return SQLITE_NOMEM;
+    if (!vtab)
+        return SQLITE_NOMEM;
     memset(vtab, 0, sizeof(CentralityVtab));
     vtab->db = db;
     *ppVtab = &vtab->base;
@@ -593,7 +622,8 @@ static int bet_best_index(sqlite3_vtab *pVTab, sqlite3_index_info *pIdxInfo) {
 static int bet_open(sqlite3_vtab *pVTab, sqlite3_vtab_cursor **ppCursor) {
     (void)pVTab;
     BetweennessCursor *cur = (BetweennessCursor *)calloc(1, sizeof(BetweennessCursor));
-    if (!cur) return SQLITE_NOMEM;
+    if (!cur)
+        return SQLITE_NOMEM;
     cur->eof = 1;
     *ppCursor = &cur->base;
     return SQLITE_OK;
@@ -606,8 +636,7 @@ static int bet_close(sqlite3_vtab_cursor *pCursor) {
     return SQLITE_OK;
 }
 
-static int bet_filter(sqlite3_vtab_cursor *pCursor, int idxNum,
-                      const char *idxStr, int argc, sqlite3_value **argv) {
+static int bet_filter(sqlite3_vtab_cursor *pCursor, int idxNum, const char *idxStr, int argc, sqlite3_value **argv) {
     (void)idxStr;
     BetweennessCursor *cur = (BetweennessCursor *)pCursor;
     CentralityVtab *vtab = (CentralityVtab *)pCursor->pVtab;
@@ -615,7 +644,10 @@ static int bet_filter(sqlite3_vtab_cursor *pCursor, int idxNum,
     cr_destroy(&cur->results);
     memset(&cur->results, 0, sizeof(CentralityResults));
 
-    if (argc < 3) { cur->eof = 1; return SQLITE_OK; }
+    if (argc < 3) {
+        cur->eof = 1;
+        return SQLITE_OK;
+    }
 
     GraphLoadConfig config;
     memset(&config, 0, sizeof(config));
@@ -623,33 +655,54 @@ static int bet_filter(sqlite3_vtab_cursor *pCursor, int idxNum,
     int auto_approx = 50000;
     int pos = 0;
 
-    #define BET_N_HIDDEN (BET_COL_TIME_END - BET_COL_EDGE_TABLE + 1)
+#define BET_N_HIDDEN (BET_COL_TIME_END - BET_COL_EDGE_TABLE + 1)
     for (int bit = 0; bit < BET_N_HIDDEN && pos < argc; bit++) {
-        if (!(idxNum & (1 << bit))) continue;
+        if (!(idxNum & (1 << bit)))
+            continue;
         switch (bit + BET_COL_EDGE_TABLE) {
-            case BET_COL_EDGE_TABLE:    config.edge_table    = graph_safe_text(argv[pos]); break;
-            case BET_COL_SRC_COL:       config.src_col       = graph_safe_text(argv[pos]); break;
-            case BET_COL_DST_COL:       config.dst_col       = graph_safe_text(argv[pos]); break;
-            case BET_COL_WEIGHT_COL:    config.weight_col    = graph_safe_text(argv[pos]); break;
-            case BET_COL_NORMALIZED:    normalized = sqlite3_value_int(argv[pos]); break;
-            case BET_COL_DIRECTION:     config.direction     = graph_safe_text(argv[pos]); break;
-            case BET_COL_AUTO_APPROX:   auto_approx = sqlite3_value_int(argv[pos]); break;
-            case BET_COL_TIMESTAMP_COL: config.timestamp_col = graph_safe_text(argv[pos]); break;
-            case BET_COL_TIME_START:    config.time_start    = argv[pos]; break;
-            case BET_COL_TIME_END:      config.time_end      = argv[pos]; break;
+        case BET_COL_EDGE_TABLE:
+            config.edge_table = graph_safe_text(argv[pos]);
+            break;
+        case BET_COL_SRC_COL:
+            config.src_col = graph_safe_text(argv[pos]);
+            break;
+        case BET_COL_DST_COL:
+            config.dst_col = graph_safe_text(argv[pos]);
+            break;
+        case BET_COL_WEIGHT_COL:
+            config.weight_col = graph_safe_text(argv[pos]);
+            break;
+        case BET_COL_NORMALIZED:
+            normalized = sqlite3_value_int(argv[pos]);
+            break;
+        case BET_COL_DIRECTION:
+            config.direction = graph_safe_text(argv[pos]);
+            break;
+        case BET_COL_AUTO_APPROX:
+            auto_approx = sqlite3_value_int(argv[pos]);
+            break;
+        case BET_COL_TIMESTAMP_COL:
+            config.timestamp_col = graph_safe_text(argv[pos]);
+            break;
+        case BET_COL_TIME_START:
+            config.time_start = argv[pos];
+            break;
+        case BET_COL_TIME_END:
+            config.time_end = argv[pos];
+            break;
         }
         pos++;
     }
 
-    if (!config.direction) config.direction = "forward";
+    if (!config.direction)
+        config.direction = "forward";
 
     GraphData g;
     graph_data_init(&g);
     char *errmsg = NULL;
     int rc = graph_data_load(vtab->db, &config, &g, &errmsg);
     if (rc != SQLITE_OK) {
-        vtab->base.zErrMsg = errmsg ? errmsg
-            : sqlite3_mprintf("graph_betweenness: failed to load graph");
+        vtab->base.zErrMsg = errmsg ? errmsg : sqlite3_mprintf("graph_betweenness: failed to load graph");
         graph_data_destroy(&g);
         return SQLITE_ERROR;
     }
@@ -663,13 +716,14 @@ static int bet_filter(sqlite3_vtab_cursor *pCursor, int idxNum,
     }
 
     /* Allocate Brandes working arrays */
-    double *CB     = (double *)calloc((size_t)N, sizeof(double));
-    double *dist   = (double *)malloc((size_t)N * sizeof(double));
-    double *sigma  = (double *)malloc((size_t)N * sizeof(double));
-    double *delta  = (double *)malloc((size_t)N * sizeof(double));
-    int    *stack  = (int *)malloc((size_t)N * sizeof(int));
-    IntList *pred  = (IntList *)calloc((size_t)N, sizeof(IntList));
-    for (int i = 0; i < N; i++) intlist_init(&pred[i]);
+    double *CB = (double *)calloc((size_t)N, sizeof(double));
+    double *dist = (double *)malloc((size_t)N * sizeof(double));
+    double *sigma = (double *)malloc((size_t)N * sizeof(double));
+    double *delta = (double *)malloc((size_t)N * sizeof(double));
+    int *stack = (int *)malloc((size_t)N * sizeof(int));
+    IntList *pred = (IntList *)calloc((size_t)N, sizeof(IntList));
+    for (int i = 0; i < N; i++)
+        intlist_init(&pred[i]);
 
     /* Determine source set (exact vs approx) */
     int n_sources = N;
@@ -679,16 +733,19 @@ static int bet_filter(sqlite3_vtab_cursor *pCursor, int idxNum,
     if (auto_approx > 0 && N > auto_approx) {
         /* Approximate: sample ceil(sqrt(N)) evenly spaced sources */
         n_sources = (int)ceil(sqrt((double)N));
-        if (n_sources < 1) n_sources = 1;
+        if (n_sources < 1)
+            n_sources = 1;
         int step = N / n_sources;
-        if (step < 1) step = 1;
+        if (step < 1)
+            step = 1;
         n_sources = 0;
         for (int i = 0; i < N && n_sources < (int)ceil(sqrt((double)N)); i += step) {
             sources[n_sources++] = i;
         }
         scale = (double)N / (double)n_sources;
     } else {
-        for (int i = 0; i < N; i++) sources[i] = i;
+        for (int i = 0; i < N; i++)
+            sources[i] = i;
     }
 
     /* Brandes main loop */
@@ -698,15 +755,14 @@ static int bet_filter(sqlite3_vtab_cursor *pCursor, int idxNum,
         int stack_size = 0;
 
         if (weighted) {
-            sssp_dijkstra(&g, s, dist, sigma, pred, stack, &stack_size,
-                          config.direction);
+            sssp_dijkstra(&g, s, dist, sigma, pred, stack, &stack_size, config.direction);
         } else {
-            sssp_bfs(&g, s, dist, sigma, pred, stack, &stack_size,
-                     config.direction);
+            sssp_bfs(&g, s, dist, sigma, pred, stack, &stack_size, config.direction);
         }
 
         /* Backward accumulation */
-        for (int i = 0; i < N; i++) delta[i] = 0.0;
+        for (int i = 0; i < N; i++)
+            delta[i] = 0.0;
         while (stack_size > 0) {
             int w = stack[--stack_size];
             for (int pi = 0; pi < pred[w].count; pi++) {
@@ -714,13 +770,15 @@ static int bet_filter(sqlite3_vtab_cursor *pCursor, int idxNum,
                 if (sigma[w] > 0)
                     delta[v] += (sigma[v] / sigma[w]) * (1.0 + delta[w]);
             }
-            if (w != s) CB[w] += delta[w];
+            if (w != s)
+                CB[w] += delta[w];
         }
     }
 
     /* Scale for approximation */
     if (scale != 1.0) {
-        for (int i = 0; i < N; i++) CB[i] *= scale;
+        for (int i = 0; i < N; i++)
+            CB[i] *= scale;
     }
 
     /* For undirected graphs (bidirectional edges), each shortest path
@@ -728,7 +786,8 @@ static int bet_filter(sqlite3_vtab_cursor *pCursor, int idxNum,
      * Halve to correct. */
     int undirected = config.direction && strcmp(config.direction, "both") == 0;
     if (undirected) {
-        for (int i = 0; i < N; i++) CB[i] /= 2.0;
+        for (int i = 0; i < N; i++)
+            CB[i] /= 2.0;
     }
 
     /* Normalize */
@@ -739,7 +798,8 @@ static int bet_filter(sqlite3_vtab_cursor *pCursor, int idxNum,
         } else {
             norm_factor = (double)(N - 1) * (double)(N - 2);
         }
-        for (int i = 0; i < N; i++) CB[i] /= norm_factor;
+        for (int i = 0; i < N; i++)
+            CB[i] /= norm_factor;
     }
 
     /* Build results */
@@ -749,7 +809,8 @@ static int bet_filter(sqlite3_vtab_cursor *pCursor, int idxNum,
     }
 
     /* Cleanup */
-    for (int i = 0; i < N; i++) intlist_destroy(&pred[i]);
+    for (int i = 0; i < N; i++)
+        intlist_destroy(&pred[i]);
     free(pred);
     free(CB);
     free(dist);
@@ -779,12 +840,15 @@ static int bet_column(sqlite3_vtab_cursor *p, sqlite3_context *ctx, int col) {
     BetweennessCursor *cur = (BetweennessCursor *)p;
     CentralityRow *row = &cur->results.rows[cur->current];
     switch (col) {
-        case BET_COL_NODE:
-            sqlite3_result_text(ctx, row->node, -1, SQLITE_TRANSIENT); break;
-        case BET_COL_CENTRALITY:
-            sqlite3_result_double(ctx, row->centrality); break;
-        default:
-            sqlite3_result_null(ctx); break;
+    case BET_COL_NODE:
+        sqlite3_result_text(ctx, row->node, -1, SQLITE_TRANSIENT);
+        break;
+    case BET_COL_CENTRALITY:
+        sqlite3_result_double(ctx, row->centrality);
+        break;
+    default:
+        sqlite3_result_null(ctx);
+        break;
     }
     return SQLITE_OK;
 }
@@ -838,21 +902,25 @@ typedef struct {
     int eof;
 } ClosenessCursor;
 
-static int clo_connect(sqlite3 *db, void *pAux, int argc, const char *const *argv,
-                       sqlite3_vtab **ppVtab, char **pzErr) {
-    (void)pAux; (void)argc; (void)argv; (void)pzErr;
-    int rc = sqlite3_declare_vtab(db,
-        "CREATE TABLE x("
-        "  node TEXT, centrality REAL,"
-        "  edge_table TEXT HIDDEN, src_col TEXT HIDDEN, dst_col TEXT HIDDEN,"
-        "  weight_col TEXT HIDDEN, normalized INTEGER HIDDEN,"
-        "  direction TEXT HIDDEN, timestamp_col TEXT HIDDEN,"
-        "  time_start HIDDEN, time_end HIDDEN"
-        ")");
-    if (rc != SQLITE_OK) return rc;
+static int clo_connect(sqlite3 *db, void *pAux, int argc, const char *const *argv, sqlite3_vtab **ppVtab,
+                       char **pzErr) {
+    (void)pAux;
+    (void)argc;
+    (void)argv;
+    (void)pzErr;
+    int rc = sqlite3_declare_vtab(db, "CREATE TABLE x("
+                                      "  node TEXT, centrality REAL,"
+                                      "  edge_table TEXT HIDDEN, src_col TEXT HIDDEN, dst_col TEXT HIDDEN,"
+                                      "  weight_col TEXT HIDDEN, normalized INTEGER HIDDEN,"
+                                      "  direction TEXT HIDDEN, timestamp_col TEXT HIDDEN,"
+                                      "  time_start HIDDEN, time_end HIDDEN"
+                                      ")");
+    if (rc != SQLITE_OK)
+        return rc;
 
     CentralityVtab *vtab = (CentralityVtab *)sqlite3_malloc(sizeof(CentralityVtab));
-    if (!vtab) return SQLITE_NOMEM;
+    if (!vtab)
+        return SQLITE_NOMEM;
     memset(vtab, 0, sizeof(CentralityVtab));
     vtab->db = db;
     *ppVtab = &vtab->base;
@@ -867,7 +935,8 @@ static int clo_best_index(sqlite3_vtab *pVTab, sqlite3_index_info *pIdxInfo) {
 static int clo_open(sqlite3_vtab *pVTab, sqlite3_vtab_cursor **ppCursor) {
     (void)pVTab;
     ClosenessCursor *cur = (ClosenessCursor *)calloc(1, sizeof(ClosenessCursor));
-    if (!cur) return SQLITE_NOMEM;
+    if (!cur)
+        return SQLITE_NOMEM;
     cur->eof = 1;
     *ppCursor = &cur->base;
     return SQLITE_OK;
@@ -880,8 +949,7 @@ static int clo_close(sqlite3_vtab_cursor *pCursor) {
     return SQLITE_OK;
 }
 
-static int clo_filter(sqlite3_vtab_cursor *pCursor, int idxNum,
-                      const char *idxStr, int argc, sqlite3_value **argv) {
+static int clo_filter(sqlite3_vtab_cursor *pCursor, int idxNum, const char *idxStr, int argc, sqlite3_value **argv) {
     (void)idxStr;
     ClosenessCursor *cur = (ClosenessCursor *)pCursor;
     CentralityVtab *vtab = (CentralityVtab *)pCursor->pVtab;
@@ -889,39 +957,61 @@ static int clo_filter(sqlite3_vtab_cursor *pCursor, int idxNum,
     cr_destroy(&cur->results);
     memset(&cur->results, 0, sizeof(CentralityResults));
 
-    if (argc < 3) { cur->eof = 1; return SQLITE_OK; }
+    if (argc < 3) {
+        cur->eof = 1;
+        return SQLITE_OK;
+    }
 
     GraphLoadConfig config;
     memset(&config, 0, sizeof(config));
-    int normalized = 1;  /* default ON for closeness */
+    int normalized = 1; /* default ON for closeness */
     int pos = 0;
 
-    #define CLO_N_HIDDEN (CLO_COL_TIME_END - CLO_COL_EDGE_TABLE + 1)
+#define CLO_N_HIDDEN (CLO_COL_TIME_END - CLO_COL_EDGE_TABLE + 1)
     for (int bit = 0; bit < CLO_N_HIDDEN && pos < argc; bit++) {
-        if (!(idxNum & (1 << bit))) continue;
+        if (!(idxNum & (1 << bit)))
+            continue;
         switch (bit + CLO_COL_EDGE_TABLE) {
-            case CLO_COL_EDGE_TABLE:    config.edge_table    = graph_safe_text(argv[pos]); break;
-            case CLO_COL_SRC_COL:       config.src_col       = graph_safe_text(argv[pos]); break;
-            case CLO_COL_DST_COL:       config.dst_col       = graph_safe_text(argv[pos]); break;
-            case CLO_COL_WEIGHT_COL:    config.weight_col    = graph_safe_text(argv[pos]); break;
-            case CLO_COL_NORMALIZED:    normalized = sqlite3_value_int(argv[pos]); break;
-            case CLO_COL_DIRECTION:     config.direction     = graph_safe_text(argv[pos]); break;
-            case CLO_COL_TIMESTAMP_COL: config.timestamp_col = graph_safe_text(argv[pos]); break;
-            case CLO_COL_TIME_START:    config.time_start    = argv[pos]; break;
-            case CLO_COL_TIME_END:      config.time_end      = argv[pos]; break;
+        case CLO_COL_EDGE_TABLE:
+            config.edge_table = graph_safe_text(argv[pos]);
+            break;
+        case CLO_COL_SRC_COL:
+            config.src_col = graph_safe_text(argv[pos]);
+            break;
+        case CLO_COL_DST_COL:
+            config.dst_col = graph_safe_text(argv[pos]);
+            break;
+        case CLO_COL_WEIGHT_COL:
+            config.weight_col = graph_safe_text(argv[pos]);
+            break;
+        case CLO_COL_NORMALIZED:
+            normalized = sqlite3_value_int(argv[pos]);
+            break;
+        case CLO_COL_DIRECTION:
+            config.direction = graph_safe_text(argv[pos]);
+            break;
+        case CLO_COL_TIMESTAMP_COL:
+            config.timestamp_col = graph_safe_text(argv[pos]);
+            break;
+        case CLO_COL_TIME_START:
+            config.time_start = argv[pos];
+            break;
+        case CLO_COL_TIME_END:
+            config.time_end = argv[pos];
+            break;
         }
         pos++;
     }
 
-    if (!config.direction) config.direction = "forward";
+    if (!config.direction)
+        config.direction = "forward";
 
     GraphData g;
     graph_data_init(&g);
     char *errmsg = NULL;
     int rc = graph_data_load(vtab->db, &config, &g, &errmsg);
     if (rc != SQLITE_OK) {
-        vtab->base.zErrMsg = errmsg ? errmsg
-            : sqlite3_mprintf("graph_closeness: failed to load graph");
+        vtab->base.zErrMsg = errmsg ? errmsg : sqlite3_mprintf("graph_closeness: failed to load graph");
         graph_data_destroy(&g);
         return SQLITE_ERROR;
     }
@@ -935,11 +1025,12 @@ static int clo_filter(sqlite3_vtab_cursor *pCursor, int idxNum,
     }
 
     /* Allocate SSSP working arrays (reused across sources) */
-    double *dist  = (double *)malloc((size_t)N * sizeof(double));
+    double *dist = (double *)malloc((size_t)N * sizeof(double));
     double *sigma = (double *)malloc((size_t)N * sizeof(double));
-    int    *stack = (int *)malloc((size_t)N * sizeof(int));
+    int *stack = (int *)malloc((size_t)N * sizeof(int));
     IntList *pred = (IntList *)calloc((size_t)N, sizeof(IntList));
-    for (int i = 0; i < N; i++) intlist_init(&pred[i]);
+    for (int i = 0; i < N; i++)
+        intlist_init(&pred[i]);
 
     double *closeness = (double *)calloc((size_t)N, sizeof(double));
     int weighted = g.has_weights;
@@ -948,11 +1039,9 @@ static int clo_filter(sqlite3_vtab_cursor *pCursor, int idxNum,
         int stack_size = 0;
 
         if (weighted) {
-            sssp_dijkstra(&g, s, dist, sigma, pred, stack, &stack_size,
-                          config.direction);
+            sssp_dijkstra(&g, s, dist, sigma, pred, stack, &stack_size, config.direction);
         } else {
-            sssp_bfs(&g, s, dist, sigma, pred, stack, &stack_size,
-                     config.direction);
+            sssp_bfs(&g, s, dist, sigma, pred, stack, &stack_size, config.direction);
         }
 
         /* Sum distances and count reachable nodes */
@@ -982,7 +1071,8 @@ static int clo_filter(sqlite3_vtab_cursor *pCursor, int idxNum,
     }
 
     /* Cleanup */
-    for (int i = 0; i < N; i++) intlist_destroy(&pred[i]);
+    for (int i = 0; i < N; i++)
+        intlist_destroy(&pred[i]);
     free(pred);
     free(dist);
     free(sigma);
@@ -1010,12 +1100,15 @@ static int clo_column(sqlite3_vtab_cursor *p, sqlite3_context *ctx, int col) {
     ClosenessCursor *cur = (ClosenessCursor *)p;
     CentralityRow *row = &cur->results.rows[cur->current];
     switch (col) {
-        case CLO_COL_NODE:
-            sqlite3_result_text(ctx, row->node, -1, SQLITE_TRANSIENT); break;
-        case CLO_COL_CENTRALITY:
-            sqlite3_result_double(ctx, row->centrality); break;
-        default:
-            sqlite3_result_null(ctx); break;
+    case CLO_COL_NODE:
+        sqlite3_result_text(ctx, row->node, -1, SQLITE_TRANSIENT);
+        break;
+    case CLO_COL_CENTRALITY:
+        sqlite3_result_double(ctx, row->centrality);
+        break;
+    default:
+        sqlite3_result_null(ctx);
+        break;
     }
     return SQLITE_OK;
 }
@@ -1049,13 +1142,16 @@ int centrality_register_tvfs(sqlite3 *db) {
     int rc;
 
     rc = sqlite3_create_module(db, "graph_degree", &graph_degree_module, NULL);
-    if (rc != SQLITE_OK) return rc;
+    if (rc != SQLITE_OK)
+        return rc;
 
     rc = sqlite3_create_module(db, "graph_betweenness", &graph_betweenness_module, NULL);
-    if (rc != SQLITE_OK) return rc;
+    if (rc != SQLITE_OK)
+        return rc;
 
     rc = sqlite3_create_module(db, "graph_closeness", &graph_closeness_module, NULL);
-    if (rc != SQLITE_OK) return rc;
+    if (rc != SQLITE_OK)
+        return rc;
 
     return SQLITE_OK;
 }
