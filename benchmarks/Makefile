@@ -34,11 +34,13 @@ EXTENSION = ../muninn$(EXT)
         graph-small graph-medium graph-large graph-scale-free graph-analyze \
         graph-centrality-small graph-centrality-medium graph-centrality-large graph-centrality-scale-free \
         graph-community-small graph-community-medium graph-community-large graph-community-scale-free \
+        graph-index-small graph-index-medium graph-index-large \
         vss-manifest manifest-vss-all graph-manifest manifest-graph-all manifest \
         analyze analyze-vss analyze-graph \
         vss-embeddings-prep vss-embeddings \
         vss-embeddings-agnews-all-MiniLM-L6-v2 vss-embeddings-agnews-all-mpnet-base-v2 vss-embeddings-agnews-BAAI-bge-large-en-v1.5 \
-        vss-embeddings-wealth-of-nations-all-models vss-embeddings-all
+        vss-embeddings-wealth-of-nations-all-models vss-embeddings-all \
+        kg-extract kg-extract-random kg-coalesce kg-demo kg-clean
 
 help:                                              ## Show this help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -227,6 +229,35 @@ graph-community-scale-free: $(EXTENSION)           ## Graph: community ops, Bara
 	-$(BENCH_GRAPH) --graph-model barabasi_albert --nodes 50000 --avg-degree 10 --operations $(COMMUNITY_OPS) $(BENCH_FLAGS)
 
 ######################################################################
+# INDEX COMPARISON BENCHMARKS
+# Run traversal ops with and without indexes to measure impact.
+# Global ops (pagerank, centrality, etc.) included to confirm
+# they are unaffected by indexes.
+######################################################################
+
+graph-index-small: $(EXTENSION)                    ## Graph: index comparison, small (N<=1K)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 100 --avg-degree 5 --index-mode both $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 500 --avg-degree 5 --index-mode both $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 1000 --avg-degree 5 --index-mode both $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 1000 --avg-degree 20 --index-mode both $(BENCH_FLAGS)
+
+graph-index-medium: $(EXTENSION)                   ## Graph: index comparison, medium (N<=10K)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 1000 --avg-degree 5 --index-mode both $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 1000 --avg-degree 20 --index-mode both $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 5000 --avg-degree 5 --index-mode both $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 5000 --avg-degree 20 --index-mode both $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 10000 --avg-degree 5 --index-mode both $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 10000 --avg-degree 20 --index-mode both $(BENCH_FLAGS)
+
+graph-index-large: $(EXTENSION)                    ## Graph: index comparison, large (N<=100K)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 10000 --avg-degree 5 --index-mode both $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 10000 --avg-degree 20 --index-mode both $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 50000 --avg-degree 5 --index-mode both $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 50000 --avg-degree 20 --index-mode both $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 100000 --avg-degree 5 --index-mode both $(BENCH_FLAGS)
+	-$(BENCH_GRAPH) --graph-model erdos_renyi --nodes 100000 --avg-degree 20 --index-mode both $(BENCH_FLAGS)
+
+######################################################################
 # AGGREGATED TARGETS
 ######################################################################
 analyze-vss:                                       ## Analyze vector results -> tables + plotly charts
@@ -260,6 +291,52 @@ manifest-graph-all:                                ## Show all graph benchmarks 
 
 manifest: manifest-vss manifest-graph              ## Show all missing benchmarks (JSONL)
 
+
+######################################################################
+# KNOWLEDGE GRAPH PIPELINE
+#
+# File-based targets encode the real data dependency DAG:
+#   texts/gutenberg_N.txt  →  kg/N.db  →  kg-coalesce
+# This ensures correct ordering even with `make -j`.
+######################################################################
+
+KG_GUTENBERG = $(PYTHON) scripts/kg_gutenberg.py
+KG_EXTRACT   = $(PYTHON) scripts/kg_extract.py
+KG_COALESCE  = $(PYTHON) scripts/kg_coalesce.py
+BOOK_ID     ?= 3300
+KG_QUERY    ?= How does the division of labour affect wages?
+
+# File targets for pipeline intermediates (enables parallel-safe DAG).
+# These are real files, not .PHONY — Make checks timestamps and skips
+# steps whose outputs already exist and are up-to-date.
+texts/gutenberg_$(BOOK_ID).txt:
+	$(KG_GUTENBERG) --download $(BOOK_ID)
+
+# The "| kg" is an order-only prerequisite (GNU Make 3.80+).
+# Normal prerequisites (left of |) trigger a rebuild when they are newer
+# than the target. Order-only prerequisites (right of |) only ensure the
+# target exists before this recipe runs — they never trigger a rebuild.
+# Without "|", any file created inside kg/ would update the directory's
+# mtime, causing Make to re-run extraction on every invocation.
+kg/$(BOOK_ID).db: texts/gutenberg_$(BOOK_ID).txt $(EXTENSION) | kg
+	$(KG_EXTRACT) --book-id $(BOOK_ID)
+
+kg:
+	mkdir -p kg
+
+# Phony convenience targets
+kg-extract: kg/$(BOOK_ID).db                      ## Extract KG from a book (BOOK_ID=..., default 3300)
+
+kg-extract-random: $(EXTENSION)                   ## Extract KG from a random Gutenberg economics book
+	$(KG_EXTRACT) --book-id $$($(KG_GUTENBERG) --random)
+
+kg-coalesce: kg/$(BOOK_ID).db                     ## Entity resolution + GraphRAG demo
+	$(KG_COALESCE) --book-id $(BOOK_ID) --query "$(KG_QUERY)"
+
+kg-demo: kg-coalesce                              ## Full pipeline: extract + coalesce + demo
+
+kg-clean:                                          ## Remove all KG databases
+	rm -rf kg/*.db
 
 clean:                                             ## Remove generated charts (keeps JSONL results)
 	rm -rf $(CURDIR)/charts/*.html 

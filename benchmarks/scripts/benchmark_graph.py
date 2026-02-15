@@ -356,11 +356,12 @@ def python_pagerank(adj, damping=0.85, iterations=100):
 # ── muninn runner ─────────────────────────────────────────────────
 
 
-def setup_muninn_edges(conn, edges):
+def setup_muninn_edges(conn, edges, indexed=True):
     """Create edge table and load edges for muninn TVFs."""
     conn.execute("CREATE TABLE IF NOT EXISTS bench_edges(src INTEGER, dst INTEGER, weight REAL)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_bench_src ON bench_edges(src)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_bench_dst ON bench_edges(dst)")
+    if indexed:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_bench_src ON bench_edges(src)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_bench_dst ON bench_edges(dst)")
     conn.executemany("INSERT INTO bench_edges(src, dst, weight) VALUES (?, ?, ?)", edges)
     conn.commit()
 
@@ -484,11 +485,12 @@ def run_graph_muninn(conn, operation, adj, start_nodes, end_nodes=None):
 # ── CTE baseline runner ──────────────────────────────────────────
 
 
-def setup_cte_edges(conn, edges):
+def setup_cte_edges(conn, edges, indexed=True):
     """Create edge table for CTE-based traversal."""
     conn.execute("CREATE TABLE IF NOT EXISTS bench_edges(src INTEGER, dst INTEGER, weight REAL)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_bench_src ON bench_edges(src)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_bench_dst ON bench_edges(dst)")
+    if indexed:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_bench_src ON bench_edges(src)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_bench_dst ON bench_edges(dst)")
     conn.executemany("INSERT INTO bench_edges(src, dst, weight) VALUES (?, ?, ?)", edges)
     conn.commit()
 
@@ -699,6 +701,7 @@ def make_graph_record(
     nodes_visited_mean,
     storage="memory",
     engine_params=None,
+    indexed=True,
 ):
     """Build a JSONL record for graph benchmark results."""
     n_queries = len(query_times)
@@ -714,6 +717,7 @@ def make_graph_record(
         "n_edges": n_edges,
         "avg_degree": round(avg_degree, 2),
         "weighted": weighted,
+        "indexed": indexed,
         "setup_time_s": round(setup_time_s, 4),
         "query_time_ms": round(mean_time_ms, 3),
         "n_queries": n_queries,
@@ -739,9 +743,11 @@ def run_graph_benchmark(
     weighted=False,
     storage="memory",
     operations=None,
+    index_modes=None,
 ):
     """Run graph traversal benchmarks for a single graph configuration."""
     operations = operations or ALL_OPERATIONS
+    index_modes = index_modes or [True]
 
     # Generate graph
     log.info("\n  Generating %s graph (n=%d)...", graph_model, n_nodes)
@@ -765,150 +771,157 @@ def run_graph_benchmark(
     end_nodes = rng.sample(lc_list, n_queries)
 
     for engine in engines:
-        log.info("\n  Engine: %s", engine)
+        # GraphQLite manages its own indexing; only SQL engines vary
+        engine_index_modes = [True] if engine == "graphqlite" else index_modes
 
-        if engine == "muninn":
-            conn = sqlite3.connect(":memory:")
-            conn.enable_load_extension(True)
-            conn.load_extension(MUNINN_PATH)
+        for indexed in engine_index_modes:
+            idx_label = "indexed" if indexed else "no-index"
+            log.info("\n  Engine: %s (%s)", engine, idx_label)
 
-            t0 = time.perf_counter()
-            setup_muninn_edges(conn, edges)
-            setup_time = time.perf_counter() - t0
+            if engine == "muninn":
+                conn = sqlite3.connect(":memory:")
+                conn.enable_load_extension(True)
+                conn.load_extension(MUNINN_PATH)
 
-            for op in operations:
-                log.info("    Operation: %s", op)
-                retval = run_graph_muninn(conn, op, adj, start_nodes, end_nodes)
+                t0 = time.perf_counter()
+                setup_muninn_edges(conn, edges, indexed=indexed)
+                setup_time = time.perf_counter() - t0
 
-                # leiden returns (result, times, extra_metrics); others return (result, times)
-                extra_metrics = {}
-                if len(retval) == 3:
-                    results, times, extra_metrics = retval
-                else:
-                    results, times = retval
+                for op in operations:
+                    log.info("    Operation: %s (%s)", op, idx_label)
+                    retval = run_graph_muninn(conn, op, adj, start_nodes, end_nodes)
 
-                if results is None:
+                    # leiden returns (result, times, extra_metrics); others return (result, times)
+                    extra_metrics = {}
+                    if len(retval) == 3:
+                        results, times, extra_metrics = retval
+                    else:
+                        results, times = retval
+
+                    if results is None:
+                        continue
+
+                    # Verify correctness
+                    correct = True
+                    nodes_visited = None
+                    if op == "bfs" and isinstance(results, list):
+                        correct = all(verify_bfs(r, adj, s) for r, s in zip(results, start_nodes, strict=False))
+                        nodes_visited = sum(len(r) for r in results) / len(results) if results else 0
+                    elif op == "components":
+                        correct = verify_components(results, adj)
+                        nodes_visited = len(results)
+                    elif op == "dfs" and isinstance(results, list):
+                        nodes_visited = sum(len(r) for r in results) / len(results) if results else 0
+                    elif op in ("degree", "betweenness", "closeness", "leiden"):
+                        nodes_visited = len(results)
+
+                    record = make_graph_record(
+                        engine="muninn",
+                        operation=op,
+                        graph_model=graph_model,
+                        n_nodes=n_nodes,
+                        n_edges=n_edges,
+                        avg_degree=actual_avg_degree,
+                        weighted=weighted,
+                        setup_time_s=setup_time,
+                        query_times=times,
+                        correct=correct,
+                        nodes_visited_mean=nodes_visited,
+                        storage=storage,
+                        engine_params=extra_metrics if extra_metrics else None,
+                        indexed=indexed,
+                    )
+                    write_jsonl_record(output_path, record)
+                    log.info("      %s (%s): %.3fms (correct=%s)", op, idx_label, record["query_time_ms"], correct)
+
+                conn.close()
+
+            elif engine == "cte":
+                conn = sqlite3.connect(":memory:")
+
+                t0 = time.perf_counter()
+                setup_cte_edges(conn, edges, indexed=indexed)
+                setup_time = time.perf_counter() - t0
+
+                for op in operations:
+                    log.info("    Operation: %s (%s)", op, idx_label)
+                    results, times = run_graph_cte(conn, op, adj, start_nodes, end_nodes)
+                    if results is None:
+                        continue
+
+                    correct = True
+                    nodes_visited = None
+                    if op == "bfs" and isinstance(results, list):
+                        correct = all(verify_bfs(r, adj, s) for r, s in zip(results, start_nodes, strict=False))
+                        nodes_visited = sum(len(r) for r in results) / len(results) if results else 0
+                    elif op == "components":
+                        correct = verify_components(results, adj)
+                        nodes_visited = len(results)
+
+                    record = make_graph_record(
+                        engine="cte",
+                        operation=op,
+                        graph_model=graph_model,
+                        n_nodes=n_nodes,
+                        n_edges=n_edges,
+                        avg_degree=actual_avg_degree,
+                        weighted=weighted,
+                        setup_time_s=setup_time,
+                        query_times=times,
+                        correct=correct,
+                        nodes_visited_mean=nodes_visited,
+                        storage=storage,
+                        indexed=indexed,
+                    )
+                    write_jsonl_record(output_path, record)
+                    log.info("      %s (%s): %.3fms (correct=%s)", op, idx_label, record["query_time_ms"], correct)
+
+                conn.close()
+
+            elif engine == "graphqlite":
+                if not HAS_GRAPHQLITE:
+                    log.warning("  GraphQLite not installed, skipping")
                     continue
 
-                # Verify correctness
-                correct = True
-                nodes_visited = None
-                if op == "bfs" and isinstance(results, list):
-                    correct = all(verify_bfs(r, adj, s) for r, s in zip(results, start_nodes, strict=False))
-                    nodes_visited = sum(len(r) for r in results) / len(results) if results else 0
-                elif op == "components":
-                    correct = verify_components(results, adj)
-                    nodes_visited = len(results)
-                elif op == "dfs" and isinstance(results, list):
-                    nodes_visited = sum(len(r) for r in results) / len(results) if results else 0
-                elif op in ("degree", "betweenness", "closeness", "leiden"):
-                    nodes_visited = len(results)
+                t0 = time.perf_counter()
+                # Setup time measured inside the runner (graph construction)
+                setup_time = 0  # will be measured per-run
 
-                record = make_graph_record(
-                    engine="muninn",
-                    operation=op,
-                    graph_model=graph_model,
-                    n_nodes=n_nodes,
-                    n_edges=n_edges,
-                    avg_degree=actual_avg_degree,
-                    weighted=weighted,
-                    setup_time_s=setup_time,
-                    query_times=times,
-                    correct=correct,
-                    nodes_visited_mean=nodes_visited,
-                    storage=storage,
-                    engine_params=extra_metrics if extra_metrics else None,
-                )
-                write_jsonl_record(output_path, record)
-                log.info("      %s: %.3fms (correct=%s)", op, record["query_time_ms"], correct)
+                for op in operations:
+                    log.info("    Operation: %s", op)
+                    t_setup = time.perf_counter()
+                    results, times = run_graph_graphqlite(adj, edges, op, n_nodes, start_nodes, end_nodes)
+                    if results is None:
+                        continue
+                    setup_time = time.perf_counter() - t_setup - sum(times)
 
-            conn.close()
+                    correct = True
+                    nodes_visited = None
+                    if op == "bfs" and isinstance(results, list):
+                        correct = all(verify_bfs(r, adj, s) for r, s in zip(results, start_nodes, strict=False))
+                        nodes_visited = sum(len(r) for r in results) / len(results) if results else 0
+                    elif op == "components":
+                        correct = verify_components(results, adj)
+                        nodes_visited = len(results)
+                    elif op == "dfs" and isinstance(results, list):
+                        nodes_visited = sum(len(r) for r in results) / len(results) if results else 0
 
-        elif engine == "cte":
-            conn = sqlite3.connect(":memory:")
-
-            t0 = time.perf_counter()
-            setup_cte_edges(conn, edges)
-            setup_time = time.perf_counter() - t0
-
-            for op in operations:
-                log.info("    Operation: %s", op)
-                results, times = run_graph_cte(conn, op, adj, start_nodes, end_nodes)
-                if results is None:
-                    continue
-
-                correct = True
-                nodes_visited = None
-                if op == "bfs" and isinstance(results, list):
-                    correct = all(verify_bfs(r, adj, s) for r, s in zip(results, start_nodes, strict=False))
-                    nodes_visited = sum(len(r) for r in results) / len(results) if results else 0
-                elif op == "components":
-                    correct = verify_components(results, adj)
-                    nodes_visited = len(results)
-
-                record = make_graph_record(
-                    engine="cte",
-                    operation=op,
-                    graph_model=graph_model,
-                    n_nodes=n_nodes,
-                    n_edges=n_edges,
-                    avg_degree=actual_avg_degree,
-                    weighted=weighted,
-                    setup_time_s=setup_time,
-                    query_times=times,
-                    correct=correct,
-                    nodes_visited_mean=nodes_visited,
-                    storage=storage,
-                )
-                write_jsonl_record(output_path, record)
-                log.info("      %s: %.3fms (correct=%s)", op, record["query_time_ms"], correct)
-
-            conn.close()
-
-        elif engine == "graphqlite":
-            if not HAS_GRAPHQLITE:
-                log.warning("  GraphQLite not installed, skipping")
-                continue
-
-            t0 = time.perf_counter()
-            # Setup time measured inside the runner (graph construction)
-            setup_time = 0  # will be measured per-run
-
-            for op in operations:
-                log.info("    Operation: %s", op)
-                t_setup = time.perf_counter()
-                results, times = run_graph_graphqlite(adj, edges, op, n_nodes, start_nodes, end_nodes)
-                if results is None:
-                    continue
-                setup_time = time.perf_counter() - t_setup - sum(times)
-
-                correct = True
-                nodes_visited = None
-                if op == "bfs" and isinstance(results, list):
-                    correct = all(verify_bfs(r, adj, s) for r, s in zip(results, start_nodes, strict=False))
-                    nodes_visited = sum(len(r) for r in results) / len(results) if results else 0
-                elif op == "components":
-                    correct = verify_components(results, adj)
-                    nodes_visited = len(results)
-                elif op == "dfs" and isinstance(results, list):
-                    nodes_visited = sum(len(r) for r in results) / len(results) if results else 0
-
-                record = make_graph_record(
-                    engine="graphqlite",
-                    operation=op,
-                    graph_model=graph_model,
-                    n_nodes=n_nodes,
-                    n_edges=n_edges,
-                    avg_degree=actual_avg_degree,
-                    weighted=weighted,
-                    setup_time_s=setup_time,
-                    query_times=times,
-                    correct=correct,
-                    nodes_visited_mean=nodes_visited,
-                    storage=storage,
-                )
-                write_jsonl_record(output_path, record)
-                log.info("      %s: %.3fms (correct=%s)", op, record["query_time_ms"], correct)
+                    record = make_graph_record(
+                        engine="graphqlite",
+                        operation=op,
+                        graph_model=graph_model,
+                        n_nodes=n_nodes,
+                        n_edges=n_edges,
+                        avg_degree=actual_avg_degree,
+                        weighted=weighted,
+                        setup_time_s=setup_time,
+                        query_times=times,
+                        correct=correct,
+                        nodes_visited_mean=nodes_visited,
+                        storage=storage,
+                    )
+                    write_jsonl_record(output_path, record)
+                    log.info("      %s: %.3fms (correct=%s)", op, record["query_time_ms"], correct)
 
 
 ALL_GRAPH_ENGINES = ["muninn", "graphqlite"]
@@ -980,6 +993,12 @@ Examples:
         default="memory",
         help="Storage backend (default: memory)",
     )
+    parser.add_argument(
+        "--index-mode",
+        choices=["indexed", "none", "both"],
+        default="indexed",
+        help="Index mode: 'indexed' (default), 'none' (no indexes), 'both' (run with and without)",
+    )
     return parser.parse_args()
 
 
@@ -1005,11 +1024,19 @@ def main():
 
     operations = args.operations.split(",") if args.operations else None
 
+    if args.index_mode == "both":
+        index_modes = [True, False]
+    elif args.index_mode == "none":
+        index_modes = [False]
+    else:
+        index_modes = [True]
+
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     output_path = RESULTS_DIR / f"graph_{timestamp}.jsonl"
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
     log.info("Results: %s", output_path)
+    log.info("Index mode: %s", args.index_mode)
 
     run_graph_benchmark(
         graph_model=args.graph_model,
@@ -1020,6 +1047,7 @@ def main():
         weighted=args.weighted,
         storage=args.storage,
         operations=operations,
+        index_modes=index_modes,
     )
 
     log.info("\nGraph benchmark complete. Results: %s", output_path)

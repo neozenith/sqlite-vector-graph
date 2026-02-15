@@ -74,4 +74,34 @@ WHERE edge_table = 'friendships' AND src_col = 'user_a'
 | `node2vec_train()` | Graph embedding generation | (scalar: nodes embedded) |
 | `hnsw_index` | HNSW vector virtual table | rowid, vector, distance |
 
-See the [full API reference](api.md) and [benchmark results](benchmarks.md) for details.
+## Installation
+
+=== "Python"
+
+    ```bash
+    pip install sqlite-muninn
+    ```
+
+=== "Node.js"
+
+    ```bash
+    npm install sqlite-muninn
+    ```
+
+=== "From Source"
+
+    ```bash
+    brew install sqlite  # macOS (or libsqlite3-dev on Linux)
+    make all
+    ```
+
+See the [Getting Started guide](getting-started.md) for full installation instructions and platform notes.
+
+## Learn More
+
+- [Getting Started](getting-started.md) — Installation, setup, and quick tour of all five subsystems
+- [API Reference](api.md) — Complete reference for all functions and virtual tables
+- [Centrality & Community Guide](centrality-community.md) — When and how to use centrality measures and Leiden
+- [Node2Vec Guide](node2vec.md) — Parameter tuning and integration with HNSW
+- [GraphRAG Cookbook](graphrag-cookbook.md) — End-to-end tutorial combining all subsystems
+- [Benchmark Results](benchmarks.md) — Performance data across real-world workloads

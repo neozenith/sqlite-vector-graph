@@ -36,15 +36,17 @@ CHARTS_DIR = PROJECT_ROOT / "benchmarks" / "charts"
 
 ENGINE_LABELS = {
     "muninn": "muninn-tvf",
+    "muninn-noindex": "muninn-tvf (no index)",
     "graphqlite": "graphqlite",
 }
 
 ENGINE_HUES = {
     "muninn": 270,  # purple
+    "muninn-noindex": 120,  # green
     "graphqlite": 340,  # pink
 }
 
-ENGINE_ORDER = ["muninn", "graphqlite"]
+ENGINE_ORDER = ["muninn", "muninn-noindex", "graphqlite"]
 
 GM_SHORT = {
     "erdos_renyi": "ER",
@@ -124,6 +126,13 @@ def load_graph_results(filter_engine=None, filter_operation=None, filter_graph_m
             # Skip CTE engine records (disabled benchmark)
             if record.get("engine") == "cte":
                 continue
+
+            # Synthesize engine variant for non-indexed runs.
+            # Records without "indexed" field are from before the feature
+            # was added and always had indexes enabled.
+            if record.get("indexed") is False:
+                record["engine"] = record["engine"] + "-noindex"
+
             if filter_engine and record.get("engine") != filter_engine:
                 continue
             if filter_operation and record.get("operation") != filter_operation:
