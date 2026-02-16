@@ -60,3 +60,4 @@ benchmarks/kg/
 CLAUDE.md
 tmp/
 docs/logo/
+.playwright-cli/

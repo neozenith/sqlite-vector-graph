@@ -2,26 +2,31 @@ import { test, expect } from '@playwright/test';
 import { setupConsoleMonitor, checkpoint } from './helpers/checkpoint';
 
 test.describe('Graph Explorer', () => {
-  test('renders graph tab and loads network', async ({ page }) => {
+  test('renders graph page and loads network', async ({ page }) => {
     setupConsoleMonitor(page);
 
     await page.goto('/');
 
-    // Switch to Graph tab
-    await page.getByRole('tab', { name: 'Graph' }).click();
+    // Click the "Graph" sidebar link to navigate
+    await page.getByRole('link', { name: 'Graph' }).click();
+    await page.waitForURL(/\/graph/);
     await checkpoint(page, 'graph-page-loaded');
 
-    // Wait for edge table selector to populate with real options
-    const tableSelect = page.locator('select').first();
-    await expect(tableSelect).toBeVisible({ timeout: 10_000 });
+    // The dataset picker shows "Edge Tables" heading when no dataset selected
+    await expect(page.getByRole('heading', { name: 'Edge Tables' })).toBeVisible({ timeout: 10_000 });
 
+    // Wait for at least one edge table card to appear (contains "edges" badge)
     await expect(async () => {
-      const options = await tableSelect.locator('option').allTextContents();
-      const realOptions = options.filter((o) => !o.includes('Select'));
-      expect(realOptions.length).toBeGreaterThanOrEqual(1);
+      const cards = await page.locator('text=/\\d+ edges/').count();
+      expect(cards).toBeGreaterThanOrEqual(1);
     }).toPass({ timeout: 10_000 });
 
-    await checkpoint(page, 'graph-table-selected');
+    await checkpoint(page, 'graph-tables-discovered');
+
+    // Click the first edge table card to select it
+    const firstCard = page.locator('[class*="cursor-pointer"]').first();
+    await firstCard.click();
+    await page.waitForURL(/\/graph\/.+/);
 
     // Graph stats should show (indicates data loaded)
     const nodesText = page.locator('text=Nodes:');
@@ -29,8 +34,8 @@ test.describe('Graph Explorer', () => {
 
     await checkpoint(page, 'graph-network-rendered');
 
-    // Centrality selector should be present
-    const centralitySelect = page.locator('select').nth(1);
+    // Centrality selector should be present in the sidebar
+    const centralitySelect = page.locator('select').first();
     await expect(centralitySelect).toBeVisible();
 
     await checkpoint(page, 'graph-centrality-visible');

@@ -6,7 +6,10 @@ FRONTEND_PORT ?= 5280
 AGENTIC_BACKEND_PORT ?= 8201
 AGENTIC_FRONTEND_PORT ?= 5281
 
-.PHONY: help install dev dev-agentic test test-api test-frontend test-e2e videos clean
+.PHONY: help install dev dev-agentic test test-api test-frontend test-e2e videos clean \
+       format format-python format-frontend \
+       lint lint-python lint-frontend \
+       typecheck typecheck-python typecheck-frontend
 
 help:                                              ## Show this help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -34,6 +37,8 @@ dev-agentic: install                               ## Start dev servers (agentic
 
 test: test-api test-frontend                       ## Run all tests
 
+ci: format lint typecheck test test-e2e e2e-videos                               ## Run all tests + E2E
+
 test-api: install-python                           ## Python API tests (>90% coverage)
 	uv run --directory . pytest -v
 
@@ -42,6 +47,36 @@ test-frontend: install-frontend                    ## TypeScript tests (>90% cov
 
 test-e2e: install                                  ## Playwright E2E tests
 	npm --prefix frontend run test:e2e
+	make videos
+
+# ── Code Quality ─────────────────────────────────────────────────────
+
+format: format-python format-frontend           ## Format all code
+
+format-python:                                   ## Format Python code with ruff
+	uv run --directory . ruff format .
+	uv run --directory . ruff check --fix-only .
+
+format-frontend: install-frontend                ## Format TypeScript code with prettier
+	npm --prefix frontend run format
+
+lint: lint-python lint-frontend                  ## Lint all code
+
+lint-python: format-python                                     ## Lint Python code with ruff
+	uv run --directory . ruff check .
+	uv run --directory . ruff format --check .
+
+lint-frontend: install-frontend format-frontend                  ## Lint TypeScript code with eslint
+	npm --prefix frontend run lint
+	npm --prefix frontend run format:check
+
+typecheck: typecheck-python typecheck-frontend   ## Type-check all code
+
+typecheck-python:                                ## Type-check Python with mypy
+	uv run --directory . mypy server/
+
+typecheck-frontend: install-frontend             ## Type-check TypeScript with tsc
+	npm --prefix frontend run typecheck
 
 # ── Video conversion ──────────────────────────────────────────────────
 
@@ -55,7 +90,7 @@ E2E_DIR = frontend/test-results
 	ffmpeg -i $< -i $@.palette.png -filter_complex "setpts=0.2*PTS,fps=10,scale=1280:-1:flags=lanczos[x];[x][1:v]paletteuse" -y $@
 	rm -f $@.palette.png
 
-videos:                                            ## Convert all E2E videos
+e2e-videos: test-e2e                                            ## Convert all E2E videos
 	$(MAKE) $(patsubst %.webm,%.mp4,$(wildcard $(E2E_DIR)/**/*.webm))
 	$(MAKE) $(patsubst %.webm,%.gif,$(wildcard $(E2E_DIR)/**/*.webm))
 

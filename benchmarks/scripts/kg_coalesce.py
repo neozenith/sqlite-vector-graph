@@ -78,7 +78,7 @@ def normalize_name(name):
     name = re.sub(r"\s+", " ", name)
     for article in ("the ", "a ", "an "):
         if name.startswith(article):
-            name = name[len(article):]
+            name = name[len(article) :]
     return name
 
 
@@ -312,7 +312,7 @@ def leiden_clustering(conn, matches):
 
     # Select canonical form per cluster: highest mention count, tie-break shortest name
     entity_to_canonical = {}
-    for community_id, members in communities.items():
+    for _community_id, members in communities.items():
         # Sort by (-mention_count, len(name)) to pick best canonical form
         members_scored = [(m, mention_counts.get(m, 0)) for m in members]
         members_scored.sort(key=lambda x: (-x[1], len(x[0])))
@@ -332,8 +332,11 @@ def leiden_clustering(conn, matches):
     conn.commit()
 
     n_merged = sum(1 for k, v in entity_to_canonical.items() if k != v)
-    log.info("Entity resolution: %d entities merged into %d canonical forms",
-             n_merged, len(set(entity_to_canonical.values())))
+    log.info(
+        "Entity resolution: %d entities merged into %d canonical forms",
+        n_merged,
+        len(set(entity_to_canonical.values())),
+    )
 
     return entity_to_canonical
 
@@ -514,7 +517,7 @@ def graphrag_query(conn, query_text, embedding_model=DEFAULT_EMBEDDING_MODEL, n2
 
     result = {
         "query": query_text,
-        "timestamp": datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
+        "timestamp": datetime.datetime.now(tz=datetime.UTC).isoformat(),
         "stages": {},
     }
 
@@ -536,11 +539,13 @@ def graphrag_query(conn, query_text, embedding_model=DEFAULT_EMBEDDING_MODEL, n2
     seed_chunks = []
     for rowid, distance in chunk_results:
         text_row = conn.execute("SELECT text FROM chunks WHERE chunk_id = ?", (rowid,)).fetchone()
-        seed_chunks.append({
-            "chunk_id": rowid,
-            "distance": round(distance, 4),
-            "text_preview": text_row[0][:200] if text_row else "",
-        })
+        seed_chunks.append(
+            {
+                "chunk_id": rowid,
+                "distance": round(distance, 4),
+                "text_preview": text_row[0][:200] if text_row else "",
+            }
+        )
 
     result["stages"]["1_hnsw_chunks"] = {
         "count": len(seed_chunks),
@@ -554,12 +559,15 @@ def graphrag_query(conn, query_text, embedding_model=DEFAULT_EMBEDDING_MODEL, n2
 
     if seed_chunk_ids:
         placeholders = ",".join("?" * len(seed_chunk_ids))
-        entity_rows = conn.execute(f"""
+        entity_rows = conn.execute(
+            f"""
             SELECT DISTINCT ec.canonical
             FROM entities e
             JOIN entity_clusters ec ON e.name = ec.name
             WHERE e.chunk_id IN ({placeholders})
-        """, seed_chunk_ids).fetchall()
+        """,
+            seed_chunk_ids,
+        ).fetchall()
         seed_entities = {r[0] for r in entity_rows}
 
     result["stages"]["2_seed_entities"] = {
@@ -573,15 +581,18 @@ def graphrag_query(conn, query_text, embedding_model=DEFAULT_EMBEDDING_MODEL, n2
 
     for seed in list(seed_entities)[:10]:  # Limit to top 10 seeds for performance
         try:
-            bfs_rows = conn.execute("""
+            bfs_rows = conn.execute(
+                """
                 SELECT node, depth FROM graph_bfs
                 WHERE edge_table = 'edges'
                   AND src_col = 'src'
                   AND dst_col = 'dst'
                   AND start_node = ?
                   AND max_depth = 2
-            """, (seed,)).fetchall()
-            for node, depth in bfs_rows:
+            """,
+                (seed,),
+            ).fetchall()
+            for node, _depth in bfs_rows:
                 expanded_entities.add(node)
         except sqlite3.OperationalError as e:
             log.debug("BFS from %r failed: %s", seed, e)
@@ -592,7 +603,12 @@ def graphrag_query(conn, query_text, embedding_model=DEFAULT_EMBEDDING_MODEL, n2
         "expanded_count": len(expanded_entities),
         "newly_discovered": sorted(newly_discovered)[:20],
     }
-    log.info("[3] BFS 2-hop: %d -> %d entities (+%d)", len(seed_entities), len(expanded_entities), len(newly_discovered))
+    log.info(
+        "[3] BFS 2-hop: %d -> %d entities (+%d)",
+        len(seed_entities),
+        len(expanded_entities),
+        len(newly_discovered),
+    )
 
     # ── [4] Centrality ranking on edges ───────────────────────────
     centrality_scores = {}
@@ -652,8 +668,7 @@ def graphrag_query(conn, query_text, embedding_model=DEFAULT_EMBEDDING_MODEL, n2
         "count": len(ranked),
         "top_bridges": ranked[:10],
     }
-    log.info("[4] Centrality: ranked %d entities, top bridge: %s",
-             len(ranked), ranked[0]["node"] if ranked else "none")
+    log.info("[4] Centrality: ranked %d entities, top bridge: %s", len(ranked), ranked[0]["node"] if ranked else "none")
 
     # ── [5] Leiden communities containing seed entities ────────────
     community_entities = set()
@@ -669,7 +684,7 @@ def graphrag_query(conn, query_text, embedding_model=DEFAULT_EMBEDDING_MODEL, n2
         """).fetchall()
 
         # Find which communities contain seed entities
-        node_community = {node: comm for node, comm in communities}
+        node_community = dict(communities)
         seed_communities = {node_community[s] for s in seed_entities if s in node_community}
 
         for node, comm in communities:
@@ -704,7 +719,7 @@ def graphrag_query(conn, query_text, embedding_model=DEFAULT_EMBEDDING_MODEL, n2
                 ).fetchall()
                 # Reverse map rowids to names
                 rowid_to_name = {v: k for k, v in n2v_rowid_map.items()}
-                for rid, dist in knn:
+                for rid, _dist in knn:
                     name = rowid_to_name.get(rid)
                     if name and name != seed:
                         n2v_similar.add(name)
@@ -724,24 +739,30 @@ def graphrag_query(conn, query_text, embedding_model=DEFAULT_EMBEDDING_MODEL, n2
     # Collect relevant passages: chunks containing any of the final entities
     final_chunks = set()
     for entity in sorted(all_entities)[:50]:  # Limit for performance
-        rows = conn.execute("""
+        rows = conn.execute(
+            """
             SELECT DISTINCT e.chunk_id
             FROM entities e
             JOIN entity_clusters ec ON e.name = ec.name
             WHERE ec.canonical = ? AND e.chunk_id IS NOT NULL
-        """, (entity,)).fetchall()
+        """,
+            (entity,),
+        ).fetchall()
         for r in rows:
             final_chunks.add(r[0])
 
     # Rank chunks by number of relevant entities they contain
     chunk_scores = collections.Counter()
     for entity in all_entities:
-        rows = conn.execute("""
+        rows = conn.execute(
+            """
             SELECT e.chunk_id
             FROM entities e
             JOIN entity_clusters ec ON e.name = ec.name
             WHERE ec.canonical = ? AND e.chunk_id IS NOT NULL
-        """, (entity,)).fetchall()
+        """,
+            (entity,),
+        ).fetchall()
         for r in rows:
             # Weight by centrality if available
             weight = centrality_scores.get(entity, {}).get("betweenness", 0.01)
@@ -752,19 +773,25 @@ def graphrag_query(conn, query_text, embedding_model=DEFAULT_EMBEDDING_MODEL, n2
     for chunk_id, score in chunk_scores.most_common(10):
         text_row = conn.execute("SELECT text FROM chunks WHERE chunk_id = ?", (chunk_id,)).fetchone()
         if text_row:
-            top_passages.append({
-                "chunk_id": chunk_id,
-                "score": round(score, 6),
-                "text_preview": text_row[0][:300],
-            })
+            top_passages.append(
+                {
+                    "chunk_id": chunk_id,
+                    "score": round(score, 6),
+                    "text_preview": text_row[0][:300],
+                }
+            )
 
     result["stages"]["7_assembly"] = {
         "total_entities": len(all_entities),
         "total_chunks": len(final_chunks),
         "top_passages": top_passages[:5],
     }
-    log.info("[7] Assembly: %d entities, %d chunks, %d ranked passages",
-             len(all_entities), len(final_chunks), len(top_passages))
+    log.info(
+        "[7] Assembly: %d entities, %d chunks, %d ranked passages",
+        len(all_entities),
+        len(final_chunks),
+        len(top_passages),
+    )
 
     # Summary
     result["summary"] = {
@@ -847,10 +874,12 @@ def process_book(book_id, query_text=None, blocking_threshold=0.4, embedding_mod
 
         # Print summary
         summary = result.get("summary", {})
-        log.info("GraphRAG summary: %d entities, %d passages, %d subsystems",
-                 summary.get("total_entities_found", 0),
-                 summary.get("total_passages", 0),
-                 len(summary.get("subsystems_exercised", [])))
+        log.info(
+            "GraphRAG summary: %d entities, %d passages, %d subsystems",
+            summary.get("total_entities_found", 0),
+            summary.get("total_passages", 0),
+            len(summary.get("subsystems_exercised", [])),
+        )
 
     conn.close()
 
@@ -864,10 +893,18 @@ def main():
     group.add_argument("--book-id", type=int, help="Process a specific book")
     group.add_argument("--all", action="store_true", help="Process all KG databases")
     parser.add_argument("--query", type=str, help="GraphRAG query to run after coalescing")
-    parser.add_argument("--blocking-threshold", type=float, default=0.4,
-                        help="Cosine distance threshold for HNSW blocking (default: 0.4)")
-    parser.add_argument("--embedding-model", type=str, default=DEFAULT_EMBEDDING_MODEL,
-                        help=f"Embedding model for queries (default: {DEFAULT_EMBEDDING_MODEL})")
+    parser.add_argument(
+        "--blocking-threshold",
+        type=float,
+        default=0.4,
+        help="Cosine distance threshold for HNSW blocking (default: 0.4)",
+    )
+    parser.add_argument(
+        "--embedding-model",
+        type=str,
+        default=DEFAULT_EMBEDDING_MODEL,
+        help=f"Embedding model for queries (default: {DEFAULT_EMBEDDING_MODEL})",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(

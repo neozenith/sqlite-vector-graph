@@ -4,12 +4,13 @@
  */
 import { Page, expect } from '@playwright/test';
 
-/** Known benign errors from libraries in headless mode. */
+/** Known benign errors from libraries and background fetches in headless mode. */
 const BENIGN_PATTERNS = [
   'luma',         // Deck.GL luma.gl WebGL errors in headless Chromium
   'WebGL',        // WebGL context creation failures
   'deck:',        // Deck.GL internal warnings
   'Failed to initialize WebGL',
+  'Failed to load resource',  // Chrome generic 500 for background API fetches (logged via failedResponses)
 ];
 
 function isBenign(msg: string): boolean {

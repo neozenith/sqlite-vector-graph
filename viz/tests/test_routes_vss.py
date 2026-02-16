@@ -147,13 +147,16 @@ def test_get_metadata_entities_vec(tmp_path: pathlib.Path) -> None:
 
     # Create entity_vec_map for metadata lookups
     conn.execute("CREATE TABLE entity_vec_map (rowid INTEGER PRIMARY KEY, name TEXT)")
-    conn.executemany("INSERT INTO entity_vec_map VALUES (?, ?)", [
-        (1, "Alice"),
-        (2, "Bob"),
-        (3, "Carol"),
-        (4, "Dave"),
-        (5, "Eve"),
-    ])
+    conn.executemany(
+        "INSERT INTO entity_vec_map VALUES (?, ?)",
+        [
+            (1, "Alice"),
+            (2, "Bob"),
+            (3, "Carol"),
+            (4, "Dave"),
+            (5, "Eve"),
+        ],
+    )
     conn.commit()
     conn.close()
 
@@ -188,7 +191,7 @@ def test_get_metadata_entities_vec(tmp_path: pathlib.Path) -> None:
 
 
 def test_get_metadata_node2vec_emb(tmp_path: pathlib.Path) -> None:
-    """_get_metadata returns node2vec type for node2vec_emb index."""
+    """node2vec_emb embeddings resolve node names from edges table."""
     db_path = str(tmp_path / "n2v.db")
     conn = sqlite3.connect(db_path)
     conn.enable_load_extension(True)
@@ -201,7 +204,16 @@ def test_get_metadata_node2vec_emb(tmp_path: pathlib.Path) -> None:
             dimensions=4, metric='cosine', m=8, ef_construction=50
         )
     """)
-    for i in range(1, 6):
+    # Edge table defines first-seen ordering: Alice(1), Bob(2), Carol(3), Dave(4), Eve(5), Frank(6)
+    conn.execute("CREATE TABLE edges (src TEXT, dst TEXT, weight REAL)")
+    conn.execute("INSERT INTO edges VALUES ('Alice', 'Bob', 1.0)")
+    conn.execute("INSERT INTO edges VALUES ('Bob', 'Carol', 1.0)")
+    conn.execute("INSERT INTO edges VALUES ('Carol', 'Dave', 1.0)")
+    conn.execute("INSERT INTO edges VALUES ('Dave', 'Eve', 1.0)")
+    conn.execute("INSERT INTO edges VALUES ('Eve', 'Frank', 1.0)")
+
+    # 6 vectors matching the 6 nodes (UMAP needs >= 4 samples)
+    for i in range(1, 7):
         vec = struct.pack("4f", float(i * 0.1), float(i * 0.2), float(i * 0.3), float(i * 0.4))
         conn.execute("INSERT INTO node2vec_emb (rowid, vector) VALUES (?, ?)", (i, vec))
     conn.commit()
@@ -223,10 +235,19 @@ def test_get_metadata_node2vec_emb(tmp_path: pathlib.Path) -> None:
         assert resp.status_code == 200
         data = resp.json()
         assert data["index"] == "node2vec_emb"
-        assert data["count"] == 5
+        assert data["count"] == 6
         # Check metadata type is node2vec
         for point in data["points"]:
             assert point["metadata"]["type"] == "node2vec"
+        # Check that node names are resolved from edges
+        labels = {p["label"] for p in data["points"]}
+        assert "Alice" in labels
+        assert "Bob" in labels
+        assert "Carol" in labels
+        assert "Frank" in labels
+        # Names also appear in metadata
+        names = {p["metadata"].get("name") for p in data["points"]}
+        assert "Alice" in names
     finally:
         config.DB_PATH = original_db_path
         db.close_connection()
@@ -260,13 +281,16 @@ def test_search_text_with_fts(tmp_path: pathlib.Path) -> None:
 
     # Create chunks table + FTS5 companion
     conn.execute("CREATE TABLE chunks (chunk_id INTEGER PRIMARY KEY, text TEXT)")
-    conn.executemany("INSERT INTO chunks VALUES (?, ?)", [
-        (1, "The quick brown fox"),
-        (2, "jumped over the lazy dog"),
-        (3, "hello world example text"),
-        (4, "another sample chunk"),
-        (5, "the fox runs fast"),
-    ])
+    conn.executemany(
+        "INSERT INTO chunks VALUES (?, ?)",
+        [
+            (1, "The quick brown fox"),
+            (2, "jumped over the lazy dog"),
+            (3, "hello world example text"),
+            (4, "another sample chunk"),
+            (5, "the fox runs fast"),
+        ],
+    )
     conn.execute("CREATE VIRTUAL TABLE chunks_fts USING fts5(text, content=chunks, content_rowid=chunk_id)")
     conn.execute("INSERT INTO chunks_fts(chunks_fts) VALUES ('rebuild')")
     conn.commit()
@@ -362,13 +386,16 @@ def test_get_metadata_chunks_vec(tmp_path: pathlib.Path) -> None:
 
     # Create chunks table for metadata
     conn.execute("CREATE TABLE chunks (chunk_id INTEGER PRIMARY KEY, text TEXT)")
-    conn.executemany("INSERT INTO chunks VALUES (?, ?)", [
-        (1, "First chunk of text"),
-        (2, "Second chunk of text"),
-        (3, "Third chunk of text"),
-        (4, "Fourth chunk of text"),
-        (5, "Fifth chunk of text"),
-    ])
+    conn.executemany(
+        "INSERT INTO chunks VALUES (?, ?)",
+        [
+            (1, "First chunk of text"),
+            (2, "Second chunk of text"),
+            (3, "Third chunk of text"),
+            (4, "Fourth chunk of text"),
+            (5, "Fifth chunk of text"),
+        ],
+    )
     conn.commit()
     conn.close()
 

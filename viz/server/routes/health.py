@@ -2,6 +2,7 @@
 
 import logging
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter
 
@@ -14,9 +15,9 @@ router = APIRouter(prefix="/api", tags=["health"])
 
 
 @router.get("/health")
-def health() -> dict:
+def health() -> dict[str, Any]:
     """Health check with database and extension status."""
-    status: dict = {
+    status: dict[str, Any] = {
         "status": "ok",
         "db_path": DB_PATH,
         "db_exists": Path(DB_PATH).exists(),

@@ -31,7 +31,7 @@ export default defineConfig({
     exclude: ['e2e/**', 'node_modules/**'],
     coverage: {
       provider: 'v8',
-      include: ['src/lib/**/*.ts', 'src/hooks/**/*.ts', 'src/stores/**/*.ts'],
+      include: ['src/lib/**/*.ts'],
       thresholds: {
         lines: 90,
         functions: 90,

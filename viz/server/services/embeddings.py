@@ -4,7 +4,7 @@ import hashlib
 import logging
 
 import numpy as np
-import umap
+import umap  # type: ignore[import-untyped]
 
 log = logging.getLogger(__name__)
 
@@ -38,8 +38,13 @@ class UMAPProjector:
         # UMAP n_neighbors must be < n_samples
         n_neighbors = min(15, max(2, n_samples - 1))
 
-        log.info("UMAP projecting %d vectors (%d-D -> %d-D, n_neighbors=%d)",
-                 n_samples, arr.shape[1], n_components, n_neighbors)
+        log.info(
+            "UMAP projecting %d vectors (%d-D -> %d-D, n_neighbors=%d)",
+            n_samples,
+            arr.shape[1],
+            n_components,
+            n_neighbors,
+        )
 
         reducer = umap.UMAP(
             n_components=n_components,
@@ -51,7 +56,7 @@ class UMAPProjector:
         projected = reducer.fit_transform(arr)
 
         self._cache[key] = projected
-        return projected
+        return projected  # type: ignore[no-any-return]
 
 
 def get_projector() -> UMAPProjector:

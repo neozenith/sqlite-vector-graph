@@ -1,10 +1,9 @@
 # CD & Distribution Plan
 
-> **Status:** Research / Proposal
-> **Date:** 2026-02-12
-> **Scope:** Publishing `muninn` to PyPI, NPM, GitHub Releases, and Homebrew
-> **Depends on:** `ci_and_packaging.md` — all packaging structure must be in place first
-> **Supersedes:** CD portions of `distribution_and_ci.md`
+> **Status:** Active — infrastructure in place, registry publishing not yet implemented
+> **Date:** 2026-02-12 (updated 2026-02-16)
+> **Scope:** Publishing `muninn` to PyPI, NPM, and GitHub Releases
+> **Depends on:** CI pipeline (`.github/workflows/ci.yml`) — fully implemented
 
 ---
 
@@ -12,19 +11,19 @@
 
 1. [Overview](#overview)
 2. [Versioning & Release Flow](#versioning--release-flow)
-3. [PyPI Publishing](#pypi-publishing)
-4. [NPM Publishing](#npm-publishing)
-5. [WASM Publishing](#wasm-publishing)
-6. [GitHub Releases](#github-releases)
-7. [Homebrew Formula](#homebrew-formula)
-8. [Release Workflow (`release.yml`)](#release-workflow-releaseyml)
+3. [Local Build Verification (`make dist`)](#local-build-verification-make-dist)
+4. [PyPI Publishing](#pypi-publishing)
+5. [NPM Publishing](#npm-publishing)
+6. [WASM Publishing](#wasm-publishing)
+7. [GitHub Releases](#github-releases)
+8. [Publish Workflow (`publish.yml`)](#publish-workflow-publishyml)
 9. [Implementation Order](#implementation-order)
 
 ---
 
 ## Overview
 
-CD automates **publishing pre-built binaries to registries**. This is optional — users can already install from git after CI/packaging is complete (see `ci_and_packaging.md`). Registry publishing provides:
+CD automates **publishing pre-built binaries to registries**. This is optional — users can already install from git after CI/packaging is complete. Registry publishing provides:
 
 - Faster installs (no compilation needed)
 - Discoverability (searchable on PyPI/NPM)
@@ -36,22 +35,32 @@ CD automates **publishing pre-built binaries to registries**. This is optional �
 | Registry | Package(s) | Trigger |
 |----------|-----------|---------|
 | **PyPI** | `sqlite-muninn` (5 platform wheels + 1 sdist) | GitHub Release |
-| **NPM** | `sqlite-muninn` (wrapper) + `@sqlite-muninn/{platform}` (5 packages) | GitHub Release |
-| **NPM** | `sqlite-muninn-wasm` (1 universal package) | GitHub Release |
+| **NPM** | `sqlite-muninn` (wrapper) + `@neozenith/sqlite-muninn-{platform}` (5 packages) | GitHub Release |
+| **NPM** | `@neozenith/sqlite-muninn-wasm` (1 universal package) | GitHub Release |
 | **GitHub Releases** | `.so`, `.dylib`, `.dll`, amalgamation tarball | GitHub Release |
-| **Homebrew** | `sqlite-muninn` formula (custom tap) | Manual after GitHub Release |
 
 ---
 
 ## Versioning & Release Flow
 
-### Single Source of Truth
+### Single Source of Truth: `VERSION` file
 
-A `VERSION` file at the repo root. All build scripts read this:
+A plain-text `VERSION` file at the repo root. Currently: `0.1.0-alpha.1`.
 
 ```
-0.1.0
+0.1.0-alpha.1
 ```
+
+#### Why VERSION File (Not Git-Tag-Based Versioning)
+
+After evaluating `setuptools-scm`, `python-semantic-release`, and `commitizen`, the VERSION file approach was chosen because:
+
+1. **Universally readable** — `cat VERSION` works in Make, Python, shell, C preprocessor (`-DVERSION=\"$(cat VERSION)\"`), Node.js, and CI. No tool-specific API needed.
+2. **No `.git` dependency** — setuptools-scm needs `.git` at build time. Source tarballs and shallow clones break version detection. The VERSION file always works.
+3. **Decoupled from commit conventions** — commit-based tools require strict Conventional Commits for version calculation. The VERSION file allows manual milestone versions (e.g., `1.0.0`).
+4. **Separation of concerns** — git-cliff handles changelog generation, the VERSION file handles version storage, and `version_stamp.py` handles propagation. Each tool does one thing.
+
+The stamp script (`scripts/version_stamp.py`) propagates the VERSION into `npm/package.json` and `skills/muninn/SKILL.md` via explicit regex targets. Run `make version-stamp` to propagate, or `python scripts/version_stamp.py --check` in CI to detect drift.
 
 ### Semantic Versioning
 
@@ -59,42 +68,69 @@ A `VERSION` file at the repo root. All build scripts read this:
 - **MINOR** — New features (algorithms, TVFs, vtab columns)
 - **PATCH** — Bug fixes, performance improvements
 
+Pre-release suffixes follow SemVer: `0.1.0-alpha.1`, `0.1.0-beta.1`, `0.1.0-rc.1`.
+
+### Changelog: git-cliff
+
+**Decided:** [git-cliff](https://github.com/orhun/git-cliff) (configured in `cliff.toml`, installed as dev dependency in `pyproject.toml`).
+
+```bash
+make changelog           # Generate/update CHANGELOG.md from git history
+make release             # Calculate next version from commits, stamp everything, update changelog
+```
+
+The `make release` target:
+1. Calculates next version from commit history via `git cliff --bumped-version`
+2. Writes it to `VERSION`
+3. Runs `make version-stamp` to propagate to all package manifests
+4. Runs `git cliff --bump -o CHANGELOG.md` to generate the changelog
+5. Prints instructions for the commit + tag
+
 ### Release Process
 
 ```
-1. Bump VERSION file, commit:    echo "0.2.0" > VERSION && git add VERSION && git commit -m "release: v0.2.0"
-2. Tag and push:                 git tag v0.2.0 && git push && git push --tags
-3. Create GitHub Release:        (manually or via release-please)
-4. release.yml triggers:
-   a. Build on 4 CI runners (producing 5 platform binaries)
-   b. Run tests on each platform
-   c. Build amalgamation
-   d. Build WASM
-   e. Package Python wheels (5 platform-tagged)
-   f. Package NPM packages (5 platform + 1 main + 1 WASM)
-   g. Upload binaries + amalgamation to GitHub Release
-   h. Publish to PyPI (trusted publisher / OIDC)
-   i. Publish to NPM (trusted publisher + provenance)
+1. make release                    # Bumps VERSION, stamps manifests, updates CHANGELOG.md
+2. Review changes
+3. git add -A && git commit -m "chore(release): v0.2.0"
+4. git tag v0.2.0
+5. git push && git push --tags
+6. Create GitHub Release (manually or via gh cli)
+7. publish.yml triggers automatically
 ```
 
 ### Multi-Package Version Coordination
 
 All packages share the same version from `VERSION`:
-- `sqlite_muninn/__init__.py` → `__version__`
-- `npm/sqlite-muninn/package.json` → `"version"`
-- All `@sqlite-muninn/{platform}/package.json` → `"version"`
-- `npm/sqlite-muninn-wasm/package.json` → `"version"`
-- Amalgamation header comment
-- SKILL.md YAML frontmatter `{{VERSION}}`
+- `pyproject.toml` → `dynamic = ["version"]` reads VERSION directly
+- `npm/package.json` → stamped by `version_stamp.py`
+- `skills/muninn/SKILL.md` → stamped by `version_stamp.py`
+- Amalgamation header → stamped by `scripts/amalgamate.sh`
+- C compile-time → injected via `-DMUNINN_VERSION=\"$(VERSION)\"` in Makefile
 
-Build scripts stamp the version from `VERSION` into all of these before packaging.
+---
 
-### Changelog Generation
+## Local Build Verification (`make dist`)
 
-Options:
-1. **[git-cliff](https://github.com/orhun/git-cliff)** — generates from Conventional Commits
-2. **[release-please](https://github.com/google-github-actions/release-please-action)** — creates release PRs
-3. **Manual `CHANGELOG.md`** — simplest, used by most SQLite extensions
+Before pushing a release, verify all artifacts build locally:
+
+```bash
+make dist
+```
+
+This produces:
+
+```
+dist/
+    muninn.dylib              # Native extension binary
+    muninn.c                  # Amalgamation source
+    muninn.h                  # Amalgamation header
+    python/
+        sqlite_muninn-*.whl   # Python wheel
+    npm/
+        sqlite-muninn-*.tgz   # npm package tarball
+```
+
+The `make dist` target runs: `version-stamp` → `build` → `amalgamation` → `python -m build --wheel` → `npm pack`.
 
 ---
 
@@ -118,10 +154,6 @@ Each CI runner produces a platform binary. A post-build script assembles platfor
 # 1. Create wheel directory structure:
 #    sqlite_muninn/__init__.py
 #    sqlite_muninn/muninn.{so,dylib,dll}
-#    sqlite_muninn/skills/muninn/SKILL.md
-#    sqlite_muninn/skills/muninn/references/cookbook-python.md
-#    sqlite_muninn/skills/muninn/references/vector-encoding.md
-#    sqlite_muninn/skills/muninn/references/platform-caveats.md
 # 2. Write METADATA, WHEEL, RECORD files
 # 3. Tag: sqlite_muninn-{version}-py3-none-{platform}.whl
 # 4. Zip into .whl
@@ -173,25 +205,25 @@ publish-pypi:
 
 ### Package Architecture
 
-The **esbuild pattern** — platform-specific optional dependencies:
+The **esbuild pattern** — platform-specific optional dependencies, all under the `@neozenith` scope:
 
 ```
-@sqlite-muninn/darwin-arm64     # macOS Apple Silicon
-@sqlite-muninn/darwin-x64       # macOS Intel
-@sqlite-muninn/linux-x64        # Linux x86_64
-@sqlite-muninn/linux-arm64      # Linux ARM64
-@sqlite-muninn/win32-x64        # Windows x86_64
-sqlite-muninn                   # Main wrapper (optionalDependencies → above)
+@neozenith/sqlite-muninn-darwin-arm64   # macOS Apple Silicon
+@neozenith/sqlite-muninn-darwin-x64     # macOS Intel
+@neozenith/sqlite-muninn-linux-x64      # Linux x86_64
+@neozenith/sqlite-muninn-linux-arm64    # Linux ARM64
+@neozenith/sqlite-muninn-win32-x64      # Windows x86_64
+sqlite-muninn                           # Main wrapper (optionalDependencies -> above)
 ```
 
 npm/yarn/pnpm automatically installs **only** the matching platform package.
 
-### Platform Package (`@sqlite-muninn/linux-x64/package.json`)
+### Platform Package (`@neozenith/sqlite-muninn-linux-x64/package.json`)
 
 ```json
 {
-  "name": "@sqlite-muninn/linux-x64",
-  "version": "0.1.0",
+  "name": "@neozenith/sqlite-muninn-linux-x64",
+  "version": "0.1.0-alpha.1",
   "os": ["linux"],
   "cpu": ["x64"],
   "files": ["muninn.so"]
@@ -203,17 +235,17 @@ npm/yarn/pnpm automatically installs **only** the matching platform package.
 ```json
 {
   "name": "sqlite-muninn",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha.1",
   "main": "index.cjs",
   "module": "index.mjs",
   "types": "index.d.ts",
-  "files": ["index.mjs", "index.cjs", "index.d.ts", "skills/**/*.md"],
+  "files": ["index.mjs", "index.cjs", "index.d.ts"],
   "optionalDependencies": {
-    "@sqlite-muninn/darwin-arm64": "0.1.0",
-    "@sqlite-muninn/darwin-x64": "0.1.0",
-    "@sqlite-muninn/linux-x64": "0.1.0",
-    "@sqlite-muninn/linux-arm64": "0.1.0",
-    "@sqlite-muninn/win32-x64": "0.1.0"
+    "@neozenith/sqlite-muninn-darwin-arm64": "0.1.0-alpha.1",
+    "@neozenith/sqlite-muninn-darwin-x64": "0.1.0-alpha.1",
+    "@neozenith/sqlite-muninn-linux-x64": "0.1.0-alpha.1",
+    "@neozenith/sqlite-muninn-linux-arm64": "0.1.0-alpha.1",
+    "@neozenith/sqlite-muninn-win32-x64": "0.1.0-alpha.1"
   }
 }
 ```
@@ -249,10 +281,10 @@ publish-npm:
     - name: Publish platform packages
       run: |
         for target in darwin-arm64 darwin-x64 linux-x64 linux-arm64 win32-x64; do
-          npm publish npm/@sqlite-muninn/$target --provenance --access public
+          npm publish npm/platforms/$target --provenance --access public
         done
     - name: Publish main package
-      run: npm publish npm/sqlite-muninn --provenance --access public
+      run: npm publish npm/ --provenance --access public
 ```
 
 ---
@@ -265,8 +297,8 @@ A single platform-independent NPM package:
 
 ```json
 {
-  "name": "sqlite-muninn-wasm",
-  "version": "0.1.0",
+  "name": "@neozenith/sqlite-muninn-wasm",
+  "version": "0.1.0-alpha.1",
   "type": "module",
   "files": ["muninn_sqlite3.js", "muninn_sqlite3.wasm"]
 }
@@ -285,12 +317,12 @@ publish-wasm:
     - uses: actions/download-artifact@v4
       with:
         name: wasm
-        path: npm/sqlite-muninn-wasm/
+        path: npm/wasm/
     - uses: actions/setup-node@v4
       with:
         node-version: "22"
         registry-url: https://registry.npmjs.org
-    - run: npm publish npm/sqlite-muninn-wasm --provenance --access public
+    - run: npm publish npm/wasm --provenance --access public
 ```
 
 ---
@@ -321,40 +353,12 @@ upload-release:
 
 ---
 
-## Homebrew Formula
+## Publish Workflow (`publish.yml`)
 
-Custom tap for macOS users:
-
-```ruby
-class SqliteMuninn < Formula
-  desc "HNSW + graph traversal + Node2Vec SQLite extension"
-  homepage "https://github.com/user/sqlite-muninn"
-  url "https://github.com/user/sqlite-muninn/archive/refs/tags/v0.1.0.tar.gz"
-  sha256 "<sha256>"
-  license "MIT"
-  depends_on "sqlite"
-
-  def install
-    system "make", "all", "SQLITE_PREFIX=#{Formula["sqlite"].opt_prefix}"
-    lib.install "muninn.dylib"
-    include.install "src/muninn.h"
-  end
-
-  test do
-    system Formula["sqlite"].opt_bin/"sqlite3", ":memory:",
-           ".load #{lib}/muninn", "SELECT 1"
-  end
-end
-```
-
-Publish as `brew tap user/tap` first. Consider `homebrew-core` if adoption grows.
-
----
-
-## Release Workflow (`release.yml`)
+File: `.github/workflows/publish.yml`
 
 ```yaml
-name: Release
+name: Publish
 on:
   release:
     types: [published]
@@ -381,14 +385,30 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - name: Build
+
+      - name: Build (Unix)
+        if: runner.os != 'Windows'
         run: make all
-      - name: Test
-        run: make test
+
+      - name: Setup MSVC
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: scripts\build_windows.bat
+
+      - name: Test (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          sudo apt-get install -y libsqlite3-dev 2>/dev/null || true
+          make test
+
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.target }}
-          path: muninn.${{ matrix.ext }}
+          path: build/muninn.${{ matrix.ext }}
 
   # ── Amalgamation ─────────────────────────────────────────
   amalgamation:
@@ -447,10 +467,10 @@ jobs:
       - name: Publish platform packages
         run: |
           for target in darwin-arm64 darwin-x64 linux-x64 linux-arm64 win32-x64; do
-            npm publish npm/@sqlite-muninn/$target --provenance --access public
+            npm publish npm/platforms/$target --provenance --access public
           done
       - name: Publish main package
-        run: npm publish npm/sqlite-muninn --provenance --access public
+        run: npm publish npm/ --provenance --access public
 
   # ── Publish WASM to NPM ─────────────────────────────────
   publish-wasm:
@@ -463,12 +483,12 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: wasm
-          path: npm/sqlite-muninn-wasm/
+          path: npm/wasm/
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
           registry-url: https://registry.npmjs.org
-      - run: npm publish npm/sqlite-muninn-wasm --provenance --access public
+      - run: npm publish npm/wasm --provenance --access public
 
   # ── Upload to GitHub Release ─────────────────────────────
   upload-release:
@@ -494,47 +514,33 @@ jobs:
 
 ## Implementation Order
 
-All items below depend on CI/packaging being in place first.
+### Phase 1: Release Infrastructure (Done)
 
-### Phase 1: Release Infrastructure
-
-1. **Add `VERSION` file** — if not already added during CI phase
-2. **Create `scripts/build_wheels.py`** — assembles platform-tagged wheels from CI artifacts
-3. **Create `scripts/stamp_version.sh`** — stamps `VERSION` into all package manifests
+1. ~~**Add `VERSION` file**~~ — `0.1.0-alpha.1`
+2. ~~**Create `scripts/version_stamp.py`**~~ — stamps VERSION into package manifests
+3. ~~**Configure git-cliff**~~ — `cliff.toml`, `make changelog`, `make release`
+4. ~~**Add `make dist`**~~ — local build verification
 
 ### Phase 2: PyPI
 
-4. **Register `sqlite-muninn` on PyPI** — claim the name
-5. **Configure PyPI trusted publisher** — OIDC link to GitHub repo
-6. **Add `publish-pypi` job** to `release.yml`
-7. **Test the full flow** — Tag → Release → PyPI
+5. **Create `scripts/build_wheels.py`** — assembles platform-tagged wheels from CI artifacts
+6. **Register `sqlite-muninn` on PyPI** — claim the name
+7. **Configure PyPI trusted publisher** — OIDC link to GitHub repo
+8. **Add `publish-pypi` job** to `publish.yml`
+9. **Test the full flow** — Tag -> Release -> PyPI
 
-### Phase 3: NPM
+### Phase 3: NPM + WASM
 
-8. **Register `sqlite-muninn` and `@sqlite-muninn/*` on NPM** — claim the names
-9. **Create NPM platform package scaffolding** — 5 platform `package.json` files
-10. **Configure NPM trusted publishing** — per-package OIDC
-11. **Add `publish-npm` job** to `release.yml`
-12. **Test with `better-sqlite3` and `node:sqlite`**
+10. **Register `sqlite-muninn` (unscoped) and `@neozenith/sqlite-muninn-*` platform packages on NPM**
+11. **Create NPM platform package scaffolding** — 5 platform `package.json` files in `npm/platforms/`
+12. **Create `npm/wasm/` package** — `@neozenith/sqlite-muninn-wasm` `package.json` + JS wrapper
+13. **Configure NPM trusted publishing** — per-package OIDC (native + WASM)
+14. **Add `publish-npm` and `publish-wasm` jobs** to `publish.yml`
+15. **Test with `better-sqlite3`, `node:sqlite`, and browser** — verify native + WASM end-to-end
 
-### Phase 4: WASM Package
-
-13. **Create `npm/sqlite-muninn-wasm/` package** — `package.json` + JS wrapper
-14. **Add `publish-wasm` job** to `release.yml`
-15. **Test in browser** — verify HNSW + graph TVFs work end-to-end
-
-### Phase 5: GitHub Releases + Homebrew
+### Phase 4: GitHub Releases
 
 16. **Add `upload-release` job** — binaries + amalgamation + WASM
-17. **Create Homebrew formula** — custom tap at `user/homebrew-tap`
-18. **Document `brew install` flow**
-
-### Phase 6: Ecosystem (Deferred)
-
-19. **vcpkg / Conan ports** — when demand warrants
-20. **`sqlite-muninn-bundled`** — Python package with baked-in SQLite (deferred unless demand)
-21. **Fuzz testing** — libFuzzer harnesses
-22. **Performance regression tracking** — Bencher or github-action-benchmark
 
 ---
 
@@ -546,7 +552,6 @@ All items below depend on CI/packaging being in place first.
 | [sqlean.py](https://github.com/nalgeon/sqlean.py) | CPython replacement | N/A | Bundles custom SQLite |
 | [esbuild](https://github.com/evanw/esbuild) | N/A | Platform optionalDeps | Pioneered the NPM pattern |
 | [sql.js](https://github.com/sql-js/sql.js) | N/A | WASM | SQLite in WebAssembly |
-| [QMD](https://github.com/tobi/qmd) | N/A | N/A | `skills/` + SKILL.md pattern |
 
 ### Key Tools
 
@@ -555,4 +560,16 @@ All items below depend on CI/packaging being in place first.
 | [pypa/gh-action-pypi-publish](https://github.com/pypa/gh-action-pypi-publish) | PyPI trusted publishing |
 | [softprops/action-gh-release](https://github.com/softprops/action-gh-release) | GitHub Release asset uploads |
 | [git-cliff](https://github.com/orhun/git-cliff) | Changelog from Conventional Commits |
-| [release-please](https://github.com/google-github-actions/release-please-action) | Automated release PRs |
+
+### Versioning Research Summary
+
+Tools evaluated for version management:
+
+| Tool | Verdict | Why |
+|------|---------|-----|
+| `setuptools-scm` | Rejected | Python-only, needs `.git` at build time, doesn't solve multi-language |
+| `python-semantic-release` | Rejected | Overkill, overlaps with git-cliff for changelogs |
+| `commitizen` | Considered | `version_files` is nice but just declarative config for same regex stamping |
+| `npm version` | Rejected | Single-ecosystem, doesn't propagate to Python/C |
+| **VERSION file + stamp script** | **Chosen** | Universal, explicit, auditable, works everywhere |
+| **git-cliff `--bumped-version`** | **Chosen** | Automates version *calculation* from commits |

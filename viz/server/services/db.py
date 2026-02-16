@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 try:
-    import pysqlite3 as sqlite3
+    import pysqlite3 as sqlite3  # type: ignore[import-not-found]
 except ImportError:
     import sqlite3
 
@@ -87,9 +87,7 @@ def discover_hnsw_indexes(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     metric_names = {0: "l2", 1: "cosine", 2: "inner_product"}
 
     # Find all tables ending in _config that have the HNSW schema
-    tables = conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE '%_config'"
-    ).fetchall()
+    tables = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE '%_config'").fetchall()
 
     indexes = []
     for (table_name,) in tables:
@@ -114,14 +112,16 @@ def discover_hnsw_indexes(conn: sqlite3.Connection) -> list[dict[str, Any]]:
             node_count = 0
 
         metric_int = int(config.get("metric", 0))
-        indexes.append({
-            "name": index_name,
-            "dimensions": int(config["dimensions"]),
-            "metric": metric_names.get(metric_int, f"unknown({metric_int})"),
-            "m": int(config.get("m", 16)),
-            "ef_construction": int(config.get("ef_construction", 200)),
-            "node_count": node_count,
-        })
+        indexes.append(
+            {
+                "name": index_name,
+                "dimensions": int(config["dimensions"]),
+                "metric": metric_names.get(metric_int, f"unknown({metric_int})"),
+                "m": int(config.get("m", 16)),
+                "ef_construction": int(config.get("ef_construction", 200)),
+                "node_count": node_count,
+            }
+        )
 
     return indexes
 
@@ -139,9 +139,7 @@ def discover_edge_tables(conn: sqlite3.Connection) -> list[dict[str, Any]]:
         name = idx["name"]
         shadow_tables.update({f"{name}_config", f"{name}_nodes", f"{name}_edges"})
 
-    tables = conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='table'"
-    ).fetchall()
+    tables = conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
 
     edge_tables = []
     # Column name patterns in priority order (most specific first).
@@ -178,12 +176,14 @@ def discover_edge_tables(conn: sqlite3.Connection) -> list[dict[str, Any]]:
             except sqlite3.OperationalError:
                 edge_count = 0
 
-            edge_tables.append({
-                "table_name": table_name,
-                "src_col": src_col,
-                "dst_col": dst_col,
-                "weight_col": weight_col,
-                "edge_count": edge_count,
-            })
+            edge_tables.append(
+                {
+                    "table_name": table_name,
+                    "src_col": src_col,
+                    "dst_col": dst_col,
+                    "weight_col": weight_col,
+                    "edge_count": edge_count,
+                }
+            )
 
     return edge_tables

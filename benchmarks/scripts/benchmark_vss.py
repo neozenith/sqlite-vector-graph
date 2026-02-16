@@ -2,8 +2,8 @@
 Multi-dimensional benchmark suite for SQLite vector search extensions.
 
 Compares muninn (HNSW), sqliteai/sqlite-vector, vectorlite, and sqlite-vec
-across multiple vector dimensions, datasets, and data volumes. Computes
-saturation metrics and writes JSONL results for analysis.
+across multiple vector dimensions, datasets, and data volumes using real
+embedding models. Writes JSONL results for analysis.
 
 Engines:
     muninn           — This project's HNSW index
@@ -16,9 +16,6 @@ Datasets:
     wealth_of_nations    — ~2.5K paragraphs from Gutenberg #3300
 
 Profiles:
-    small       — 3 dims (384, 768, 1536), N <= 50K, random vectors (~10 min)
-    medium      — 2 dims (384, 768), N = 100K-500K, random vectors (~1-2 hrs)
-    saturation  — 8 dims (32-1536), N = 50K, random vectors (~20 min)
     models      — 3 real embedding models x 2 datasets (~30 min)
 
 Prerequisites:
@@ -26,8 +23,7 @@ Prerequisites:
     make all
 
 Run:
-    python python/benchmark_vss.py --profile small
-    python python/benchmark_vss.py --source random --dim 384 --sizes 1000,5000
+    python python/benchmark_vss.py --profile models
     python python/benchmark_vss.py --source model:all-MiniLM-L6-v2 --sizes 1000 --dataset ag_news
 """
 
@@ -36,7 +32,6 @@ import datetime
 import importlib.resources
 import json
 import logging
-import math
 import platform
 import random
 import re
@@ -88,9 +83,6 @@ HNSW_M = 16
 HNSW_EF_CONSTRUCTION = 200
 HNSW_EF_SEARCH = 64
 
-# Saturation sampling
-SATURATION_SAMPLE_PAIRS = 10_000
-
 # Memory budget per-dimension max N (safe for 8GB total)
 MAX_N_BY_DIM = {
     32: 500_000,
@@ -129,11 +121,6 @@ DATASETS = {
 
 # Profile definitions
 PROFILES = {
-    "saturation": {
-        "source": "random",
-        "dimensions": [32, 64, 128, 256, 512, 768, 1024, 1536],
-        "sizes": [50_000],
-    },
     "models": {
         "source": "models",
         "dimensions": None,  # determined by model
@@ -149,16 +136,6 @@ PROFILES = {
 def _sqlite_vector_ext_path():
     """Locate the sqliteai-vector binary for load_extension()."""
     return str(importlib.resources.files("sqlite_vector.binaries") / "vector")
-
-
-def random_vector(dim):
-    """Generate a random unit vector."""
-    v = [random.gauss(0, 1) for _ in range(dim)]
-    norm = math.sqrt(sum(x * x for x in v))
-    if norm < 1e-10:
-        v[0] = 1.0
-        norm = 1.0
-    return [x / norm for x in v]
 
 
 def pack_vector(v):
@@ -183,11 +160,6 @@ def _fmt_bytes(size):
             return f"{size:.1f} {unit}"
         size /= 1024
     return f"{size:.1f} TB"
-
-
-def generate_dataset(n, dim):
-    """Generate n random unit vectors as a dict of {rowid: list[float]}."""
-    return {i: random_vector(dim) for i in range(1, n + 1)}
 
 
 def pick_queries(vectors, n_queries):
@@ -223,8 +195,6 @@ def format_time(seconds):
 
 def make_scenario_name(vector_source, model_name, dataset, dim, n):
     """Build a deterministic scenario name from run parameters."""
-    if vector_source == "random":
-        return f"random_dim{dim}_n{n}"
     ds_suffix = f"_{dataset}" if dataset and dataset != "ag_news" else ""
     return f"model_{model_name}{ds_suffix}_n{n}"
 
@@ -341,74 +311,6 @@ def load_dataset_texts(dataset_key, max_n):
 
     log.error("Unknown dataset source_type: %s", ds_config["source_type"])
     sys.exit(1)
-
-
-# ── Saturation metrics ────────────────────────────────────────────
-
-
-def compute_saturation_metrics(vectors, dim, n_sample_pairs=SATURATION_SAMPLE_PAIRS):
-    """Compute vector space saturation metrics from sampled pairwise distances.
-
-    Returns dict with relative_contrast, distance_cv, nearest_farthest_ratio.
-    """
-    ids = list(vectors.keys())
-    n = len(ids)
-
-    if n < 10:
-        return {"relative_contrast": None, "distance_cv": None, "nearest_farthest_ratio": None}
-
-    # Sample pairwise distances
-    n_pairs = min(n_sample_pairs, n * (n - 1) // 2)
-    pairwise_dists = []
-    for _ in range(n_pairs):
-        i, j = random.sample(ids, 2)
-        d = math.sqrt(sum((a - b) ** 2 for a, b in zip(vectors[i], vectors[j], strict=False)))
-        pairwise_dists.append(d)
-
-    mean_pairwise = sum(pairwise_dists) / len(pairwise_dists)
-    var_pairwise = sum((d - mean_pairwise) ** 2 for d in pairwise_dists) / len(pairwise_dists)
-    std_pairwise = math.sqrt(var_pairwise)
-
-    # Sample nearest-neighbor and farthest distances for a subset of points
-    n_sample_queries = min(100, n)
-    sample_query_ids = random.sample(ids, n_sample_queries)
-    nn_dists = []
-    nf_ratios = []
-
-    for qid in sample_query_ids:
-        q = vectors[qid]
-        # Compute distances to a sample of other points
-        sample_targets = random.sample(ids, min(500, n))
-        dists_to_targets = []
-        for tid in sample_targets:
-            if tid == qid:
-                continue
-            d = math.sqrt(sum((a - b) ** 2 for a, b in zip(q, vectors[tid], strict=False)))
-            dists_to_targets.append(d)
-
-        if dists_to_targets:
-            d_min = min(dists_to_targets)
-            d_max = max(dists_to_targets)
-            nn_dists.append(d_min)
-            if d_max > 1e-10:
-                nf_ratios.append(d_min / d_max)
-
-    mean_nn = sum(nn_dists) / len(nn_dists) if nn_dists else 0
-
-    # Relative Contrast: mean(pairwise) / mean(nearest-neighbor) -> 1.0 means saturated
-    rc = mean_pairwise / mean_nn if mean_nn > 1e-10 else None
-
-    # Coefficient of Variation: std(pairwise) / mean(pairwise) -> 0 means saturated
-    cv = std_pairwise / mean_pairwise if mean_pairwise > 1e-10 else None
-
-    # Nearest/Farthest ratio: mean -> 1.0 means saturated
-    nf = sum(nf_ratios) / len(nf_ratios) if nf_ratios else None
-
-    return {
-        "relative_contrast": round(rc, 4) if rc is not None else None,
-        "distance_cv": round(cv, 4) if cv is not None else None,
-        "nearest_farthest_ratio": round(nf, 4) if nf is not None else None,
-    }
 
 
 # ── Ground truth computation ──────────────────────────────────────
@@ -746,7 +648,6 @@ def make_record(
     dim,
     n,
     metrics,
-    saturation,
     storage="memory",
     engine_params=None,
     dataset=None,
@@ -773,9 +674,6 @@ def make_record(
         "quantize_s": round(metrics["quantize_s"], 3) if metrics.get("quantize_s") is not None else None,
         "db_path": metrics.get("db_path"),
         "db_size_bytes": metrics.get("db_size_bytes"),
-        "relative_contrast": saturation.get("relative_contrast"),
-        "distance_cv": saturation.get("distance_cv"),
-        "nearest_farthest_ratio": saturation.get("nearest_farthest_ratio"),
         "platform": info["platform"],
         "python_version": info["python_version"],
         "engine_params": engine_params or {},
@@ -985,7 +883,6 @@ def verify_extensions():
 
 
 def run_benchmark(
-    vector_source,
     model_name,
     dim,
     sizes,
@@ -995,31 +892,27 @@ def run_benchmark(
     run_timestamp=None,
     dataset=None,
 ):
-    """Run the benchmark for a single dimension and vector source."""
+    """Run the benchmark for a single model and dataset."""
     total_configs = len(sizes) * len(engines)
     completed = 0
     start_time = time.perf_counter()
 
+    model_info = EMBEDDING_MODELS.get(model_name)
+    if model_info is None:
+        log.error("Unknown model: %s", model_name)
+        return
+
     for n in sizes:
         n = enforce_memory_limit(dim, n)
 
-        # Generate or load vectors
-        if vector_source == "random":
-            log.info("\n  Generating %d random vectors (dim=%d)...", n, dim)
-            vectors = generate_dataset(n, dim)
-        else:
-            model_info = EMBEDDING_MODELS.get(model_name)
-            if model_info is None:
-                log.error("Unknown model: %s", model_name)
-                continue
-            vectors = load_or_generate_model_vectors(
-                model_name,
-                model_info["model_id"],
-                dim,
-                n,
-                dataset=dataset or "ag_news",
-            )
-            n = len(vectors)  # may be clamped by dataset size
+        vectors = load_or_generate_model_vectors(
+            model_name,
+            model_info["model_id"],
+            dim,
+            n,
+            dataset=dataset or "ag_news",
+        )
+        n = len(vectors)  # may be clamped by dataset size
 
         query_ids = pick_queries(vectors, N_QUERIES)
 
@@ -1027,20 +920,14 @@ def run_benchmark(
         log.info("  Computing ground truth (N=%d, dim=%d)...", n, dim)
         ground_truth = compute_ground_truth(vectors, query_ids, K, dim)
 
-        # Compute saturation metrics (once per dim/N combo)
-        log.info("  Computing saturation metrics...")
-        saturation = compute_saturation_metrics(vectors, dim)
-
         # Determine db paths for disk storage
-        scenario = make_scenario_name(vector_source, model_name, dataset, dim, n)
+        scenario = make_scenario_name("model", model_name, dataset, dim, n)
 
         for engine in engines:
             if storage == "disk":
                 db_path = str(make_db_path(scenario, run_timestamp, engine))
             else:
                 db_path = ":memory:"
-
-            record_dataset = dataset if vector_source != "random" else None
 
             if engine == "muninn":
                 log.info("  Running muninn HNSW (N=%d, dim=%d, storage=%s)...", n, dim, storage)
@@ -1050,8 +937,8 @@ def run_benchmark(
                 record = make_record(
                     engine="muninn",
                     search_method="hnsw",
-                    vector_source=vector_source,
-                    model_name=model_name if vector_source != "random" else None,
+                    vector_source="model",
+                    model_name=model_name,
                     dim=dim,
                     n=n,
                     metrics={
@@ -1062,10 +949,9 @@ def run_benchmark(
                         "db_path": vg.get("db_path"),
                         "db_size_bytes": vg.get("db_size_bytes"),
                     },
-                    saturation=saturation,
                     storage=storage,
                     engine_params={"m": HNSW_M, "ef_construction": HNSW_EF_CONSTRUCTION, "ef_search": HNSW_EF_SEARCH},
-                    dataset=record_dataset,
+                    dataset=dataset,
                 )
                 write_jsonl_record(output_path, record)
 
@@ -1079,8 +965,8 @@ def run_benchmark(
                 record_q = make_record(
                     engine="sqlite_vector",
                     search_method="quantize_scan",
-                    vector_source=vector_source,
-                    model_name=model_name if vector_source != "random" else None,
+                    vector_source="model",
+                    model_name=model_name,
                     dim=dim,
                     n=n,
                     metrics={
@@ -1092,9 +978,8 @@ def run_benchmark(
                         "db_path": sv.get("db_path"),
                         "db_size_bytes": sv.get("db_size_bytes"),
                     },
-                    saturation=saturation,
                     storage=storage,
-                    dataset=record_dataset,
+                    dataset=dataset,
                 )
                 write_jsonl_record(output_path, record_q)
 
@@ -1102,8 +987,8 @@ def run_benchmark(
                 record_f = make_record(
                     engine="sqlite_vector",
                     search_method="full_scan",
-                    vector_source=vector_source,
-                    model_name=model_name if vector_source != "random" else None,
+                    vector_source="model",
+                    model_name=model_name,
                     dim=dim,
                     n=n,
                     metrics={
@@ -1115,9 +1000,8 @@ def run_benchmark(
                         "db_path": sv.get("db_path"),
                         "db_size_bytes": sv.get("db_size_bytes"),
                     },
-                    saturation=saturation,
                     storage=storage,
-                    dataset=record_dataset,
+                    dataset=dataset,
                 )
                 write_jsonl_record(output_path, record_f)
 
@@ -1132,8 +1016,8 @@ def run_benchmark(
                 record = make_record(
                     engine="vectorlite",
                     search_method="hnsw",
-                    vector_source=vector_source,
-                    model_name=model_name if vector_source != "random" else None,
+                    vector_source="model",
+                    model_name=model_name,
                     dim=dim,
                     n=n,
                     metrics={
@@ -1144,10 +1028,9 @@ def run_benchmark(
                         "db_path": vl.get("db_path"),
                         "db_size_bytes": vl.get("db_size_bytes"),
                     },
-                    saturation=saturation,
                     storage=storage,
                     engine_params={"m": HNSW_M, "ef_construction": HNSW_EF_CONSTRUCTION, "ef_search": HNSW_EF_SEARCH},
-                    dataset=record_dataset,
+                    dataset=dataset,
                 )
                 write_jsonl_record(output_path, record)
 
@@ -1162,8 +1045,8 @@ def run_benchmark(
                 record = make_record(
                     engine="sqlite_vec",
                     search_method="brute_force",
-                    vector_source=vector_source,
-                    model_name=model_name if vector_source != "random" else None,
+                    vector_source="model",
+                    model_name=model_name,
                     dim=dim,
                     n=n,
                     metrics={
@@ -1174,9 +1057,8 @@ def run_benchmark(
                         "db_path": sv.get("db_path"),
                         "db_size_bytes": sv.get("db_size_bytes"),
                     },
-                    saturation=saturation,
                     storage=storage,
-                    dataset=record_dataset,
+                    dataset=dataset,
                 )
                 write_jsonl_record(output_path, record)
 
@@ -1203,27 +1085,21 @@ def parse_args():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Profiles:
-  small       3 dims (384,768,1536), N<=50K, random      (~10 min)
-  medium      2 dims (384,768), N=100K-500K, random      (~1-2 hrs)
-  saturation  8 dims (32-1536), N=50K, random            (~20 min)
   models      3 models x 2 datasets, N<=250K             (~30 min)
 
-Datasets (for model source):
+Datasets:
   ag_news              120K news snippets (HuggingFace)
   wealth_of_nations    ~2.5K paragraphs from Gutenberg #3300
 
 Examples:
-  python python/benchmark_vss.py --profile small
-  python python/benchmark_vss.py --source random --dim 384 --sizes 1000,5000
+  python python/benchmark_vss.py --profile models
   python python/benchmark_vss.py --source model:all-MiniLM-L6-v2 --sizes 1000 --dataset ag_news
   python python/benchmark_vss.py --source model:all-MiniLM-L6-v2 --sizes 1000 --dataset wealth_of_nations
-  python python/benchmark_vss.py --engine sqlite_vec --source random --dim 384 --sizes 1000
-  python python/benchmark_vss.py --profile small --storage disk
+  python python/benchmark_vss.py --profile models --storage disk
         """,
     )
     parser.add_argument("--profile", choices=PROFILES.keys(), help="Predefined benchmark profile")
-    parser.add_argument("--source", default="random", help="Vector source: 'random' or 'model:<model_id>'")
-    parser.add_argument("--dim", type=int, help="Vector dimension (for random source)")
+    parser.add_argument("--source", help="Vector source: 'model:<model_id>' (e.g., model:all-MiniLM-L6-v2)")
     parser.add_argument("--sizes", help="Comma-separated dataset sizes (e.g., 1000,5000,10000)")
     parser.add_argument(
         "--engine",
@@ -1302,74 +1178,52 @@ def main():
         profile = PROFILES[args.profile]
         log.info("Running profile: %s", args.profile)
 
-        if profile["source"] == "models":
-            datasets_to_run = profile.get("datasets", ["ag_news"])
-            # Run each model x dataset separately
-            for dataset_key in datasets_to_run:
-                for model_label, model_info in EMBEDDING_MODELS.items():
-                    dim = model_info["dim"]
-                    log.info("\n" + "=" * 72)
-                    log.info("Model: %s (dim=%d), Dataset: %s", model_label, dim, dataset_key)
-                    log.info("=" * 72)
-                    run_benchmark(
-                        vector_source="model",
-                        model_name=model_label,
-                        dim=dim,
-                        sizes=profile["sizes"],
-                        engines=engines,
-                        output_path=output_path,
-                        storage=storage,
-                        run_timestamp=timestamp,
-                        dataset=dataset_key,
-                    )
-        else:
-            for dim in profile["dimensions"]:
+        datasets_to_run = profile.get("datasets", ["ag_news"])
+        # Run each model x dataset separately
+        for dataset_key in datasets_to_run:
+            for model_label, model_info in EMBEDDING_MODELS.items():
+                dim = model_info["dim"]
                 log.info("\n" + "=" * 72)
-                log.info("Dimension: %d", dim)
+                log.info("Model: %s (dim=%d), Dataset: %s", model_label, dim, dataset_key)
                 log.info("=" * 72)
                 run_benchmark(
-                    vector_source=profile["source"],
-                    model_name=None,
+                    model_name=model_label,
                     dim=dim,
                     sizes=profile["sizes"],
                     engines=engines,
                     output_path=output_path,
                     storage=storage,
                     run_timestamp=timestamp,
+                    dataset=dataset_key,
                 )
-    else:
-        # Custom run from individual args
+    elif args.source:
+        # Custom run from --source model:<model_id>
         source = args.source
-        model_name = None
         dataset = args.dataset
 
-        if source.startswith("model:"):
-            model_id = source.split(":", 1)[1]
-            # Find model by ID
-            model_name = None
-            dim = args.dim
-            for label, info in EMBEDDING_MODELS.items():
-                if info["model_id"] == model_id:
-                    model_name = label
-                    dim = info["dim"]
-                    break
-            if model_name is None:
-                model_name = model_id
-                if dim is None:
-                    log.error("Must specify --dim for unknown model")
-                    sys.exit(1)
-            source = "model"
-        else:
-            dim = args.dim or 384
+        if not source.startswith("model:"):
+            log.error("--source must be 'model:<model_id>' (e.g., model:all-MiniLM-L6-v2)")
+            sys.exit(1)
+
+        model_id = source.split(":", 1)[1]
+        model_name = None
+        dim = None
+        for label, info in EMBEDDING_MODELS.items():
+            if info["model_id"] == model_id:
+                model_name = label
+                dim = info["dim"]
+                break
+        if model_name is None:
+            log.error("Unknown model: %s. Known models: %s", model_id, list(EMBEDDING_MODELS.keys()))
+            sys.exit(1)
 
         sizes = [int(s) for s in args.sizes.split(",")] if args.sizes else [1_000, 5_000, 10_000]
 
         log.info("\n" + "=" * 72)
-        log.info("Custom run: source=%s, dim=%d, sizes=%s, dataset=%s", source, dim, sizes, dataset)
+        log.info("Custom run: model=%s, dim=%d, sizes=%s, dataset=%s", model_name, dim, sizes, dataset)
         log.info("=" * 72)
 
         run_benchmark(
-            vector_source=source,
             model_name=model_name,
             dim=dim,
             sizes=sizes,
@@ -1377,8 +1231,11 @@ def main():
             output_path=output_path,
             storage=storage,
             run_timestamp=timestamp,
-            dataset=dataset if source != "random" else None,
+            dataset=dataset,
         )
+    else:
+        log.error("Must specify --profile or --source")
+        sys.exit(1)
 
     log.info("\n" + "=" * 72)
     log.info("Benchmark complete. Results: %s", output_path)

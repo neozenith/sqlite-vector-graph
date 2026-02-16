@@ -48,11 +48,12 @@ TEST_SRC = test/test_main.c test/test_vec_math.c test/test_priority_queue.c \
 
 .PHONY: all debug test test-python test-js test-install test-all clean help \
         amalgamation install uninstall version version-stamp \
+        dist dist-extension dist-python dist-npm dist-wasm changelog release \
         docs-serve docs-build docs-clean \
         format format-c format-python format-js \
         lint lint-c lint-python lint-js \
         typecheck typecheck-python typecheck-js \
-        ci
+        ci ci-all
 
 help:                                          ## Show this help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -117,7 +118,7 @@ format-python:                                 ## Format Python code with ruff
 format-js:                                     ## Format TypeScript code with biome
 	npm --prefix npm run format
 
-lint: lint-c lint-python lint-js               ## Lint all code
+lint: lint-c lint-python lint-js format               ## Lint all code
 
 lint-c:                                        ## Lint C code with clang-format (check mode)
 	@if command -v clang-format >/dev/null 2>&1; then \
@@ -134,7 +135,7 @@ lint-python:                                   ## Lint Python code with ruff
 lint-js:                                       ## Lint TypeScript code with biome
 	npm --prefix npm run lint
 
-typecheck: typecheck-python typecheck-js       ## Type-check all code
+typecheck: typecheck-python typecheck-js format       ## Type-check all code
 
 typecheck-python:                              ## Type-check Python with mypy
 	.venv/bin/mypy sqlite_muninn/
@@ -153,6 +154,42 @@ dist/muninn.c dist/muninn.h: $(SRC) $(HEADERS)
 
 version-stamp:                                 ## Stamp VERSION into skill files + package.json
 	.venv/bin/python scripts/version_stamp.py
+
+dist: dist-extension dist-python dist-npm amalgamation ## Build all distributable artifacts into dist/
+	@echo ""
+	@echo "All artifacts in dist/:"
+	@ls -lh dist/ dist/python/ dist/npm/ 2>/dev/null
+	@if [ -f dist/muninn_sqlite3.wasm ]; then echo ""; ls -lh dist/muninn_sqlite3.*; fi
+
+dist-extension: version-stamp build/muninn$(EXT) ## Copy native extension to dist/
+	@mkdir -p dist
+	cp build/muninn$(EXT) dist/
+
+dist-python: version-stamp build/muninn$(EXT)  ## Build Python wheel into dist/python/
+	@mkdir -p dist/python
+	uv build --wheel --out-dir dist/python
+
+dist-npm: version-stamp                       ## Pack npm tarball into dist/npm/
+	@mkdir -p dist/npm
+	npm pack --pack-destination dist/npm npm/
+
+dist-wasm: amalgamation                       ## Build WASM module into dist/ (requires emcc)
+	$(MAKE) -C wasm dist
+
+changelog:                                     ## Generate CHANGELOG.md from git history
+	.venv/bin/git-cliff -o CHANGELOG.md
+	@echo "CHANGELOG.md updated"
+
+release:                                       ## Calculate next version from commits and prepare release
+	$(eval NEW_VERSION := $(shell .venv/bin/git-cliff --bumped-version 2>/dev/null | sed 's/^v//'))
+	@if [ -z "$(NEW_VERSION)" ]; then echo "error: could not determine next version"; exit 1; fi
+	@echo "Next version: $(NEW_VERSION)"
+	@echo "$(NEW_VERSION)" > VERSION
+	$(MAKE) version-stamp
+	.venv/bin/git-cliff --bump -o CHANGELOG.md
+	@echo ""
+	@echo "VERSION, CHANGELOG.md, and package manifests updated to $(NEW_VERSION)"
+	@echo "Review changes, then: git add -A && git commit -m 'chore(release): $(NEW_VERSION)' && git tag v$(NEW_VERSION)"
 
 ######################################################################
 # INSTALL
@@ -192,7 +229,11 @@ docs-clean:                                    ## Clean documentation build
 # CI
 ######################################################################
 
-ci: lint typecheck test test-python test-js    ## Full CI pipeline
+ci: lint typecheck test test-python test-js docs-build    ## Full CI pipeline
+
+ci-all: ci
+	make -C viz ci
+	make -C wasm ci
 
 ######################################################################
 # CLEAN

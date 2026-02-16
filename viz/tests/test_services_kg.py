@@ -29,11 +29,14 @@ def _make_kg_conn(tmp_path: pathlib.Path) -> sqlite3.Connection:
 
     # Stage 1: chunks
     conn.execute("CREATE TABLE chunks (chunk_id INTEGER PRIMARY KEY, text TEXT)")
-    conn.executemany("INSERT INTO chunks VALUES (?, ?)", [
-        (1, "Adam Smith wrote about the division of labor."),
-        (2, "The wealth of nations depends on productive labor."),
-        (3, "Free trade promotes economic growth."),
-    ])
+    conn.executemany(
+        "INSERT INTO chunks VALUES (?, ?)",
+        [
+            (1, "Adam Smith wrote about the division of labor."),
+            (2, "The wealth of nations depends on productive labor."),
+            (3, "Free trade promotes economic growth."),
+        ],
+    )
 
     # Stage 3: entities
     conn.execute("""
@@ -41,11 +44,14 @@ def _make_kg_conn(tmp_path: pathlib.Path) -> sqlite3.Connection:
             name TEXT, entity_type TEXT, strategy TEXT, chunk_id INTEGER
         )
     """)
-    conn.executemany("INSERT INTO entities VALUES (?, ?, ?, ?)", [
-        ("Adam Smith", "PERSON", "llm", 1),
-        ("division of labor", "CONCEPT", "llm", 1),
-        ("wealth of nations", "WORK", "llm", 2),
-    ])
+    conn.executemany(
+        "INSERT INTO entities VALUES (?, ?, ?, ?)",
+        [
+            ("Adam Smith", "PERSON", "llm", 1),
+            ("division of labor", "CONCEPT", "llm", 1),
+            ("wealth of nations", "WORK", "llm", 2),
+        ],
+    )
 
     # Stage 4: relations
     conn.execute("""
@@ -53,18 +59,24 @@ def _make_kg_conn(tmp_path: pathlib.Path) -> sqlite3.Connection:
             src TEXT, dst TEXT, rel_type TEXT, weight REAL
         )
     """)
-    conn.executemany("INSERT INTO relations VALUES (?, ?, ?, ?)", [
-        ("Adam Smith", "division of labor", "wrote_about", 1.0),
-        ("Adam Smith", "wealth of nations", "authored", 1.0),
-    ])
+    conn.executemany(
+        "INSERT INTO relations VALUES (?, ?, ?, ?)",
+        [
+            ("Adam Smith", "division of labor", "wrote_about", 1.0),
+            ("Adam Smith", "wealth of nations", "authored", 1.0),
+        ],
+    )
 
     # Stage 5: entity_clusters
     conn.execute("CREATE TABLE entity_clusters (name TEXT PRIMARY KEY, canonical TEXT)")
-    conn.executemany("INSERT INTO entity_clusters VALUES (?, ?)", [
-        ("Adam Smith", "Adam Smith"),
-        ("division of labor", "division of labor"),
-        ("wealth of nations", "wealth of nations"),
-    ])
+    conn.executemany(
+        "INSERT INTO entity_clusters VALUES (?, ?)",
+        [
+            ("Adam Smith", "Adam Smith"),
+            ("division of labor", "division of labor"),
+            ("wealth of nations", "wealth of nations"),
+        ],
+    )
 
     # Stage 6: nodes + edges
     conn.execute("""
@@ -73,10 +85,13 @@ def _make_kg_conn(tmp_path: pathlib.Path) -> sqlite3.Connection:
             name TEXT UNIQUE, entity_type TEXT, mention_count INTEGER
         )
     """)
-    conn.executemany("INSERT INTO nodes (name, entity_type, mention_count) VALUES (?, ?, ?)", [
-        ("Adam Smith", "PERSON", 5),
-        ("division of labor", "CONCEPT", 3),
-    ])
+    conn.executemany(
+        "INSERT INTO nodes (name, entity_type, mention_count) VALUES (?, ?, ?)",
+        [
+            ("Adam Smith", "PERSON", 5),
+            ("division of labor", "CONCEPT", 3),
+        ],
+    )
     conn.execute("""
         CREATE TABLE edges (src TEXT, dst TEXT, rel_type TEXT, weight REAL)
     """)
@@ -117,19 +132,25 @@ def _make_full_kg_conn(tmp_path: pathlib.Path) -> sqlite3.Connection:
 
     # FTS for full-text search on chunks
     conn.execute("CREATE VIRTUAL TABLE chunks_fts USING fts5(chunk_id, text)")
-    conn.executemany("INSERT INTO chunks_fts VALUES (?, ?)", [
-        (1, "Adam Smith wrote about the division of labor."),
-        (2, "The wealth of nations depends on productive labor."),
-        (3, "Free trade promotes economic growth."),
-    ])
+    conn.executemany(
+        "INSERT INTO chunks_fts VALUES (?, ?)",
+        [
+            (1, "Adam Smith wrote about the division of labor."),
+            (2, "The wealth of nations depends on productive labor."),
+            (3, "Free trade promotes economic growth."),
+        ],
+    )
     conn.commit()
 
     # entity_vec_map for VSS metadata
     conn.execute("CREATE TABLE entity_vec_map (rowid INTEGER PRIMARY KEY, name TEXT)")
-    conn.executemany("INSERT INTO entity_vec_map VALUES (?, ?)", [
-        (1, "Adam Smith"),
-        (2, "division of labor"),
-    ])
+    conn.executemany(
+        "INSERT INTO entity_vec_map VALUES (?, ?)",
+        [
+            (1, "Adam Smith"),
+            (2, "division of labor"),
+        ],
+    )
     conn.commit()
 
     return conn
@@ -141,12 +162,12 @@ def test_pipeline_summary_counts(tmp_path: pathlib.Path) -> None:
     summary = get_pipeline_summary(conn)
     stages = {s["stage"]: s for s in summary["stages"]}
 
-    assert stages[1]["count"] == 3   # chunks
+    assert stages[1]["count"] == 3  # chunks
     assert stages[1]["available"] is True
-    assert stages[3]["count"] == 3   # entities
-    assert stages[4]["count"] == 2   # relations
-    assert stages[5]["count"] == 3   # entity_clusters
-    assert stages[6]["count"] == 2   # nodes
+    assert stages[3]["count"] == 3  # entities
+    assert stages[4]["count"] == 2  # relations
+    assert stages[5]["count"] == 3  # entity_clusters
+    assert stages[6]["count"] == 2  # nodes
     conn.close()
 
 
@@ -156,9 +177,9 @@ def test_pipeline_summary_with_hnsw(tmp_path: pathlib.Path) -> None:
     summary = get_pipeline_summary(conn)
     stages = {s["stage"]: s for s in summary["stages"]}
 
-    assert stages[2]["count"] == 3   # chunks_vec_nodes
+    assert stages[2]["count"] == 3  # chunks_vec_nodes
     assert stages[2]["available"] is True
-    assert stages[7]["count"] == 2   # node2vec_emb_nodes
+    assert stages[7]["count"] == 2  # node2vec_emb_nodes
     assert stages[7]["available"] is True
     conn.close()
 

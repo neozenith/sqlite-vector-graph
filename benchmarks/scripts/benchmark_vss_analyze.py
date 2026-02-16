@@ -43,8 +43,6 @@ from benchmark_vss import (
 from benchmark_vss import (
     RESULTS_DIR as VSS_RESULTS_DIR,
 )
-from plotly.subplots import make_subplots
-
 log = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -60,13 +58,12 @@ def load_all_results(filter_source=None, filter_dim=None, filter_model=None, fil
     records = []
     # Only load vector benchmark files (exclude graph_*.jsonl and kg_*.jsonl)
     jsonl_files = sorted(
-        f for f in RESULTS_DIR.glob("*.jsonl")
-        if not f.name.startswith("graph_") and not f.name.startswith("kg_")
+        f for f in RESULTS_DIR.glob("*.jsonl") if not f.name.startswith("graph_") and not f.name.startswith("kg_")
     )
 
     if not jsonl_files:
         log.error("No JSONL files found in %s", RESULTS_DIR)
-        log.error("Run 'make benchmark-models' or 'make benchmark-small' first.")
+        log.error("Run 'make benchmark-models' first.")
         return records
 
     log.info("Loading %d JSONL file(s) from %s", len(jsonl_files), RESULTS_DIR)
@@ -107,7 +104,7 @@ def aggregate(records):
         key = (
             r["engine"],
             r["search_method"],
-            r.get("vector_source", "random"),
+            r.get("vector_source", "model"),
             r.get("model_name"),
             r.get("dataset"),
             r["dim"],
@@ -130,9 +127,6 @@ def _aggregate_group(records):
         "recall_at_k",
         "memory_delta_mb",
         "db_size_bytes",
-        "relative_contrast",
-        "distance_cv",
-        "nearest_farthest_ratio",
     ]
 
     result = {"count": len(records)}
@@ -183,11 +177,6 @@ def _get_models(agg):
 def _get_datasets(agg):
     """Get sorted unique dataset names (excluding None)."""
     return sorted({k[4] for k in agg if k[4] is not None})
-
-
-def _get_dims(agg):
-    """Get sorted unique dimensions."""
-    return sorted({k[5] for k in agg})
 
 
 def _get_sizes(agg, dim=None, model=None, dataset=None):
@@ -334,7 +323,6 @@ def print_tables(agg):
     """Print all text summary tables."""
     models = _get_models(agg)
     datasets = _get_datasets(agg)
-    has_random = any(k[2] == "random" for k in agg)
     active_pairs = _get_engine_method_pairs(agg)
 
     if models:
@@ -349,12 +337,6 @@ def print_tables(agg):
             print_model_insert_table(ds_agg, models, active_pairs, ds_label)
             print_model_recall_table(ds_agg, models, active_pairs, ds_label)
             print_model_storage_table(ds_agg, models, active_pairs, ds_label)
-
-    if has_random:
-        random_agg = {k: v for k, v in agg.items() if k[2] == "random"}
-        print_random_search_table(random_agg, active_pairs)
-
-    print_saturation_table(agg)
 
 
 def _col_header(pairs):
@@ -557,90 +539,6 @@ def print_model_storage_table(agg, models, active_pairs, ds_label=""):
                     val = _get_val(agg, engine, method, "model", model, ds, dim, n, "db_size_bytes")
                     row += f" | {_fmt_bytes(val):>{col_w}}"
                 print(row)
-
-
-def print_random_search_table(agg, active_pairs):
-    """Print search latency table for random vectors (if present)."""
-    random_keys = [k for k in agg if k[2] == "random"]
-    if not random_keys:
-        return
-
-    rand_pairs = [(e, m) for e, m in active_pairs if any(k[0] == e and k[1] == m for k in random_keys)]
-    if not rand_pairs:
-        return
-
-    col_labels = _col_header(rand_pairs)
-    col_w = max(12, max(len(c) for c in col_labels) + 2)
-
-    print(f"\n{'=' * 100}")
-    print("SEARCH LATENCY — RANDOM VECTORS (ms/query)")
-    print("=" * 100)
-
-    dims = sorted({k[5] for k in random_keys})
-    for dim in dims:
-        sizes = sorted({k[6] for k in random_keys if k[5] == dim})
-        if not sizes:
-            continue
-
-        print(f"\n  dim={dim}")
-        header = f"  {'N':>10}"
-        for label in col_labels:
-            header += f" | {label:>{col_w}}"
-        header += f" | {'vg wins?':>10}"
-        print(header)
-        print(f"  {'-' * 10}" + f"-+-{'-' * col_w}" * len(col_labels) + f"-+-{'-' * 10}")
-
-        for n in sizes:
-            row = f"  {n:>10,}"
-            for engine, method in rand_pairs:
-                val = _get_val(agg, engine, method, "random", None, None, dim, n, "search_latency_ms")
-                row += f" | {_fmt(val):>{col_w}}"
-
-            hnsw = _get_val(agg, "muninn", "hnsw", "random", None, None, dim, n, "search_latency_ms")
-            qscan = _get_val(agg, "sqlite_vector", "quantize_scan", "random", None, None, dim, n, "search_latency_ms")
-            winner = ""
-            if hnsw is not None and qscan is not None:
-                winner = "YES" if hnsw < qscan else "no"
-            row += f" | {winner:>10}"
-            print(row)
-
-
-def print_saturation_table(agg):
-    """Print saturation analysis table."""
-    sat_data = {}
-    for key, entry in agg.items():
-        dim = key[5]
-        model = key[3]
-        rc = entry.get("relative_contrast_mean")
-        cv = entry.get("distance_cv_mean")
-        nf = entry.get("nearest_farthest_ratio_mean")
-        if rc is not None:
-            label = f"{dim}d-{model}" if model else f"{dim}d-random"
-            if label not in sat_data:
-                sat_data[label] = {"rc": [], "cv": [], "nf": [], "dim": dim}
-            sat_data[label]["rc"].append(rc)
-            if cv is not None:
-                sat_data[label]["cv"].append(cv)
-            if nf is not None:
-                sat_data[label]["nf"].append(nf)
-
-    if not sat_data:
-        return
-
-    print(f"\n{'=' * 100}")
-    print("SATURATION ANALYSIS (curse of dimensionality)")
-    print("  RC -> 1.0 = saturated | CV -> 0 = saturated | NF -> 1.0 = saturated")
-    print("=" * 100)
-    print(f"  {'Source':>25} | {'Relative Contrast':>18} | {'Distance CV':>12} | {'Near/Far Ratio':>15}")
-    print(f"  {'-' * 25}-+-{'-' * 18}-+-{'-' * 12}-+-{'-' * 15}")
-
-    for label in sorted(sat_data.keys(), key=lambda lbl: sat_data[lbl]["dim"]):
-        d = sat_data[label]
-        rc_mean = sum(d["rc"]) / len(d["rc"]) if d["rc"] else None
-        cv_mean = sum(d["cv"]) / len(d["cv"]) if d["cv"] else None
-        nf_mean = sum(d["nf"]) / len(d["nf"]) if d["nf"] else None
-
-        print(f"  {label:>25} | {_fmt(rc_mean, '.4f'):>18} | {_fmt(cv_mean, '.4f'):>12} | {_fmt(nf_mean, '.4f'):>15}")
 
 
 # ── Per-model charts ──────────────────────────────────────────────
@@ -1078,153 +976,6 @@ def chart_dataset_comparison(agg):
         _save_chart(fig, f"dataset_comparison_{model}")
 
 
-def chart_saturation(agg):
-    """Saturation metrics by model/source as bar chart.
-
-    X-axis labels use {dims}d-{model} format, colors from model's
-    primary engine hue (purple for models, grey for random).
-    """
-    sat_by_label = defaultdict(lambda: {"rc": [], "cv": [], "nf": [], "dim": 0})
-
-    for key, entry in agg.items():
-        model = key[3]
-        dim = key[5]
-        rc = entry.get("relative_contrast_mean")
-        cv = entry.get("distance_cv_mean")
-        nf = entry.get("nearest_farthest_ratio_mean")
-        if rc is None:
-            continue
-
-        label = f"{dim}d-{model}" if model else f"{dim}d-random"
-        sat_by_label[label]["rc"].append(rc)
-        sat_by_label[label]["dim"] = dim
-        if cv is not None:
-            sat_by_label[label]["cv"].append(cv)
-        if nf is not None:
-            sat_by_label[label]["nf"].append(nf)
-
-    if not sat_by_label:
-        log.info("  No saturation data available, skipping chart")
-        return
-
-    fig = make_subplots(
-        rows=1,
-        cols=2,
-        subplot_titles=["Relative Contrast (lower = less saturated)", "Distance CV (higher = less saturated)"],
-        horizontal_spacing=0.1,
-    )
-
-    sorted_labels = sorted(sat_by_label.keys(), key=lambda lbl: sat_by_label[lbl]["dim"])
-    n_bars = len(sorted_labels)
-
-    for bar_idx, label in enumerate(sorted_labels):
-        data = sat_by_label[label]
-        rc_mean = sum(data["rc"]) / len(data["rc"])
-        cv_mean = sum(data["cv"]) / len(data["cv"]) if data["cv"] else None
-
-        # Use muninn purple hue for model bars, grey for random
-        is_model = "random" not in label
-        hue = 270 if is_model else 0
-        sat = 75 if is_model else 0
-        if n_bars <= 1:
-            lum = 45
-        else:
-            t = bar_idx / (n_bars - 1)
-            lum = 58 - int(t * 23)
-        color = f"hsl({hue}, {sat}%, {lum}%)"
-
-        fig.add_trace(
-            go.Bar(x=[label], y=[rc_mean], name=label, marker_color=color, showlegend=False),
-            row=1,
-            col=1,
-        )
-
-        if cv_mean is not None:
-            fig.add_trace(
-                go.Bar(x=[label], y=[cv_mean], name=label, marker_color=color, showlegend=False),
-                row=1,
-                col=2,
-            )
-
-    fig.add_hline(y=1.0, line_dash="dash", line_color="red", opacity=0.5, row=1, col=1, annotation_text="saturated")
-    fig.add_hline(y=0.0, line_dash="dash", line_color="red", opacity=0.5, row=1, col=2, annotation_text="saturated")
-
-    fig.update_layout(
-        title="Vector Space Saturation by Embedding Model",
-        height=450,
-        width=900,
-        template="plotly_white",
-    )
-
-    _save_chart(fig, "saturation")
-
-
-# ── Random vector charts (secondary) ─────────────────────────────
-
-
-def chart_random_tipping_point(agg):
-    """Search latency vs N for random vectors (if data exists)."""
-    random_keys = [k for k in agg if k[2] == "random"]
-    if not random_keys:
-        return
-
-    dims = sorted({k[5] for k in random_keys})
-    dim_dash = {
-        32: "solid",
-        64: "dot",
-        128: "dash",
-        256: "dashdot",
-        384: "solid",
-        512: "dot",
-        768: "dash",
-        1024: "dashdot",
-        1536: "longdash",
-    }
-
-    fig = go.Figure()
-
-    for dim in dims:
-        for engine, method in ENGINE_METHOD_PAIRS:
-            sizes = sorted(k[6] for k in random_keys if k[0] == engine and k[1] == method and k[5] == dim)
-            if not sizes:
-                continue
-
-            latencies = [
-                _get_val(agg, engine, method, "random", None, None, dim, n, "search_latency_ms") for n in sizes
-            ]
-
-            color = _make_color(engine, method)
-            opacity = _trace_opacity(engine)
-            dash = dim_dash.get(dim, "solid")
-            label = f"{_engine_label(engine, method)} d={dim}"
-
-            fig.add_trace(
-                go.Scatter(
-                    x=sizes,
-                    y=latencies,
-                    mode="lines+markers",
-                    name=label,
-                    line={"color": color, "dash": dash, "width": 2},
-                    marker={"size": 6},
-                    opacity=opacity,
-                )
-            )
-
-    fig.update_layout(
-        title="Search Latency vs Dataset Size (Random Vectors)",
-        xaxis_title="Dataset Size (N)",
-        yaxis_title="Search Latency (ms/query)",
-        xaxis_type="log",
-        yaxis_type="log",
-        height=600,
-        width=1000,
-        template="plotly_white",
-        legend={"orientation": "v", "yanchor": "top", "y": 1, "xanchor": "left", "x": 1.02},
-    )
-
-    _save_chart(fig, "tipping_point_random")
-
-
 def generate_all_charts(agg):
     """Generate all Plotly HTML + JSON charts."""
     log.info("Generating charts...")
@@ -1236,10 +987,6 @@ def generate_all_charts(agg):
     chart_model_insert_throughput(agg)
     chart_model_db_size(agg)
     chart_dataset_comparison(agg)
-    chart_saturation(agg)
-
-    # Random vector charts (secondary, if data exists)
-    chart_random_tipping_point(agg)
 
     log.info("All charts generated in %s", CHARTS_DIR)
 
@@ -1349,38 +1096,19 @@ def vss_manifest():
     manifest = {}
     for profile_name, profile in PROFILES.items():
         scenarios = []
-        if profile["source"] == "models":
-            datasets = profile.get("datasets", ["ag_news"])
-            for dataset in datasets:
-                for model_label, model_info in EMBEDDING_MODELS.items():
-                    dim = model_info["dim"]
-                    source_str = f"model:{model_info['model_id']}"
-                    # Clamp by dataset size (from cache) and memory budget
-                    info = _npy_info(model_label, dataset)
-                    max_n_data = info[0] if info else max(profile["sizes"])
-                    max_n_mem = MAX_N_BY_DIM.get(dim, 100_000)
-                    max_n = min(max_n_data, max_n_mem)
-                    valid_sizes = _clamp_sizes(profile["sizes"], max_n)
-                    for n in valid_sizes:
-                        scenario = make_scenario_name("model", model_label, dataset, dim, n)
-                        for engine in ALL_ENGINES:
-                            pattern = f"benchmarks/results/{scenario}/*_{engine}.sqlite"
-                            scenarios.append(
-                                {
-                                    "scenario": scenario,
-                                    "engine": engine,
-                                    "pattern": pattern,
-                                    "source": source_str,
-                                    "sizes": n,
-                                    "dataset": dataset,
-                                }
-                            )
-        else:
-            for dim in profile["dimensions"]:
-                max_n = MAX_N_BY_DIM.get(dim, 100_000)
+        datasets = profile.get("datasets", ["ag_news"])
+        for dataset in datasets:
+            for model_label, model_info in EMBEDDING_MODELS.items():
+                dim = model_info["dim"]
+                source_str = f"model:{model_info['model_id']}"
+                # Clamp by dataset size (from cache) and memory budget
+                info = _npy_info(model_label, dataset)
+                max_n_data = info[0] if info else max(profile["sizes"])
+                max_n_mem = MAX_N_BY_DIM.get(dim, 100_000)
+                max_n = min(max_n_data, max_n_mem)
                 valid_sizes = _clamp_sizes(profile["sizes"], max_n)
                 for n in valid_sizes:
-                    scenario = make_scenario_name(profile["source"], None, None, dim, n)
+                    scenario = make_scenario_name("model", model_label, dataset, dim, n)
                     for engine in ALL_ENGINES:
                         pattern = f"benchmarks/results/{scenario}/*_{engine}.sqlite"
                         scenarios.append(
@@ -1388,9 +1116,9 @@ def vss_manifest():
                                 "scenario": scenario,
                                 "engine": engine,
                                 "pattern": pattern,
-                                "source": "random",
-                                "dim": dim,
+                                "source": source_str,
                                 "sizes": n,
+                                "dataset": dataset,
                             }
                         )
         manifest[profile_name] = scenarios
@@ -1456,10 +1184,8 @@ def _build_vss_cmd(entry, storage=None):
     parts = [
         ".venv/bin/python benchmarks/scripts/benchmark_vss.py",
         f"--source {entry['source']}",
+        f"--sizes {entry['sizes']}",
     ]
-    if entry.get("dim"):
-        parts.append(f"--dim {entry['dim']}")
-    parts.append(f"--sizes {entry['sizes']}")
     if entry.get("dataset"):
         parts.append(f"--dataset {entry['dataset']}")
     parts.append(f"--engine {entry['engine']}")
@@ -1508,8 +1234,6 @@ def print_manifest_report(mode="all", storage=None, limit=0):
             }
             if entry.get("dataset"):
                 obj["dataset"] = entry["dataset"]
-            if entry.get("dim"):
-                obj["dim"] = entry["dim"]
             if is_done:
                 obj["found"] = found
             obj["cmd"] = _build_vss_cmd(entry, storage)
@@ -1539,7 +1263,7 @@ def parse_args():
     parser.add_argument("--limit", type=int, default=0, help="Limit output to first N entries (0 = unlimited)")
     parser.add_argument("--storage", choices=["memory", "disk"], default=None, help="Filter by storage mode")
     parser.add_argument("--prep-manifest", action="store_true", help="Show models-prep cache completeness")
-    parser.add_argument("--filter-source", help="Filter by vector source (e.g., 'random', 'model')")
+    parser.add_argument("--filter-source", help="Filter by vector source (e.g., 'model')")
     parser.add_argument("--filter-dim", type=int, help="Filter by dimension")
     parser.add_argument("--filter-model", help="Filter by model name (e.g., 'MiniLM', 'MPNet')")
     parser.add_argument("--filter-dataset", help="Filter by dataset (e.g., 'ag_news', 'wealth_of_nations')")

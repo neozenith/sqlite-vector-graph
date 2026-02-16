@@ -60,7 +60,6 @@ make -C benchmarks graph-manifest   # Graph completeness report
 .venv/bin/python benchmarks/scripts/benchmark_graph.py --graph-model barabasi_albert --nodes 5000 --avg-degree 5
 
 # All vector profiles
-make -C benchmarks saturation  # Random vectors, 8 dims, N=50K
 make -C benchmarks models      # Real embeddings, 3 models x 2 datasets, N<=250K
 
 # All graph profiles

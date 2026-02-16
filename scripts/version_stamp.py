@@ -23,12 +23,12 @@ VERSION = (PROJECT_ROOT / "VERSION").read_text().strip()
 TARGETS: list[tuple[str, re.Pattern[str], str]] = [
     (
         "skills/muninn/SKILL.md",
-        re.compile(r'(  version:\s*")[\d]+\.[\d]+\.[\d]+(")'),
+        re.compile(r'(  version:\s*")[\d]+\.[\d]+\.[\d]+[^"]*(")'),
         rf"\g<1>{VERSION}\2",
     ),
     (
         "npm/package.json",
-        re.compile(r'("version":\s*")[\d]+\.[\d]+\.[\d]+(")'),
+        re.compile(r'("version":\s*")[\d]+\.[\d]+\.[\d]+[^"]*(")'),
         rf"\g<1>{VERSION}\2",
     ),
 ]

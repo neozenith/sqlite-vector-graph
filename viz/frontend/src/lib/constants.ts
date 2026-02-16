@@ -2,34 +2,41 @@
 
 /** Community color palette (10 distinct colors for Leiden communities). */
 export const COMMUNITY_COLORS: readonly string[] = [
-  '#4e79a7', '#f28e2b', '#e15759', '#76b7b2', '#59a14f',
-  '#edc948', '#b07aa1', '#ff9da7', '#9c755f', '#bab0ac',
-] as const;
+  '#4e79a7',
+  '#f28e2b',
+  '#e15759',
+  '#76b7b2',
+  '#59a14f',
+  '#edc948',
+  '#b07aa1',
+  '#ff9da7',
+  '#9c755f',
+  '#bab0ac',
+] as const
 
 /** Get a color for a community ID (wraps around if > 10 communities). */
-export const communityColor = (id: number): string =>
-  COMMUNITY_COLORS[id % COMMUNITY_COLORS.length];
+export const communityColor = (id: number): string => COMMUNITY_COLORS[id % COMMUNITY_COLORS.length]
 
 /** Default HNSW search parameters. */
-export const DEFAULT_K = 20;
-export const DEFAULT_EF_SEARCH = 64;
+export const DEFAULT_K = 20
+export const DEFAULT_EF_SEARCH = 64
 
 /** Default graph parameters. */
-export const DEFAULT_MAX_DEPTH = 3;
-export const DEFAULT_RESOLUTION = 1.0;
-export const DEFAULT_SUBGRAPH_LIMIT = 500;
+export const DEFAULT_MAX_DEPTH = 3
+export const DEFAULT_RESOLUTION = 1.0
+export const DEFAULT_SUBGRAPH_LIMIT = 500
 
 /** Default UMAP projection dimensions. */
-export const DEFAULT_PROJECTION_DIMS = 2;
+export const DEFAULT_PROJECTION_DIMS = 2
 
 /** Search highlight color (orange). */
-export const SEARCH_HIGHLIGHT_COLOR: [number, number, number] = [255, 140, 0];
+export const SEARCH_HIGHLIGHT_COLOR: [number, number, number] = [255, 140, 0]
 
 /** Background point color (muted blue). */
-export const BACKGROUND_POINT_COLOR: [number, number, number] = [100, 149, 237];
+export const BACKGROUND_POINT_COLOR: [number, number, number] = [100, 149, 237]
 
 /** Selected point color (red). */
-export const SELECTED_POINT_COLOR: [number, number, number] = [255, 50, 50];
+export const SELECTED_POINT_COLOR: [number, number, number] = [255, 50, 50]
 
 /** Available Cytoscape layout algorithms. */
 export const LAYOUT_OPTIONS = [
@@ -40,9 +47,9 @@ export const LAYOUT_OPTIONS = [
   { value: 'concentric', label: 'Concentric' },
   { value: 'breadthfirst', label: 'Breadth-first' },
   { value: 'random', label: 'Random' },
-] as const;
+] as const
 
-export type LayoutName = (typeof LAYOUT_OPTIONS)[number]['value'];
+export type LayoutName = (typeof LAYOUT_OPTIONS)[number]['value']
 
 /** Pipeline stage names for display. */
 export const STAGE_NAMES: Record<number, string> = {
@@ -53,4 +60,15 @@ export const STAGE_NAMES: Record<number, string> = {
   5: 'Entity Resolution',
   6: 'Graph Construction',
   7: 'Node2Vec',
-};
+}
+
+/** Pipeline stage URL slugs. */
+export const KG_STAGE_ROUTES: Record<number, string> = {
+  1: 'chunk',
+  2: 'embedding',
+  3: 'entity',
+  4: 'relation',
+  5: 'resolution',
+  6: 'graph',
+  7: 'node2vec',
+}

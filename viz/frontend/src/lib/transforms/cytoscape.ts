@@ -1,52 +1,45 @@
 /** Cytoscape.js data transforms — convert API data to Cytoscape elements. */
 
-import type {
-  CentralityScore,
-  GraphEdge,
-  GraphNode,
-} from '../types';
-import { communityColor } from '../constants';
+import type { CentralityScore, GraphEdge, GraphNode } from '../types'
+import { communityColor } from '../constants'
 
 export interface CytoscapeNode {
   data: {
-    id: string;
-    label: string;
-    color?: string;
-    size?: number;
-    mention_count?: number;
-    entity_type?: string;
-    parent?: string;
-  };
+    id: string
+    label: string
+    color?: string
+    size?: number
+    mention_count?: number
+    entity_type?: string
+    parent?: string
+  }
 }
 
 export interface CytoscapeEdge {
   data: {
-    id: string;
-    source: string;
-    target: string;
-    weight: number;
-    rel_type?: string;
-  };
+    id: string
+    source: string
+    target: string
+    weight: number
+    rel_type?: string
+  }
 }
 
-export type CytoscapeElement = CytoscapeNode | CytoscapeEdge;
+export type CytoscapeElement = CytoscapeNode | CytoscapeEdge
 
 /**
  * Convert API graph data to Cytoscape elements array.
  */
-export function toCytoscapeElements(
-  nodes: GraphNode[],
-  edges: GraphEdge[],
-): CytoscapeElement[] {
+export function toCytoscapeElements(nodes: GraphNode[], edges: GraphEdge[]): CytoscapeElement[] {
   const nodeElements: CytoscapeNode[] = nodes.map((n) => ({
     data: {
       id: n.id,
       label: n.label,
       mention_count: n.mention_count,
       entity_type: n.entity_type,
-      size: Math.max(20, Math.min(60, (n.mention_count ?? 1) * 5)),
+      size: Math.max(8, Math.min(24, (n.mention_count ?? 1) * 3)),
     },
-  }));
+  }))
 
   const edgeElements: CytoscapeEdge[] = edges.map((e, i) => ({
     data: {
@@ -56,9 +49,9 @@ export function toCytoscapeElements(
       weight: e.weight,
       ...(e.rel_type != null ? { rel_type: e.rel_type } : {}),
     },
-  }));
+  }))
 
-  return [...nodeElements, ...edgeElements];
+  return [...nodeElements, ...edgeElements]
 }
 
 /**
@@ -69,58 +62,52 @@ export function applyCommunityColors(
   nodeCommunity: Record<string, number>,
 ): CytoscapeElement[] {
   return elements.map((el) => {
-    if ('source' in el.data) return el; // Edge, skip
-    const communityId = nodeCommunity[el.data.id];
+    if ('source' in el.data) return el // Edge, skip
+    const communityId = nodeCommunity[el.data.id]
     if (communityId !== undefined) {
       return {
         ...el,
         data: { ...el.data, color: communityColor(communityId) },
-      };
+      }
     }
-    return el;
-  });
+    return el
+  })
 }
 
 /**
  * Apply centrality-based sizing to Cytoscape node elements.
  */
-export function applyCentralitySizing(
-  elements: CytoscapeElement[],
-  scores: CentralityScore[],
-): CytoscapeElement[] {
-  const scoreMap = new Map(scores.map((s) => [s.node, s.centrality]));
-  const maxScore = Math.max(...scores.map((s) => s.centrality), 0.001);
+export function applyCentralitySizing(elements: CytoscapeElement[], scores: CentralityScore[]): CytoscapeElement[] {
+  const scoreMap = new Map(scores.map((s) => [s.node, s.centrality]))
+  const maxScore = Math.max(...scores.map((s) => s.centrality), 0.001)
 
   return elements.map((el) => {
-    if ('source' in el.data) return el; // Edge, skip
-    const score = scoreMap.get(el.data.id);
+    if ('source' in el.data) return el // Edge, skip
+    const score = scoreMap.get(el.data.id)
     if (score !== undefined) {
-      const normalized = score / maxScore; // 0..1
-      const size = 20 + normalized * 50; // 20..70
+      const normalized = score / maxScore // 0..1
+      const size = 8 + normalized * 24 // 8..32
       return {
         ...el,
         data: { ...el.data, size },
-      };
+      }
     }
-    return el;
-  });
+    return el
+  })
 }
 
 /**
  * Highlight BFS results by adding a `highlighted` flag to node data.
  */
-export function highlightBfsNodes(
-  elements: CytoscapeElement[],
-  bfsNodeIds: Set<string>,
-): CytoscapeElement[] {
+export function highlightBfsNodes(elements: CytoscapeElement[], bfsNodeIds: Set<string>): CytoscapeElement[] {
   return elements.map((el) => {
-    if ('source' in el.data) return el;
-    const highlighted = bfsNodeIds.has(el.data.id);
+    if ('source' in el.data) return el
+    const highlighted = bfsNodeIds.has(el.data.id)
     return {
       ...el,
       data: { ...el.data, highlighted } as CytoscapeNode['data'] & { highlighted: boolean },
-    };
-  });
+    }
+  })
 }
 
 /**
@@ -132,7 +119,7 @@ export function applyCommunityGrouping(
   nodeCommunity: Record<string, number>,
 ): CytoscapeElement[] {
   // Collect unique community IDs
-  const communityIds = new Set(Object.values(nodeCommunity));
+  const communityIds = new Set(Object.values(nodeCommunity))
 
   // Create parent nodes
   const parentNodes: CytoscapeNode[] = [...communityIds].map((id) => ({
@@ -140,20 +127,20 @@ export function applyCommunityGrouping(
       id: `community-${id}`,
       label: `Community ${id}`,
     },
-  }));
+  }))
 
   // Set parent on member nodes
   const updatedElements = elements.map((el) => {
-    if ('source' in el.data) return el; // Edge, skip
-    const communityId = nodeCommunity[el.data.id];
+    if ('source' in el.data) return el // Edge, skip
+    const communityId = nodeCommunity[el.data.id]
     if (communityId !== undefined) {
       return {
         ...el,
         data: { ...el.data, parent: `community-${communityId}` },
-      };
+      }
     }
-    return el;
-  });
+    return el
+  })
 
-  return [...parentNodes, ...updatedElements];
+  return [...parentNodes, ...updatedElements]
 }

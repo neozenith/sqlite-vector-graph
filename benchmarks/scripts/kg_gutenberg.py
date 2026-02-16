@@ -195,10 +195,24 @@ def main():
     parser = argparse.ArgumentParser(description="Gutenberg Text Manager for KG pipeline")
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--search", type=str, help="Search Gutendex API, print results")
-    group.add_argument("--download", type=int, metavar="ID", help="Download + cache a specific book (prints ID to stdout)")
-    group.add_argument("--random", action="store_true", help="Pick a random book, download it (prints ID to stdout)")
+    group.add_argument(
+        "--download",
+        type=int,
+        metavar="ID",
+        help="Download + cache a specific book (prints ID to stdout)",
+    )
+    group.add_argument(
+        "--random",
+        action="store_true",
+        help="Pick a random book, download it (prints ID to stdout)",
+    )
     group.add_argument("--list-cached", action="store_true", help="List cached text files")
-    parser.add_argument("--topic", type=str, default="economics", help="Topic filter for --search/--random (default: economics)")
+    parser.add_argument(
+        "--topic",
+        type=str,
+        default="economics",
+        help="Topic filter for --search/--random (default: economics)",
+    )
     args = parser.parse_args()
 
     # Logging to stderr so stdout is clean for piping

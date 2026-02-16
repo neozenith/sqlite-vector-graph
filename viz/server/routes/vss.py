@@ -1,6 +1,7 @@
 """VSS (Vector Similarity Search) endpoints."""
 
 import logging
+import sqlite3
 import struct
 from typing import Any
 
@@ -17,12 +18,12 @@ router = APIRouter(prefix="/api", tags=["vss"])
 
 
 @router.get("/indexes")
-def list_indexes(conn=Depends(db_session)) -> list[dict[str, Any]]:
+def list_indexes(conn: sqlite3.Connection = Depends(db_session)) -> list[dict[str, Any]]:
     """List all discovered HNSW indexes."""
     return discover_hnsw_indexes(conn)
 
 
-def _get_index_info(conn, name: str) -> dict[str, Any]:
+def _get_index_info(conn: sqlite3.Connection, name: str) -> dict[str, Any]:
     """Get a specific index info or raise 400."""
     try:
         validate_identifier(name)
@@ -36,11 +37,9 @@ def _get_index_info(conn, name: str) -> dict[str, Any]:
     return match
 
 
-def _load_vectors(conn, index_name: str, dimensions: int) -> list[tuple[int, list[float]]]:
+def _load_vectors(conn: sqlite3.Connection, index_name: str, dimensions: int) -> list[tuple[int, list[float]]]:
     """Load all vectors from an HNSW index's _nodes shadow table."""
-    rows = conn.execute(
-        f"SELECT id, vector FROM [{index_name}_nodes]"
-    ).fetchall()
+    rows = conn.execute(f"SELECT id, vector FROM [{index_name}_nodes]").fetchall()
 
     result = []
     for row in rows:
@@ -51,7 +50,7 @@ def _load_vectors(conn, index_name: str, dimensions: int) -> list[tuple[int, lis
     return result
 
 
-def _get_metadata(conn, index_name: str, node_id: int) -> dict[str, Any]:
+def _get_metadata(conn: sqlite3.Connection, index_name: str, node_id: int) -> dict[str, Any]:
     """Get metadata for a node based on the index type."""
     metadata: dict[str, Any] = {"id": node_id}
 
@@ -68,15 +67,32 @@ def _get_metadata(conn, index_name: str, node_id: int) -> dict[str, Any]:
     elif index_name == "node2vec_emb":
         # Node2Vec uses first-seen ordering from edge table
         metadata["type"] = "node2vec"
+        # Name is set externally via _build_n2v_name_map
 
     return metadata
+
+
+def _build_n2v_name_map(conn: sqlite3.Connection) -> dict[int, str]:
+    """Build rowid → node name map for node2vec_emb using first-seen edge ordering."""
+    try:
+        rows = conn.execute("SELECT src, dst FROM edges").fetchall()
+    except Exception:
+        return {}
+    name_to_idx: dict[str, int] = {}
+    for row in rows:
+        src, dst = row["src"], row["dst"]
+        if src not in name_to_idx:
+            name_to_idx[src] = len(name_to_idx)
+        if dst not in name_to_idx:
+            name_to_idx[dst] = len(name_to_idx)
+    return {idx + 1: name for name, idx in name_to_idx.items()}
 
 
 @router.get("/vss/{index_name}/embeddings")
 def get_embeddings(
     index_name: str,
     dimensions: int = Query(default=2, ge=2, le=3),
-    conn=Depends(db_session),
+    conn: sqlite3.Connection = Depends(db_session),
 ) -> dict[str, Any]:
     """Get UMAP-projected embeddings for an HNSW index."""
     info = _get_index_info(conn, index_name)
@@ -88,13 +104,18 @@ def get_embeddings(
     ids = [v[0] for v in vectors_raw]
     vectors = [v[1] for v in vectors_raw]
 
+    # Build node name map for node2vec embeddings
+    n2v_name_map: dict[int, str] = {}
+    if index_name == "node2vec_emb":
+        n2v_name_map = _build_n2v_name_map(conn)
+
     # UMAP project
     projector = get_projector()
     projected = projector.fit_transform(vectors, n_components=dimensions)
 
     points = []
     for i, node_id in enumerate(ids):
-        point = {
+        point: dict[str, Any] = {
             "id": node_id,
             "x": round(float(projected[i][0]), 4),
             "y": round(float(projected[i][1]), 4),
@@ -103,6 +124,11 @@ def get_embeddings(
             point["z"] = round(float(projected[i][2]), 4)
 
         metadata = _get_metadata(conn, index_name, node_id)
+
+        # For node2vec, inject the node name from the edge-ordering map
+        if index_name == "node2vec_emb" and node_id in n2v_name_map:
+            metadata["name"] = n2v_name_map[node_id]
+
         point["label"] = metadata.get("name") or metadata.get("text", "")[:50]
         point["metadata"] = metadata
 
@@ -123,15 +149,13 @@ def search_vss(
     query_id: int = Query(...),
     k: int = Query(default=20, ge=1, le=100),
     ef_search: int = Query(default=64, ge=1, le=500),
-    conn=Depends(db_session),
+    conn: sqlite3.Connection = Depends(db_session),
 ) -> dict[str, Any]:
     """KNN search from a given node ID in an HNSW index."""
-    info = _get_index_info(conn, index_name)
+    _get_index_info(conn, index_name)  # validates index exists
 
     # Get the query vector
-    row = conn.execute(
-        f"SELECT vector FROM [{index_name}_nodes] WHERE id = ?", (query_id,)
-    ).fetchone()
+    row = conn.execute(f"SELECT vector FROM [{index_name}_nodes] WHERE id = ?", (query_id,)).fetchone()
     if row is None:
         raise HTTPException(status_code=404, detail=f"Node {query_id} not found in {index_name}")
 
@@ -169,22 +193,19 @@ def search_text(
     q: str = Query(..., min_length=1),
     k: int = Query(default=20, ge=1, le=100),
     ef_search: int = Query(default=64, ge=1, le=500),
-    conn=Depends(db_session),
+    conn: sqlite3.Connection = Depends(db_session),
 ) -> dict[str, Any]:
     """Text search: FTS5 match → centroid vector → HNSW KNN search.
 
     Only works for indexes with a companion FTS5 table (e.g., chunks_vec + chunks_fts).
     """
-    info = _get_index_info(conn, index_name)
-    dimensions = info["dimensions"]
+    _get_index_info(conn, index_name)  # validates index exists
 
     # Determine FTS5 table name (e.g., chunks_vec → chunks_fts)
     fts_table = index_name.replace("_vec", "_fts")
 
     # Check that the FTS5 table exists
-    table_exists = conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (fts_table,)
-    ).fetchone()
+    table_exists = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (fts_table,)).fetchone()
     if not table_exists:
         raise HTTPException(
             status_code=400,

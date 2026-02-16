@@ -90,8 +90,8 @@ def test_stage_items_missing_table(client: TestClient) -> None:
     assert data["page"] == 1
 
 
-def test_stage_items_pagination(tmp_path) -> None:
-    """GET /api/kg/stage/{n}/items returns paginated data."""
+def _kg_test_client(tmp_path, db_name: str = "pagination.db", setup_cb=None):
+    """Create a test client with a temporary KG database."""
     import pathlib
 
     try:
@@ -102,15 +102,14 @@ def test_stage_items_pagination(tmp_path) -> None:
     PROJECT_ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
     EXTENSION_PATH = str(PROJECT_ROOT / "build" / "muninn")
 
-    db_path = str(tmp_path / "pagination.db")
+    db_path = str(tmp_path / db_name)
     conn = sqlite3.connect(db_path)
     conn.enable_load_extension(True)
     conn.load_extension(EXTENSION_PATH)
 
-    # Create entities table with data
-    conn.execute("CREATE TABLE entities (name TEXT, entity_type TEXT, chunk_id INTEGER)")
-    for i in range(50):
-        conn.execute("INSERT INTO entities VALUES (?, ?, ?)", (f"entity_{i}", "PERSON", i))
+    if setup_cb:
+        setup_cb(conn)
+
     conn.commit()
     conn.close()
 
@@ -125,6 +124,18 @@ def test_stage_items_pagination(tmp_path) -> None:
     from server.main import app
 
     test_client = TestClient(app)
+    return test_client, config, db, original_db_path
+
+
+def test_stage_items_pagination(tmp_path) -> None:
+    """GET /api/kg/stage/{n}/items returns paginated data."""
+
+    def setup(conn):
+        conn.execute("CREATE TABLE entities (name TEXT, entity_type TEXT, chunk_id INTEGER)")
+        for i in range(50):
+            conn.execute("INSERT INTO entities VALUES (?, ?, ?)", (f"entity_{i}", "PERSON", i))
+
+    test_client, config, db, original_db_path = _kg_test_client(tmp_path, setup_cb=setup)
     try:
         # Page 1
         resp = test_client.get("/api/kg/stage/3/items?page=1&page_size=10")
@@ -149,3 +160,86 @@ def test_stage_items_pagination(tmp_path) -> None:
         config.DB_PATH = original_db_path
         db.close_connection()
         db.reset_connection()
+
+
+def test_entities_grouped(tmp_path) -> None:
+    """GET /api/kg/stage/3/entities-grouped returns grouped entities."""
+
+    def setup(conn):
+        conn.execute("CREATE TABLE entities (name TEXT, entity_type TEXT, chunk_id INTEGER)")
+        # "Alice" appears in 3 chunks, "Bob" in 1
+        for cid in [1, 2, 3]:
+            conn.execute("INSERT INTO entities VALUES ('Alice', 'PERSON', ?)", (cid,))
+        conn.execute("INSERT INTO entities VALUES ('Bob', 'PERSON', 10)")
+
+    test_client, config, db, original_db_path = _kg_test_client(tmp_path, "grouped.db", setup)
+    try:
+        resp = test_client.get("/api/kg/stage/3/entities-grouped")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 2
+        # Sorted by count DESC so Alice first
+        alice = data["items"][0]
+        assert alice["name"] == "Alice"
+        assert alice["mention_count"] == 3
+        assert len(alice["chunk_ids"]) == 3
+
+        # Filter
+        resp = test_client.get("/api/kg/stage/3/entities-grouped?q=Bob")
+        data = resp.json()
+        assert data["total"] == 1
+        assert data["items"][0]["name"] == "Bob"
+    finally:
+        config.DB_PATH = original_db_path
+        db.close_connection()
+        db.reset_connection()
+
+
+def test_entities_grouped_missing_table(client: TestClient) -> None:
+    """GET /api/kg/stage/3/entities-grouped with no entities table returns empty."""
+    resp = client.get("/api/kg/stage/3/entities-grouped")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 0
+    assert data["items"] == []
+
+
+def test_entities_by_chunk(tmp_path) -> None:
+    """GET /api/kg/stage/3/entities-by-chunk returns per-chunk entities with full text."""
+
+    def setup(conn):
+        conn.execute("CREATE TABLE chunks (chunk_id INTEGER PRIMARY KEY, text TEXT)")
+        conn.execute("INSERT INTO chunks VALUES (1, 'The quick brown fox jumped over the lazy dog.')")
+        conn.execute("INSERT INTO chunks VALUES (2, 'Another chunk of text about markets.')")
+        conn.execute("CREATE TABLE entities (name TEXT, entity_type TEXT, chunk_id INTEGER)")
+        conn.execute("INSERT INTO entities VALUES ('fox', 'ANIMAL', 1)")
+        conn.execute("INSERT INTO entities VALUES ('dog', 'ANIMAL', 1)")
+        conn.execute("INSERT INTO entities VALUES ('markets', 'CONCEPT', 2)")
+
+    test_client, config, db, original_db_path = _kg_test_client(tmp_path, "bychunk.db", setup)
+    try:
+        resp = test_client.get("/api/kg/stage/3/entities-by-chunk")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 2
+
+        chunk1 = next(c for c in data["items"] if c["chunk_id"] == 1)
+        assert chunk1["entity_count"] == 2
+        assert "fox" in chunk1["text"]  # Full text, not truncated
+        assert len(chunk1["entities"]) == 2
+
+        chunk2 = next(c for c in data["items"] if c["chunk_id"] == 2)
+        assert chunk2["entity_count"] == 1
+    finally:
+        config.DB_PATH = original_db_path
+        db.close_connection()
+        db.reset_connection()
+
+
+def test_entities_by_chunk_missing_table(client: TestClient) -> None:
+    """GET /api/kg/stage/3/entities-by-chunk with no entities table returns empty."""
+    resp = client.get("/api/kg/stage/3/entities-by-chunk")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 0
+    assert data["items"] == []

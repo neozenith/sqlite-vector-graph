@@ -15,7 +15,6 @@ from server.services.db import (
     discover_edge_tables,
     discover_hnsw_indexes,
     get_connection,
-    reset_connection,
 )
 
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
@@ -94,9 +93,7 @@ def test_discover_edge_tables(tmp_path: pathlib.Path) -> None:
 def test_discover_edge_tables_column_priority(tmp_path: pathlib.Path) -> None:
     """discover_edge_tables prefers 'src' over 'source' when both present."""
     conn = _make_conn(tmp_path)
-    conn.execute(
-        "CREATE TABLE relations (src TEXT, dst TEXT, weight REAL, source TEXT)"
-    )
+    conn.execute("CREATE TABLE relations (src TEXT, dst TEXT, weight REAL, source TEXT)")
     conn.execute("INSERT INTO relations VALUES ('a', 'b', 1.0, 'llm')")
     conn.commit()
 
@@ -281,12 +278,15 @@ def test_discover_hnsw_missing_nodes_table(tmp_path: pathlib.Path) -> None:
 
     # Manually create only a _config table without the _nodes table
     conn.execute("CREATE TABLE orphan_config (key TEXT, value TEXT)")
-    conn.executemany("INSERT INTO orphan_config VALUES (?, ?)", [
-        ("dimensions", "4"),
-        ("metric", "1"),
-        ("m", "16"),
-        ("ef_construction", "200"),
-    ])
+    conn.executemany(
+        "INSERT INTO orphan_config VALUES (?, ?)",
+        [
+            ("dimensions", "4"),
+            ("metric", "1"),
+            ("m", "16"),
+            ("ef_construction", "200"),
+        ],
+    )
     conn.commit()
 
     indexes = discover_hnsw_indexes(conn)

@@ -1,6 +1,7 @@
 """Graph exploration endpoints using muninn TVFs."""
 
 import logging
+import sqlite3
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -14,12 +15,12 @@ router = APIRouter(prefix="/api", tags=["graph"])
 
 
 @router.get("/graphs")
-def list_graphs(conn=Depends(db_session)) -> list[dict[str, Any]]:
+def list_graphs(conn: sqlite3.Connection = Depends(db_session)) -> list[dict[str, Any]]:
     """List all discovered edge tables."""
     return discover_edge_tables(conn)
 
 
-def _validate_edge_table(conn, edge_table: str) -> dict[str, Any]:
+def _validate_edge_table(conn: sqlite3.Connection, edge_table: str) -> dict[str, Any]:
     """Validate and find an edge table or raise 400/404."""
     try:
         validate_identifier(edge_table)
@@ -37,7 +38,7 @@ def _validate_edge_table(conn, edge_table: str) -> dict[str, Any]:
 def get_subgraph(
     edge_table: str,
     limit: int = Query(default=500, ge=1, le=5000),
-    conn=Depends(db_session),
+    conn: sqlite3.Connection = Depends(db_session),
 ) -> dict[str, Any]:
     """Get a subgraph of nodes and edges for visualization."""
     info = _validate_edge_table(conn, edge_table)
@@ -104,13 +105,14 @@ def bfs_traversal(
     start: str = Query(...),
     max_depth: int = Query(default=3, ge=1, le=10),
     direction: str = Query(default="both", pattern="^(out|in|both)$"),
-    conn=Depends(db_session),
+    conn: sqlite3.Connection = Depends(db_session),
 ) -> dict[str, Any]:
     """BFS traversal from a start node using muninn's graph_bfs TVF."""
     info = _validate_edge_table(conn, edge_table)
 
     try:
-        rows = conn.execute("""
+        rows = conn.execute(
+            """
             SELECT node, depth FROM graph_bfs
             WHERE edge_table = ?
               AND src_col = ?
@@ -118,7 +120,9 @@ def bfs_traversal(
               AND start_node = ?
               AND max_depth = ?
               AND direction = ?
-        """, (edge_table, info["src_col"], info["dst_col"], start, max_depth, direction)).fetchall()
+        """,
+            (edge_table, info["src_col"], info["dst_col"], start, max_depth, direction),
+        ).fetchall()
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"BFS failed: {e}") from e
 
@@ -138,7 +142,7 @@ def bfs_traversal(
 def detect_communities(
     edge_table: str,
     resolution: float = Query(default=1.0, ge=0.1, le=10.0),
-    conn=Depends(db_session),
+    conn: sqlite3.Connection = Depends(db_session),
 ) -> dict[str, Any]:
     """Community detection via muninn's graph_leiden TVF."""
     info = _validate_edge_table(conn, edge_table)
@@ -146,14 +150,17 @@ def detect_communities(
     weight_clause = f"AND weight_col = '{info['weight_col']}'" if info["weight_col"] else ""
 
     try:
-        rows = conn.execute(f"""
+        rows = conn.execute(
+            f"""
             SELECT node, community_id FROM graph_leiden
             WHERE edge_table = ?
               AND src_col = ?
               AND dst_col = ?
               {weight_clause}
               AND resolution = ?
-        """, (edge_table, info["src_col"], info["dst_col"], resolution)).fetchall()
+        """,
+            (edge_table, info["src_col"], info["dst_col"], resolution),
+        ).fetchall()
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Leiden failed: {e}") from e
 
@@ -179,7 +186,7 @@ def compute_centrality(
     edge_table: str,
     measure: str = Query(default="degree", pattern="^(degree|betweenness|closeness)$"),
     direction: str = Query(default="both", pattern="^(out|in|both)$"),
-    conn=Depends(db_session),
+    conn: sqlite3.Connection = Depends(db_session),
 ) -> dict[str, Any]:
     """Compute centrality measures via muninn's centrality TVFs."""
     info = _validate_edge_table(conn, edge_table)
@@ -189,23 +196,29 @@ def compute_centrality(
     # Degree doesn't support direction parameter
     if measure == "degree":
         try:
-            rows = conn.execute(f"""
+            rows = conn.execute(
+                f"""
                 SELECT node, centrality FROM [{tvf_name}]
                 WHERE edge_table = ?
                   AND src_col = ?
                   AND dst_col = ?
-            """, (edge_table, info["src_col"], info["dst_col"])).fetchall()
+            """,
+                (edge_table, info["src_col"], info["dst_col"]),
+            ).fetchall()
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Centrality failed: {e}") from e
     else:
         try:
-            rows = conn.execute(f"""
+            rows = conn.execute(
+                f"""
                 SELECT node, centrality FROM [{tvf_name}]
                 WHERE edge_table = ?
                   AND src_col = ?
                   AND dst_col = ?
                   AND direction = ?
-            """, (edge_table, info["src_col"], info["dst_col"], direction)).fetchall()
+            """,
+                (edge_table, info["src_col"], info["dst_col"], direction),
+            ).fetchall()
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Centrality failed: {e}") from e
 

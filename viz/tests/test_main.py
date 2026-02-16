@@ -1,7 +1,5 @@
 """Tests for the main application module (lifespan, app creation)."""
 
-import pathlib
-
 from fastapi.testclient import TestClient
 
 from server.main import app

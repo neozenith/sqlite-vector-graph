@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>muninn WASM Demo</title>
+
+    <!-- Tailwind CSS (Play CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Deck.GL + luma.gl for 3D embedding visualization -->
+    <script src="https://unpkg.com/deck.gl@8.9.35/dist.min.js"></script>
+    <script src="https://unpkg.com/@luma.gl/core@8.5.21/dist.min.js"></script>
+
+    <!-- Cytoscape.js for graph network visualization -->
+    <script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
+
+    <!-- Transformers.js for in-browser embeddings -->
+    <script type="module">
+      import {
+        pipeline,
+        env,
+      } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers";
+      env.allowLocalModels = false;
+      env.useBrowserCache = true;
+      window.transformers = { pipeline, env };
+    </script>
+
+    <!-- Custom styles -->
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="bg-gray-950 text-gray-100 min-h-screen flex flex-col">
+    <!-- Header -->
+    <header class="border-b border-gray-800 px-6 py-4">
+      <div class="flex items-center justify-between max-w-screen-xl mx-auto">
+        <div class="flex items-center gap-3">
+          <h1 class="text-xl font-bold tracking-tight">
+            muninn <span class="text-indigo-400 font-normal">WASM Demo</span>
+          </h1>
+        </div>
+        <div id="status-indicators" class="flex items-center gap-4 text-sm">
+          <span class="status-pill" id="status-wasm" data-status="loading"
+            >WASM</span
+          >
+          <span
+            class="status-pill"
+            id="status-transformers"
+            data-status="loading"
+            >Embeddings</span
+          >
+          <span class="status-pill" id="status-deckgl" data-status="loading"
+            >3D Viz</span
+          >
+          <span class="status-pill" id="status-cytoscape" data-status="loading"
+            >Graph</span
+          >
+        </div>
+      </div>
+    </header>
+
+    <!-- Search Bar -->
+    <div class="px-6 py-4 border-b border-gray-800">
+      <div class="max-w-screen-xl mx-auto">
+        <div class="relative">
+          <input
+            id="search-input"
+            type="text"
+            placeholder="Search the Wealth of Nations knowledge graph..."
+            class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 text-gray-100 placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            disabled
+          />
+          <div id="search-spinner" class="absolute right-3 top-3.5 hidden">
+            <div class="spinner"></div>
+          </div>
+        </div>
+        <p id="search-hint" class="mt-2 text-sm text-gray-500">
+          Loading libraries... please wait.
+        </p>
+      </div>
+    </div>
+
+    <!-- Main Content: Split View -->
+    <main class="flex-1 px-6 py-4">
+      <div
+        class="max-w-screen-xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-4 h-full"
+      >
+        <!-- Left: Deck.GL 3D Embedding Visualization -->
+        <div
+          class="bg-gray-900 rounded-lg border border-gray-800 overflow-hidden flex flex-col"
+        >
+          <div
+            class="px-4 py-2 border-b border-gray-800 flex items-center justify-between"
+          >
+            <h2 class="text-sm font-medium text-gray-400">
+              Embedding Space (3D)
+            </h2>
+            <span id="deckgl-count" class="text-xs text-gray-600"
+              >0 points</span
+            >
+          </div>
+          <div id="deckgl-container" class="flex-1 relative min-h-[400px]">
+            <div
+              id="deckgl-placeholder"
+              class="absolute inset-0 flex items-center justify-center text-gray-600 text-sm"
+            >
+              Search to visualize embeddings in 3D
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Cytoscape Graph Visualization -->
+        <div
+          class="bg-gray-900 rounded-lg border border-gray-800 overflow-hidden flex flex-col"
+        >
+          <div
+            class="px-4 py-2 border-b border-gray-800 flex items-center justify-between"
+          >
+            <h2 class="text-sm font-medium text-gray-400">Knowledge Graph</h2>
+            <span id="cytoscape-count" class="text-xs text-gray-600"
+              >0 nodes</span
+            >
+          </div>
+          <div id="cy" class="flex-1 min-h-[400px]"></div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Results Panel -->
+    <div id="results-panel" class="border-t border-gray-800 px-6 py-4 hidden">
+      <div class="max-w-screen-xl mx-auto">
+        <h3 class="text-sm font-medium text-gray-400 mb-3">Search Results</h3>
+        <div
+          id="results-list"
+          class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-64 overflow-y-auto"
+        ></div>
+      </div>
+    </div>
+
+    <!-- Footer / Status Bar -->
+    <footer class="border-t border-gray-800 px-6 py-2">
+      <div
+        class="max-w-screen-xl mx-auto flex items-center justify-between text-xs text-gray-600"
+      >
+        <span id="db-status">Database: not loaded</span>
+        <span>muninn SQLite extension &mdash; WASM build</span>
+      </div>
+    </footer>
+
+    <!-- WASM SQLite module (emscripten output) -->
+    <script src="build/muninn_sqlite3.js"></script>
+
+    <!-- App logic -->
+    <script src="script.js"></script>
+  </body>
+</html>

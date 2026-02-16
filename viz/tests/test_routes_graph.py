@@ -62,10 +62,13 @@ def test_get_subgraph_no_nodes_table(tmp_path: pathlib.Path) -> None:
 
     # Create edge table but NO nodes table for metadata lookup
     conn.execute("CREATE TABLE test_edges (src TEXT, dst TEXT, weight REAL)")
-    conn.executemany("INSERT INTO test_edges VALUES (?, ?, ?)", [
-        ("alice", "bob", 1.0),
-        ("bob", "carol", 2.0),
-    ])
+    conn.executemany(
+        "INSERT INTO test_edges VALUES (?, ?, ?)",
+        [
+            ("alice", "bob", 1.0),
+            ("bob", "carol", 2.0),
+        ],
+    )
     conn.commit()
     conn.close()
 
@@ -127,9 +130,7 @@ def test_communities(client: TestClient) -> None:
     assert data["community_count"] >= 1
     assert data["node_count"] >= 1
     # Every node should be assigned a community
-    assert set(data["node_community"].keys()) == {
-        n for nodes in data["communities"].values() for n in nodes
-    }
+    assert set(data["node_community"].keys()) == {n for nodes in data["communities"].values() for n in nodes}
 
 
 def test_centrality_degree(client: TestClient) -> None:
@@ -176,10 +177,13 @@ def test_subgraph_with_rel_type(tmp_path: pathlib.Path) -> None:
     conn.load_extension(EXTENSION_PATH)
 
     conn.execute("CREATE TABLE typed_edges (src TEXT, dst TEXT, weight REAL, rel_type TEXT)")
-    conn.executemany("INSERT INTO typed_edges VALUES (?, ?, ?, ?)", [
-        ("alice", "bob", 1.0, "KNOWS"),
-        ("bob", "carol", 2.0, "WORKS_WITH"),
-    ])
+    conn.executemany(
+        "INSERT INTO typed_edges VALUES (?, ?, ?, ?)",
+        [
+            ("alice", "bob", 1.0, "KNOWS"),
+            ("bob", "carol", 2.0, "WORKS_WITH"),
+        ],
+    )
     conn.commit()
     conn.close()
 

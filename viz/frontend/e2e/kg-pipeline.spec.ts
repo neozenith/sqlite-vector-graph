@@ -7,54 +7,58 @@ test.describe('KG Pipeline Explorer', () => {
 
     await page.goto('/');
 
-    // Switch to KG Pipeline tab
-    await page.getByRole('tab', { name: 'KG Pipeline' }).click();
+    // Click the "KG Pipeline" sidebar link
+    await page.getByRole('link', { name: 'KG Pipeline' }).click();
+    await page.waitForURL(/\/kg\/?$/);
     await checkpoint(page, 'kg-page-loaded');
 
-    // Pipeline card should show loaded stages (not 0/7)
-    const pipelineCard = page.getByText(/Pipeline \([1-7]\/7\)/);
-    await expect(pipelineCard).toBeVisible({ timeout: 15_000 });
+    // Pipeline heading should show loaded stages (not 0/7)
+    const pipelineHeading = page.getByText(/KG Pipeline \([1-7]\/7\)/);
+    await expect(pipelineHeading).toBeVisible({ timeout: 15_000 });
 
-    // Should show stage buttons
-    const stage1 = page.locator('button', { hasText: /^1\./ }).first();
+    // Stage cards are rendered as Links with "N. Name" text
+    const stage1 = page.locator('a', { hasText: /^1\./ }).first();
     await expect(stage1).toBeVisible({ timeout: 5_000 });
 
-    await checkpoint(page, 'kg-stage-1-chunks');
+    await checkpoint(page, 'kg-overview-loaded');
 
-    // Click on stage 3 (Entities)
-    const stage3 = page.locator('button', { hasText: /^3\./ }).first();
+    // Click on stage 3 (Entity Extraction) card — navigates to stage page
+    const stage3 = page.locator('a', { hasText: /^3\./ }).first();
     await stage3.click();
-    await page.waitForTimeout(1000);
+    await page.waitForURL(/\/kg\/entity/);
+
+    // KG stage pills should be visible on stage pages (exact: true avoids matching stage card links)
+    const entityPill = page.getByRole('link', { name: 'Entity Extraction', exact: true });
+    await expect(entityPill).toBeVisible({ timeout: 5_000 });
+
     await checkpoint(page, 'kg-stage-3-entities');
 
-    // Click on stage 6 (Graph)
-    const stage6 = page.locator('button', { hasText: /^6\./ }).first();
-    await stage6.click();
-    await page.waitForTimeout(1000);
-    await checkpoint(page, 'kg-stage-6-graph');
+    // Navigate back to overview via pill
+    const overviewPill = page.getByRole('link', { name: 'Overview' });
+    await overviewPill.click();
+    await page.waitForURL(/\/kg\/?$/);
 
-    // Data funnel should be visible
+    // Data funnel should be visible on overview
     const funnelCard = page.getByText('Data Funnel');
-    await expect(funnelCard).toBeVisible();
+    await expect(funnelCard).toBeVisible({ timeout: 10_000 });
 
     await checkpoint(page, 'kg-funnel-visible');
   });
 
-  test('has GraphRAG query input', async ({ page }) => {
+  test('has GraphRAG query page', async ({ page }) => {
     setupConsoleMonitor(page);
 
-    await page.goto('/');
+    // Navigate directly to the KG query page
+    await page.goto('/kg/query/');
+    await checkpoint(page, 'kg-query-page-loaded');
 
-    // Switch to KG Pipeline tab
-    await page.getByRole('tab', { name: 'KG Pipeline' }).click();
-
-    // GraphRAG query section should be visible
-    const queryInput = page.locator('input[placeholder*="division of labor"]');
+    // Search input should be visible
+    const queryInput = page.locator('input[placeholder*="knowledge graph"]');
     await expect(queryInput).toBeVisible({ timeout: 10_000 });
 
-    // Query button should be present
-    const queryButton = page.getByRole('button', { name: 'Query' });
-    await expect(queryButton).toBeVisible();
+    // Search button should be present
+    const searchButton = page.getByRole('button', { name: 'Search' });
+    await expect(searchButton).toBeVisible();
 
     await checkpoint(page, 'kg-graphrag-ready');
   });

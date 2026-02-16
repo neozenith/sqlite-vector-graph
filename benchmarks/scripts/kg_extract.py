@@ -69,20 +69,67 @@ CHUNK_OVERLAP = 50
 # the zero-dependency FTS5 extraction when no NER model is available.
 ECONOMICS_SEED_ENTITIES = {
     # Core concepts
-    "labour", "capital", "wages", "profit", "rent", "price", "market",
-    "value", "money", "trade", "commerce", "industry", "agriculture",
-    "manufacture", "stock", "revenue", "tax", "wealth", "nation",
-    "commodity", "employment", "production", "consumption", "exchange",
+    "labour",
+    "capital",
+    "wages",
+    "profit",
+    "rent",
+    "price",
+    "market",
+    "value",
+    "money",
+    "trade",
+    "commerce",
+    "industry",
+    "agriculture",
+    "manufacture",
+    "stock",
+    "revenue",
+    "tax",
+    "wealth",
+    "nation",
+    "commodity",
+    "employment",
+    "production",
+    "consumption",
+    "exchange",
     # Institutions and actors
-    "merchant", "landlord", "farmer", "workman", "sovereign", "government",
-    "parliament", "colony", "bank", "company", "corporation",
+    "merchant",
+    "landlord",
+    "farmer",
+    "workman",
+    "sovereign",
+    "government",
+    "parliament",
+    "colony",
+    "bank",
+    "company",
+    "corporation",
     # Economic mechanisms
-    "supply", "demand", "competition", "monopoly", "bounty", "duty",
-    "interest", "credit", "debt", "coin", "silver", "gold",
-    "importation", "exportation",
+    "supply",
+    "demand",
+    "competition",
+    "monopoly",
+    "bounty",
+    "duty",
+    "interest",
+    "credit",
+    "debt",
+    "coin",
+    "silver",
+    "gold",
+    "importation",
+    "exportation",
     # Related concepts
-    "property", "liberty", "poverty", "improvement", "invention",
-    "division", "accumulation", "proportion", "quantity",
+    "property",
+    "liberty",
+    "poverty",
+    "improvement",
+    "invention",
+    "division",
+    "accumulation",
+    "proportion",
+    "quantity",
 }
 
 
@@ -124,7 +171,7 @@ def normalize_entity_name(name):
     # Strip leading articles
     for article in ("the ", "a ", "an "):
         if name.startswith(article):
-            name = name[len(article):]
+            name = name[len(article) :]
     return name
 
 
@@ -238,13 +285,13 @@ def extract_gliner_entities(conn, chunks):
 
     for batch_start in range(0, len(chunks), batch_size):
         batch_chunks = chunks[batch_start : batch_start + batch_size]
-        batch_texts = [c for c in batch_chunks]
+        batch_texts = list(batch_chunks)
         chunk_ids = list(range(batch_start + 1, batch_start + 1 + len(batch_texts)))
 
         predictions = model.batch_predict_entities(batch_texts, GLINER_ENTITY_TYPES, threshold=0.3)
 
         rows = []
-        for chunk_id, preds in zip(chunk_ids, predictions):
+        for chunk_id, preds in zip(chunk_ids, predictions, strict=False):
             for entity in preds:
                 name = entity["text"].strip()
                 if len(name) < 2:
@@ -259,7 +306,12 @@ def extract_gliner_entities(conn, chunks):
             entity_count += len(rows)
 
         if (batch_start // batch_size) % 10 == 0:
-            log.info("  GLiNER: processed %d/%d chunks, %d entities so far", batch_start + len(batch_texts), len(chunks), entity_count)
+            log.info(
+                "  GLiNER: processed %d/%d chunks, %d entities so far",
+                batch_start + len(batch_texts),
+                len(chunks),
+                entity_count,
+            )
 
     conn.commit()
     log.info("GLiNER: extracted %d entities", entity_count)
@@ -348,7 +400,11 @@ def extract_fts5_concepts(conn, chunks):
     then intersects with the seed entity list. Also discovers co-occurring seed
     terms within chunks to build relation edges.
     """
-    log.info("FTS5 concept discovery: scanning %d chunks against %d seed entities", len(chunks), len(ECONOMICS_SEED_ENTITIES))
+    log.info(
+        "FTS5 concept discovery: scanning %d chunks against %d seed entities",
+        len(chunks),
+        len(ECONOMICS_SEED_ENTITIES),
+    )
 
     # Create fts5vocab table for term statistics
     conn.execute("CREATE VIRTUAL TABLE IF NOT EXISTS chunks_vocab USING fts5vocab(chunks_fts, row)")
@@ -391,7 +447,7 @@ def extract_fts5_concepts(conn, chunks):
     cooccurrence = collections.Counter()
 
     for i, t1 in enumerate(terms_list):
-        for t2 in terms_list[i + 1:]:
+        for t2 in terms_list[i + 1 :]:
             overlap = term_chunks[t1] & term_chunks[t2]
             if len(overlap) >= 2:  # Co-occur in at least 2 chunks
                 cooccurrence[(t1, t2)] = len(overlap)
@@ -439,7 +495,7 @@ def build_cooccurrence_edges(conn):
         # Same chunk
         entity_list = sorted(entities)
         for i, e1 in enumerate(entity_list):
-            for e2 in entity_list[i + 1:]:
+            for e2 in entity_list[i + 1 :]:
                 pair_count[(e1, e2)] += 1
 
         # Adjacent chunk
@@ -502,7 +558,7 @@ def embed_chunks_and_entities(conn, chunks, model_name=DEFAULT_EMBEDDING_MODEL):
     t0 = time.time()
     entity_embeddings = model.encode(entity_names, batch_size=256, normalize_embeddings=True, show_progress_bar=False)
 
-    for idx, (name, emb) in enumerate(zip(entity_names, entity_embeddings), 1):
+    for idx, (_name, emb) in enumerate(zip(entity_names, entity_embeddings, strict=True), 1):
         conn.execute(
             "INSERT INTO entities_vec (rowid, vector) VALUES (?, ?)",
             (idx, pack_vector(emb)),
@@ -640,9 +696,18 @@ def main():
     parser = argparse.ArgumentParser(description="KG Entity/Relation Extraction Pipeline")
     parser.add_argument("--book-id", type=int, required=True, help="Gutenberg book ID")
     parser.add_argument("--text-file", type=str, help="Override text file path")
-    parser.add_argument("--strategies", type=str, help="Comma-separated: gliner,spacy_svo,fts5 (default: all available)")
+    parser.add_argument(
+        "--strategies",
+        type=str,
+        help="Comma-separated: gliner,spacy_svo,fts5 (default: all available)",
+    )
     parser.add_argument("--force", action="store_true", help="Overwrite existing DB")
-    parser.add_argument("--embedding-model", type=str, default=DEFAULT_EMBEDDING_MODEL, help=f"Embedding model (default: {DEFAULT_EMBEDDING_MODEL})")
+    parser.add_argument(
+        "--embedding-model",
+        type=str,
+        default=DEFAULT_EMBEDDING_MODEL,
+        help=f"Embedding model (default: {DEFAULT_EMBEDDING_MODEL})",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(

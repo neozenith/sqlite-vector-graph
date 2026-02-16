@@ -1,24 +1,30 @@
 /** Generic paginated list: search input, prev/next controls, renders items as rows. */
 
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 
 interface Props {
-  items: Record<string, unknown>[];
-  total: number;
-  page: number;
-  pageSize: number;
-  isLoading: boolean;
-  filter: string;
-  onFilterChange: (query: string) => void;
-  onPageChange: (page: number) => void;
+  items: Record<string, unknown>[]
+  total: number
+  page: number
+  pageSize: number
+  isLoading: boolean
+  filter: string
+  onFilterChange: (query: string) => void
+  onPageChange: (page: number) => void
 }
 
 export function PaginatedList({
-  items, total, page, pageSize, isLoading,
-  filter, onFilterChange, onPageChange,
+  items,
+  total,
+  page,
+  pageSize,
+  isLoading,
+  filter,
+  onFilterChange,
+  onPageChange,
 }: Props) {
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
   return (
     <div className="space-y-2">
@@ -49,9 +55,7 @@ export function PaginatedList({
       )}
 
       <div className="flex items-center justify-between text-xs">
-        <span className="text-muted-foreground">
-          {total} total
-        </span>
+        <span className="text-muted-foreground">{total} total</span>
         <div className="flex items-center gap-1">
           <Button
             variant="outline"
@@ -62,7 +66,9 @@ export function PaginatedList({
           >
             Prev
           </Button>
-          <span className="px-2">{page} / {totalPages}</span>
+          <span className="px-2">
+            {page} / {totalPages}
+          </span>
           <Button
             variant="outline"
             size="sm"
@@ -75,5 +81,5 @@ export function PaginatedList({
         </div>
       </div>
     </div>
-  );
+  )
 }

@@ -1,11 +1,10 @@
 """Knowledge Graph pipeline stage queries and GraphRAG execution."""
 
 import logging
-import struct
 from typing import Any
 
 try:
-    import pysqlite3 as sqlite3
+    import pysqlite3 as sqlite3  # type: ignore[import-not-found]
 except ImportError:
     import sqlite3
 
@@ -17,14 +16,14 @@ def _table_exists(conn: sqlite3.Connection, name: str) -> bool:
     row = conn.execute(
         "SELECT count(*) FROM sqlite_master WHERE type IN ('table', 'view') AND name = ?", (name,)
     ).fetchone()
-    return row[0] > 0
+    return bool(row[0] > 0)
 
 
 def _safe_count(conn: sqlite3.Connection, table: str) -> int:
     """Count rows in a table, returning 0 if table doesn't exist."""
     if not _table_exists(conn, table):
         return 0
-    return conn.execute(f"SELECT count(*) FROM [{table}]").fetchone()[0]
+    return int(conn.execute(f"SELECT count(*) FROM [{table}]").fetchone()[0])
 
 
 def get_pipeline_summary(conn: sqlite3.Connection) -> dict[str, Any]:
@@ -33,75 +32,89 @@ def get_pipeline_summary(conn: sqlite3.Connection) -> dict[str, Any]:
 
     # Stage 1: Chunking
     chunk_count = _safe_count(conn, "chunks")
-    stages.append({
-        "stage": 1,
-        "name": "Chunking",
-        "description": "Text split into paragraphs",
-        "count": chunk_count,
-        "available": chunk_count > 0,
-    })
+    stages.append(
+        {
+            "stage": 1,
+            "name": "Chunking",
+            "description": "Text split into paragraphs",
+            "count": chunk_count,
+            "available": chunk_count > 0,
+        }
+    )
 
     # Stage 2: Embedding
     chunks_vec_count = _safe_count(conn, "chunks_vec_nodes")
-    stages.append({
-        "stage": 2,
-        "name": "Embedding",
-        "description": "Chunk embeddings via HNSW",
-        "count": chunks_vec_count,
-        "available": chunks_vec_count > 0,
-    })
+    stages.append(
+        {
+            "stage": 2,
+            "name": "Embedding",
+            "description": "Chunk embeddings via HNSW",
+            "count": chunks_vec_count,
+            "available": chunks_vec_count > 0,
+        }
+    )
 
     # Stage 3: Entity Extraction
     entity_count = _safe_count(conn, "entities")
-    stages.append({
-        "stage": 3,
-        "name": "Entity Extraction",
-        "description": "Named entities extracted from chunks",
-        "count": entity_count,
-        "available": entity_count > 0,
-    })
+    stages.append(
+        {
+            "stage": 3,
+            "name": "Entity Extraction",
+            "description": "Named entities extracted from chunks",
+            "count": entity_count,
+            "available": entity_count > 0,
+        }
+    )
 
     # Stage 4: Relation Extraction
     relation_count = _safe_count(conn, "relations")
-    stages.append({
-        "stage": 4,
-        "name": "Relation Extraction",
-        "description": "Entity-to-entity relationships",
-        "count": relation_count,
-        "available": relation_count > 0,
-    })
+    stages.append(
+        {
+            "stage": 4,
+            "name": "Relation Extraction",
+            "description": "Entity-to-entity relationships",
+            "count": relation_count,
+            "available": relation_count > 0,
+        }
+    )
 
     # Stage 5: Entity Resolution
     cluster_count = _safe_count(conn, "entity_clusters")
-    stages.append({
-        "stage": 5,
-        "name": "Entity Resolution",
-        "description": "Synonym detection via HNSW + Leiden",
-        "count": cluster_count,
-        "available": cluster_count > 0,
-    })
+    stages.append(
+        {
+            "stage": 5,
+            "name": "Entity Resolution",
+            "description": "Synonym detection via HNSW + Leiden",
+            "count": cluster_count,
+            "available": cluster_count > 0,
+        }
+    )
 
     # Stage 6: Graph Construction
     node_count = _safe_count(conn, "nodes")
     edge_count = _safe_count(conn, "edges")
-    stages.append({
-        "stage": 6,
-        "name": "Graph Construction",
-        "description": "Coalesced knowledge graph",
-        "count": node_count,
-        "available": node_count > 0,
-        "extra": {"node_count": node_count, "edge_count": edge_count},
-    })
+    stages.append(
+        {
+            "stage": 6,
+            "name": "Graph Construction",
+            "description": "Coalesced knowledge graph",
+            "count": node_count,
+            "available": node_count > 0,
+            "extra": {"node_count": node_count, "edge_count": edge_count},
+        }
+    )
 
     # Stage 7: Node2Vec
     n2v_count = _safe_count(conn, "node2vec_emb_nodes")
-    stages.append({
-        "stage": 7,
-        "name": "Node2Vec",
-        "description": "Structural graph embeddings",
-        "count": n2v_count,
-        "available": n2v_count > 0,
-    })
+    stages.append(
+        {
+            "stage": 7,
+            "name": "Node2Vec",
+            "description": "Structural graph embeddings",
+            "count": n2v_count,
+            "available": n2v_count > 0,
+        }
+    )
 
     return {"stages": stages}
 
@@ -253,14 +266,14 @@ def _stage_resolution(conn: sqlite3.Connection) -> dict[str, Any]:
 
     cluster_list = []
     for row in clusters:
-        members = conn.execute(
-            "SELECT name FROM entity_clusters WHERE canonical = ?", (row["canonical"],)
-        ).fetchall()
-        cluster_list.append({
-            "canonical": row["canonical"],
-            "size": row["size"],
-            "members": [m["name"] for m in members],
-        })
+        members = conn.execute("SELECT name FROM entity_clusters WHERE canonical = ?", (row["canonical"],)).fetchall()
+        cluster_list.append(
+            {
+                "canonical": row["canonical"],
+                "size": row["size"],
+                "members": [m["name"] for m in members],
+            }
+        )
 
     return {
         "stage": 5,
@@ -364,16 +377,16 @@ def run_graphrag_query(
     result: dict[str, Any] = {"query": query_text, "stages": {}}
 
     # Stage 1: Full-text search on chunks (no embedding model needed)
-    seed_chunks: list[dict] = []
+    seed_chunks: list[dict[str, Any]] = []
     if _table_exists(conn, "chunks_fts"):
         try:
-            rows = conn.execute("""
+            rows = conn.execute(
+                """
                 SELECT chunk_id, text FROM chunks_fts WHERE chunks_fts MATCH ? LIMIT ?
-            """, (query_text, k)).fetchall()
-            seed_chunks = [
-                {"chunk_id": r["chunk_id"], "text_preview": r["text"][:200]}
-                for r in rows
-            ]
+            """,
+                (query_text, k),
+            ).fetchall()
+            seed_chunks = [{"chunk_id": r["chunk_id"], "text_preview": r["text"][:200]} for r in rows]
         except Exception as e:
             log.warning("FTS search failed: %s", e)
 
@@ -385,12 +398,15 @@ def run_graphrag_query(
     if seed_chunk_ids and _table_exists(conn, "entity_clusters"):
         placeholders = ",".join("?" * len(seed_chunk_ids))
         try:
-            entity_rows = conn.execute(f"""
+            entity_rows = conn.execute(
+                f"""
                 SELECT DISTINCT ec.canonical
                 FROM entities e
                 JOIN entity_clusters ec ON e.name = ec.name
                 WHERE e.chunk_id IN ({placeholders})
-            """, seed_chunk_ids).fetchall()
+            """,
+                seed_chunk_ids,
+            ).fetchall()
             seed_entities = {r["canonical"] for r in entity_rows}
         except Exception as e:
             log.warning("Seed entity lookup failed: %s", e)
@@ -404,14 +420,17 @@ def run_graphrag_query(
     expanded_entities = set(seed_entities)
     for seed in list(seed_entities)[:10]:
         try:
-            bfs_rows = conn.execute("""
+            bfs_rows = conn.execute(
+                """
                 SELECT node, depth FROM graph_bfs
                 WHERE edge_table = 'edges'
                   AND src_col = 'src'
                   AND dst_col = 'dst'
                   AND start_node = ?
                   AND max_depth = ?
-            """, (seed, max_depth)).fetchall()
+            """,
+                (seed, max_depth),
+            ).fetchall()
             for row in bfs_rows:
                 expanded_entities.add(row["node"])
         except Exception:
@@ -444,7 +463,7 @@ def run_graphrag_query(
         except Exception:
             pass
 
-    ranked = []
+    ranked: list[dict[str, Any]] = []
     for node, scores in centrality_scores.items():
         combined = sum(scores.values()) / max(len(scores), 1)
         ranked.append({"node": node, "combined_score": round(combined, 6), **scores})
@@ -485,9 +504,7 @@ def run_graphrag_query(
             if seed_rowid is None:
                 continue
             try:
-                vec_row = conn.execute(
-                    "SELECT vector FROM node2vec_emb_nodes WHERE id = ?", (seed_rowid,)
-                ).fetchone()
+                vec_row = conn.execute("SELECT vector FROM node2vec_emb_nodes WHERE id = ?", (seed_rowid,)).fetchone()
                 if vec_row is None:
                     continue
                 knn = conn.execute(
@@ -510,28 +527,33 @@ def run_graphrag_query(
     all_entities = expanded_entities | community_entities | n2v_similar
 
     # Collect relevant passages
-    top_passages: list[dict] = []
+    top_passages: list[dict[str, Any]] = []
     for entity in sorted(all_entities)[:50]:
         try:
-            rows = conn.execute("""
+            rows = conn.execute(
+                """
                 SELECT DISTINCT c.chunk_id, c.text
                 FROM entities e
                 JOIN entity_clusters ec ON e.name = ec.name
                 JOIN chunks c ON e.chunk_id = c.chunk_id
                 WHERE ec.canonical = ?
-            """, (entity,)).fetchall()
+            """,
+                (entity,),
+            ).fetchall()
             for r in rows:
-                top_passages.append({
-                    "chunk_id": r["chunk_id"],
-                    "text_preview": r["text"][:300],
-                    "entity": entity,
-                })
+                top_passages.append(
+                    {
+                        "chunk_id": r["chunk_id"],
+                        "text_preview": r["text"][:300],
+                        "entity": entity,
+                    }
+                )
         except Exception:
             pass
 
     # Deduplicate by chunk_id
     seen_chunks: set[int] = set()
-    unique_passages: list[dict] = []
+    unique_passages: list[dict[str, Any]] = []
     for p in top_passages:
         if p["chunk_id"] not in seen_chunks:
             seen_chunks.add(p["chunk_id"])
