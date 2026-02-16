@@ -37,7 +37,7 @@ export const version: string = readVersion();
  *
  * Resolution order:
  * 1. Local dev — build/ directory at repo root
- * 2. Platform-specific optional dependency (@neozenith/sqlite-muninn-<platform>-<arch>)
+ * 2. Platform-specific optional dependency (@sqlite-muninn/<platform>-<arch>)
  *    Uses sibling resolution: __dirname/../<pkg>/muninn.<ext>
  *    This works because npm installs optionalDependencies as siblings
  *    under node_modules/.
@@ -56,9 +56,9 @@ export function getLoadablePath(): string {
 
   // Try platform-specific package (npm registry install)
   // Sibling resolution: node_modules/sqlite-muninn/dist/../.. = node_modules/
-  // Then into @neozenith/sqlite-muninn-<platform>-<arch>/muninn.<ext>
+  // Then into @sqlite-muninn/<platform>-<arch>/muninn.<ext>
   const archName = arch === "arm64" ? "arm64" : "x64";
-  const pkgName = `@neozenith/sqlite-muninn-${platform}-${archName}`;
+  const pkgName = `@sqlite-muninn/${platform}-${archName}`;
   const pkgPath = join(ROOT, "..", pkgName, `muninn.${ext}`);
   if (statSync(pkgPath, { throwIfNoEntry: false })) {
     return pkgPath;

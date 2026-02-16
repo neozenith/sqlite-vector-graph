@@ -23,8 +23,8 @@ VERSION = (PROJECT_ROOT / "VERSION").read_text().strip()
 _VERSION_RE = re.compile(r'("version":\s*")[\d]+\.[\d]+\.[\d]+[^"]*(")')
 _VERSION_REPL = rf"\g<1>{VERSION}\2"
 
-# Matches "@neozenith/sqlite-muninn-<target>": "<version>" in optionalDependencies
-_OPTIONAL_DEP_RE = re.compile(r'("@neozenith/sqlite-muninn-[^"]+": ")[\d]+\.[\d]+\.[\d]+[^"]*(")')
+# Matches "@sqlite-muninn/<target>": "<version>" in optionalDependencies
+_OPTIONAL_DEP_RE = re.compile(r'("@sqlite-muninn/[^"]+": ")[\d]+\.[\d]+\.[\d]+[^"]*(")')
 _OPTIONAL_DEP_REPL = rf"\g<1>{VERSION}\2"
 
 TARGETS: list[tuple[str, re.Pattern[str], str]] = [

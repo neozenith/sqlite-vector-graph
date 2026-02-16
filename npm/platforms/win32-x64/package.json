@@ -1,6 +1,6 @@
 {
-  "name": "@neozenith/sqlite-muninn-win32-x64",
-  "version": "0.1.0-alpha.2",
+  "name": "@sqlite-muninn/win32-x64",
+  "version": "0.1.0-alpha.3",
   "description": "sqlite-muninn native binary for Windows x64",
   "repository": {
     "type": "git",
