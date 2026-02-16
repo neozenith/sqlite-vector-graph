@@ -1,7 +1,7 @@
 # sqlite-muninn
 
 <div align="center">
-    <img src="docs/assets/muninn_logo_transparent.png" alt="Muninn Raven Logo" width=480px/>
+    <img src="https://joshpeak.net/sqlite-muninn/assets/muninn_logo_transparent.png" alt="Muninn Raven Logo" width=480px/>
     <p><i>Odin's mythic <a href="https://en.wikipedia.org/wiki/Huginn_and_Muninn">raven of Memory</a>.</i></p>
 </div>
 
@@ -11,25 +11,6 @@ A zero-dependency C extension for SQLite to add an advanced collection of knowle
 
 **[Documentation](https://neozenith.github.io/sqlite-muninn/)** | **[GitHub](https://github.com/neozenith/sqlite-muninn)**
 
-```mermaid
-graph LR
-    subgraph Muninn Extension
-        direction TB
-        HNSW["HNSW Virtual Table<br/><i>hnsw_index</i>"]
-        GTVF["Graph TVFs<br/><i>bfs, dfs, shortest_path,<br/>components, pagerank</i>"]
-        CENT["Centrality TVFs<br/><i>degree, betweenness,<br/>closeness</i>"]
-        COMM["Community Detection<br/><i>graph_leiden</i>"]
-        N2V["Node2Vec Training<br/><i>node2vec_train()</i>"]
-    end
-
-    ET["Any Edge Table<br/><i>src, dst columns</i>"] --> GTVF
-    ET --> CENT
-    ET --> COMM
-    ET --> N2V
-    N2V -->|embeddings| HNSW
-    APP["Application<br/><i>embeddings from<br/>any source</i>"] -->|INSERT| HNSW
-    HNSW -->|KNN search| APP
-```
 
 ## Features
 

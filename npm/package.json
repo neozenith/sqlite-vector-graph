@@ -1,6 +1,6 @@
 {
   "name": "sqlite-muninn",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-alpha.2",
   "description": "HNSW vector search + graph traversal + Node2Vec for SQLite",
   "main": "dist/index.js",
   "module": "dist/index.mjs",

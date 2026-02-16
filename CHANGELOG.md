@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-## [Unreleased]
+## [0.1.0-alpha.1] - 2026-02-16
 
 ### Bug Fixes
 - Fix CI: use pysqlite3-binary for extension loading, install uv
@@ -25,6 +25,12 @@ Also add build/ directory to getLoadablePath() search order since
 make all outputs to build/muninn.{so,dylib,dll}, not the repo root.
 
 Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+
+### Documentation
+- Doc (benchmarks): Rebuilding the benchmarked dataset- Doc (benchmark): Rebuilding the benchmark dataset
+
+### Features
+- Add WASM demo, overhaul viz frontend, refine CD plan- Add publish.yml workflow for release automation- Build platform wheels natively in CI with uv
 
 ### Other
 - Initial commit- Initial benchmarking results- Updated benchmark metrics results- More benchmark docs updates- Updated docs benchmarks- Update docs dataset URL reference- Checkpoint planning documents- Project rename to sqlite-muninn- Add project logo- Add graph community and centrality- Updated planning documents- Add ci and agent skills as well as python and nodejs wrappers- Some house keeping- Huge CI refactor- Iterate on fixing CI- Started works on visualisation tool and planning out KG benchmarks
