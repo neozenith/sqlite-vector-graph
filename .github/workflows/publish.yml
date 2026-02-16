@@ -172,11 +172,15 @@ jobs:
   # ── Publish to NPM ──────────────────────────────────────
   # Platform packages MUST be published before the main package because
   # npm install of the main package immediately resolves optionalDependencies.
+  # Uses npm Trusted Publishing (OIDC) — no NODE_AUTH_TOKEN needed.
+  # Each package must have a trusted publisher configured on npmjs.com:
+  #   https://www.npmjs.com/package/<name>/access → GitHub Actions → neozenith/sqlite-muninn/publish.yml
   publish-npm:
     needs: [build, build-macos]
     runs-on: ubuntu-latest
     name: Publish to NPM
     permissions:
+      contents: read
       id-token: write
     steps:
       - uses: actions/checkout@v4
@@ -187,6 +191,10 @@ jobs:
         with:
           node-version: "22"
           registry-url: https://registry.npmjs.org
+
+      # Trusted Publishing requires npm >= 11.5.1 (Node 22 ships ~10.x)
+      - name: Upgrade npm for Trusted Publishing
+        run: npm install -g npm@latest
 
       - name: Determine npm dist-tag
         id: npm-tag
@@ -226,6 +234,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Publish WASM to NPM
     permissions:
+      contents: read
       id-token: write
     steps:
       - uses: actions/checkout@v4
@@ -239,6 +248,9 @@ jobs:
         with:
           node-version: "22"
           registry-url: https://registry.npmjs.org
+
+      - name: Upgrade npm for Trusted Publishing
+        run: npm install -g npm@latest
 
       - name: Determine npm dist-tag
         id: npm-tag

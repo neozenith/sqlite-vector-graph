@@ -1,13 +1,19 @@
 {
   "name": "@sqlite-muninn/linux-x64",
-  "version": "0.1.0-alpha.5",
-  "description": "sqlite-muninn native binary for Linux x64",
+  "version": "0.1.0-alpha.6",
+  "description": "sqlite-muninn native binary for linux x64",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/neozenith/sqlite-muninn.git"
   },
   "license": "MIT",
-  "os": ["linux"],
-  "cpu": ["x64"],
-  "files": ["muninn.so"]
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "files": [
+    "muninn.so"
+  ]
 }

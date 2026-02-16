@@ -1,13 +1,19 @@
 {
   "name": "@sqlite-muninn/darwin-arm64",
-  "version": "0.1.0-alpha.5",
-  "description": "sqlite-muninn native binary for macOS ARM64",
+  "version": "0.1.0-alpha.6",
+  "description": "sqlite-muninn native binary for darwin arm64",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/neozenith/sqlite-muninn.git"
   },
   "license": "MIT",
-  "os": ["darwin"],
-  "cpu": ["arm64"],
-  "files": ["muninn.dylib"]
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "files": [
+    "muninn.dylib"
+  ]
 }
