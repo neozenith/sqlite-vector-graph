@@ -246,11 +246,8 @@ jobs:
       - name: Setup Emscripten
         uses: mymindstorm/setup-emsdk@v14
 
-      - name: Create amalgamation
-        run: make amalgamation
-
       - name: Build WASM
-        run: bash scripts/build_wasm.sh
+        run: make -C wasm dist
 
       - uses: actions/upload-artifact@v4
         with:

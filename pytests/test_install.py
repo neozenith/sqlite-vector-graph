@@ -10,6 +10,7 @@ Marked with `pytest.mark.integration` — skipped by default during
 """
 
 import pathlib
+import re
 import shutil
 import subprocess
 
@@ -17,6 +18,15 @@ import pytest
 
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parent.parent
 VERSION = (PROJECT_ROOT / "VERSION").read_text().strip()
+
+
+def _normalize_version(v: str) -> str:
+    """Normalize a version string per PEP 440 (e.g., '0.1.0-alpha.1' -> '0.1.0a1')."""
+    # Replace common pre-release separators: -alpha.N -> aN, -beta.N -> bN, -rc.N -> rcN
+    v = re.sub(r"[-.]?alpha[-.]?", "a", v)
+    v = re.sub(r"[-.]?beta[-.]?", "b", v)
+    v = re.sub(r"[-.]?rc[-.]?", "rc", v)
+    return v
 
 
 def _run(args: list[str], cwd: pathlib.Path) -> subprocess.CompletedProcess[str]:
@@ -53,7 +63,7 @@ class TestPipInstall:
                 ["uv", "run", "python", "-c", "import sqlite_muninn; print(sqlite_muninn.__version__)"],
                 cwd=tmp_path,
             )
-            assert result.stdout.strip() == VERSION
+            assert result.stdout.strip() == _normalize_version(VERSION)
 
             result = _run(
                 ["uv", "run", "python", "-c", "import sqlite_muninn; print(sqlite_muninn.loadable_path())"],
