@@ -31,6 +31,13 @@
     "dist/",
     "VERSION"
   ],
+  "optionalDependencies": {
+    "@neozenith/sqlite-muninn-darwin-arm64": "0.1.0-alpha.2",
+    "@neozenith/sqlite-muninn-darwin-x64": "0.1.0-alpha.2",
+    "@neozenith/sqlite-muninn-linux-x64": "0.1.0-alpha.2",
+    "@neozenith/sqlite-muninn-linux-arm64": "0.1.0-alpha.2",
+    "@neozenith/sqlite-muninn-win32-x64": "0.1.0-alpha.2"
+  },
   "devDependencies": {
     "@biomejs/biome": "^2.0.0",
     "@types/node": "^22.0.0",

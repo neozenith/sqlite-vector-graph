@@ -170,6 +170,8 @@ jobs:
         run: uv publish dist/*.whl
 
   # ── Publish to NPM ──────────────────────────────────────
+  # Platform packages MUST be published before the main package because
+  # npm install of the main package immediately resolves optionalDependencies.
   publish-npm:
     needs: [build, build-macos]
     runs-on: ubuntu-latest
@@ -178,18 +180,31 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
           registry-url: https://registry.npmjs.org
+
+      - name: Copy binaries into platform packages
+        run: |
+          cp linux-x86_64/muninn.so    npm/platforms/linux-x64/muninn.so
+          cp linux-arm64/muninn.so     npm/platforms/linux-arm64/muninn.so
+          cp windows-x86_64/muninn.dll npm/platforms/win32-x64/muninn.dll
+          # macOS universal binary goes to both darwin packages
+          cp macos-universal/muninn.dylib npm/platforms/darwin-arm64/muninn.dylib
+          cp macos-universal/muninn.dylib npm/platforms/darwin-x64/muninn.dylib
+
       - name: Publish platform packages
         run: |
           for target in darwin-arm64 darwin-x64 linux-x64 linux-arm64 win32-x64; do
-            npm publish npm/platforms/$target --provenance --access public
+            npm publish ./npm/platforms/$target --provenance --access public
           done
+
       - name: Publish main package
-        run: npm publish npm/ --provenance --access public
+        run: npm publish ./npm --provenance --access public
 
   # ── Publish WASM to NPM ─────────────────────────────────
   publish-wasm:
@@ -200,15 +215,18 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           name: wasm
           path: npm/wasm/
+
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
           registry-url: https://registry.npmjs.org
-      - run: npm publish npm/wasm --provenance --access public
+
+      - run: npm publish ./npm/wasm --provenance --access public
 
   # ── Upload to GitHub Release ─────────────────────────────
   upload-release:

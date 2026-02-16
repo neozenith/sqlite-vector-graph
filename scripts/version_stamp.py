@@ -20,17 +20,27 @@ VERSION = (PROJECT_ROOT / "VERSION").read_text().strip()
 
 # Each entry: (file relative to project root, compiled regex, replacement template)
 # The regex must capture a group so we can surgically replace only the version part.
+_VERSION_RE = re.compile(r'("version":\s*")[\d]+\.[\d]+\.[\d]+[^"]*(")')
+_VERSION_REPL = rf"\g<1>{VERSION}\2"
+
+# Matches "@neozenith/sqlite-muninn-<target>": "<version>" in optionalDependencies
+_OPTIONAL_DEP_RE = re.compile(r'("@neozenith/sqlite-muninn-[^"]+": ")[\d]+\.[\d]+\.[\d]+[^"]*(")')
+_OPTIONAL_DEP_REPL = rf"\g<1>{VERSION}\2"
+
 TARGETS: list[tuple[str, re.Pattern[str], str]] = [
     (
         "skills/muninn/SKILL.md",
         re.compile(r'(  version:\s*")[\d]+\.[\d]+\.[\d]+[^"]*(")'),
         rf"\g<1>{VERSION}\2",
     ),
-    (
-        "npm/package.json",
-        re.compile(r'("version":\s*")[\d]+\.[\d]+\.[\d]+[^"]*(")'),
-        rf"\g<1>{VERSION}\2",
-    ),
+    ("npm/package.json", _VERSION_RE, _VERSION_REPL),
+    ("npm/package.json", _OPTIONAL_DEP_RE, _OPTIONAL_DEP_REPL),
+    ("npm/platforms/darwin-arm64/package.json", _VERSION_RE, _VERSION_REPL),
+    ("npm/platforms/darwin-x64/package.json", _VERSION_RE, _VERSION_REPL),
+    ("npm/platforms/linux-x64/package.json", _VERSION_RE, _VERSION_REPL),
+    ("npm/platforms/linux-arm64/package.json", _VERSION_RE, _VERSION_REPL),
+    ("npm/platforms/win32-x64/package.json", _VERSION_RE, _VERSION_REPL),
+    ("npm/wasm/package.json", _VERSION_RE, _VERSION_REPL),
 ]
 
 

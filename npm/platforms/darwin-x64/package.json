@@ -1,0 +1,13 @@
+{
+  "name": "@neozenith/sqlite-muninn-darwin-x64",
+  "version": "0.1.0-alpha.2",
+  "description": "sqlite-muninn native binary for macOS x64",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/neozenith/sqlite-muninn.git"
+  },
+  "license": "MIT",
+  "os": ["darwin"],
+  "cpu": ["x64"],
+  "files": ["muninn.dylib"]
+}

@@ -36,8 +36,11 @@ export const version: string = readVersion();
  * Get the absolute path to the muninn loadable extension binary.
  *
  * Resolution order:
- * 1. Repo root (git install / local dev) — VERSION file sits at the repo root
- * 2. Platform-specific optional dependency (@sqlite-muninn/<platform>-<arch>)
+ * 1. Local dev — build/ directory at repo root
+ * 2. Platform-specific optional dependency (@neozenith/sqlite-muninn-<platform>-<arch>)
+ *    Uses sibling resolution: __dirname/../<pkg>/muninn.<ext>
+ *    This works because npm installs optionalDependencies as siblings
+ *    under node_modules/.
  */
 export function getLoadablePath(): string {
   const ext = EXT_MAP[platform];
@@ -51,22 +54,14 @@ export function getLoadablePath(): string {
     return buildPath;
   }
 
-  // Try repo root (legacy / manual placement)
-  const localPath = join(REPO_ROOT, `muninn.${ext}`);
-  if (statSync(localPath, { throwIfNoEntry: false })) {
-    return localPath;
-  }
-
   // Try platform-specific package (npm registry install)
+  // Sibling resolution: node_modules/sqlite-muninn/dist/../.. = node_modules/
+  // Then into @neozenith/sqlite-muninn-<platform>-<arch>/muninn.<ext>
   const archName = arch === "arm64" ? "arm64" : "x64";
-  const pkgName = `@sqlite-muninn/${platform}-${archName}`;
-  try {
-    const pkgPath = join(REPO_ROOT, "node_modules", pkgName, `muninn.${ext}`);
-    if (statSync(pkgPath, { throwIfNoEntry: false })) {
-      return pkgPath;
-    }
-  } catch {
-    // Package not found
+  const pkgName = `@neozenith/sqlite-muninn-${platform}-${archName}`;
+  const pkgPath = join(ROOT, "..", pkgName, `muninn.${ext}`);
+  if (statSync(pkgPath, { throwIfNoEntry: false })) {
+    return pkgPath;
   }
 
   throw new Error(
