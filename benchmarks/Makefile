@@ -66,15 +66,18 @@ vss-embeddings-agnews-all-MiniLM-L6-v2: $(EXTENSION)
 	$(BENCH_VSS) --source model:all-MiniLM-L6-v2 --sizes 1000 --dataset ag_news $(BENCH_FLAGS)
 	$(BENCH_VSS) --source model:all-MiniLM-L6-v2 --sizes 5000 --dataset ag_news $(BENCH_FLAGS)
 	$(BENCH_VSS) --source model:all-MiniLM-L6-v2 --sizes 10000 --dataset ag_news $(BENCH_FLAGS)
+
+vss-embeddings-agnews-all-MiniLM-L6-v2-large: $(EXTENSION)
 	$(BENCH_VSS) --source model:all-MiniLM-L6-v2 --sizes 50000 --dataset ag_news $(BENCH_FLAGS)
 	$(BENCH_VSS) --source model:all-MiniLM-L6-v2 --sizes 100000 --dataset ag_news $(BENCH_FLAGS)
-	$(BENCH_VSS) --source model:all-MiniLM-L6-v2 --sizes 250000 --dataset ag_news $(BENCH_FLAGS)
 
 
 vss-embeddings-agnews-all-mpnet-base-v2: $(EXTENSION)
 	$(BENCH_VSS) --source model:all-mpnet-base-v2 --sizes 1000 --dataset ag_news $(BENCH_FLAGS)
 	$(BENCH_VSS) --source model:all-mpnet-base-v2 --sizes 5000 --dataset ag_news $(BENCH_FLAGS)
 	$(BENCH_VSS) --source model:all-mpnet-base-v2 --sizes 10000 --dataset ag_news $(BENCH_FLAGS)
+
+vss-embeddings-agnews-all-mpnet-base-v2-large: $(EXTENSION)
 	$(BENCH_VSS) --source model:all-mpnet-base-v2 --sizes 50000 --dataset ag_news $(BENCH_FLAGS)
 	$(BENCH_VSS) --source model:all-mpnet-base-v2 --sizes 100000 --dataset ag_news $(BENCH_FLAGS)
 
@@ -82,6 +85,8 @@ vss-embeddings-agnews-BAAI-bge-large-en-v1.5: $(EXTENSION)
 	$(BENCH_VSS) --source model:BAAI/bge-large-en-v1.5 --sizes 1000 --dataset ag_news $(BENCH_FLAGS)
 	$(BENCH_VSS) --source model:BAAI/bge-large-en-v1.5 --sizes 5000 --dataset ag_news $(BENCH_FLAGS)
 	$(BENCH_VSS) --source model:BAAI/bge-large-en-v1.5 --sizes 10000 --dataset ag_news $(BENCH_FLAGS)
+
+vss-embeddings-agnews-BAAI-bge-large-en-v1.5-large: $(EXTENSION)
 	$(BENCH_VSS) --source model:BAAI/bge-large-en-v1.5 --sizes 50000 --dataset ag_news $(BENCH_FLAGS)
 	$(BENCH_VSS) --source model:BAAI/bge-large-en-v1.5 --sizes 100000 --dataset ag_news $(BENCH_FLAGS)
 
@@ -95,6 +100,7 @@ vss-embeddings-wealth-of-nations-all-models: $(EXTENSION)											# 	# Wealth 
 
 vss-embeddings-all: vss-embeddings-agnews-all-MiniLM-L6-v2 vss-embeddings-agnews-all-mpnet-base-v2 vss-embeddings-agnews-BAAI-bge-large-en-v1.5 vss-embeddings-wealth-of-nations-all-models  ## Run all VSS embedding benchmarks
 
+vss-embeddings-large: vss-embeddings-agnews-all-MiniLM-L6-v2-large vss-embeddings-agnews-all-mpnet-base-v2-large vss-embeddings-agnews-BAAI-bge-large-en-v1.5-large  ## Run only large VSS embedding benchmarks (N>=50K)
 
 ######################################################################
 # GRAPH BENCHMARKS
