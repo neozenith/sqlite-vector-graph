@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [0.1.0-alpha.8] - 2026-02-17
+
+### Bug Fixes
+- Address more npm publishing bugs
+
+## [0.1.0-alpha.7] - 2026-02-17
+
+### Bug Fixes
+- Address build and publish sequence and tsup prePublishOnly hook not having devDependencies available
+
+## [0.1.0-alpha.6] - 2026-02-16
+
+### Bug Fixes
+- Iterating on github action publishing to npm with trusted publishing
+
 ## [0.1.0-alpha.5] - 2026-02-16
 
 ### Bug Fixes

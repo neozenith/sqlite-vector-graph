@@ -237,7 +237,7 @@ jobs:
       # Install devDependencies so tsup can build the main package's dist/
       - name: Install main package dependencies
         working-directory: npm
-        run: npm ci
+        run: npm install
 
       - name: Publish main package
         run: npm publish ./npm --provenance --access public --tag ${{ steps.npm-tag.outputs.tag }}

@@ -154,6 +154,8 @@ dist/muninn.c dist/muninn.h: $(SRC) $(HEADERS)
 
 version-stamp:                                 ## Stamp VERSION into skill files + package.json
 	.venv/bin/python scripts/version_stamp.py
+	npm --prefix ./npm install # update package-lock.json with new version
+	make changelog
 
 dist: dist-extension dist-python dist-npm amalgamation ## Build all distributable artifacts into dist/
 	@echo ""
