@@ -24,6 +24,7 @@ install-frontend:                                  ## Install frontend deps
 	npm --prefix frontend install
 
 dev: install                                       ## Start dev servers (human ports)
+	@echo "http://localhost:$(FRONTEND_PORT)/kg/query/"
 	npx --prefix frontend concurrently --kill-others \
 		--names "backend,frontend" --prefix-colors "blue,green" \
 		"uv run --directory . python -m server --port $(BACKEND_PORT)" \

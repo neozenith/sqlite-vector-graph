@@ -40,7 +40,7 @@ function toEmbeddingPoints(result: KGSearchResult): EmbeddingPoint[] {
     metadata: {
       similarity: vss.similarity,
       rank: i,
-      text: `${vss.text}\nSimilarity: ${(vss.similarity * 100).toFixed(1)}%`,
+      text: `Chunk #${vss.chunk_id} \u00b7 ${(vss.similarity * 100).toFixed(1)}%\n${vss.text}`,
     },
     color: rankColor(i, total),
   }))

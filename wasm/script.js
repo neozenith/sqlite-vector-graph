@@ -371,9 +371,15 @@ function initDeckGL() {
       controller: true,
       effects: [lightingEffect],
       layers: [],
-      getTooltip: ({ object }) =>
-        object && {
-          html: `<div style="max-width:250px">${object.text || ""}</div>`,
+      getTooltip: ({ object }) => {
+        if (!object) return null;
+        const pct = (object.similarity * 100).toFixed(1);
+        const text =
+          object.chunkText.length > 80
+            ? object.chunkText.substring(0, 80) + "..."
+            : object.chunkText;
+        return {
+          html: `<div style="max-width:300px"><div style="font-weight:600; margin-bottom:4px">Chunk #${object.chunkId} &middot; ${pct}%</div><div style="font-size:11px; line-height:1.4">${text || "No text"}</div></div>`,
           style: {
             backgroundColor: "rgba(0,0,0,0.85)",
             color: "white",
@@ -381,7 +387,8 @@ function initDeckGL() {
             borderRadius: "6px",
             fontSize: "12px",
           },
-        },
+        };
+      },
     });
 
     window.deckInstance = deckInstance;
@@ -870,7 +877,8 @@ async function performSearch(queryText) {
             ],
             color: rankColor(rank, total),
             radius: 3 + similarity * 8,
-            text: `${chunkMap[sr.rowid] || ""}\nSimilarity: ${(similarity * 100).toFixed(1)}%`,
+            chunkId: sr.rowid,
+            chunkText: chunkMap[sr.rowid] || "",
             similarity: similarity,
           };
         });

@@ -29,7 +29,7 @@ export function EmbeddingCanvas({
   className = 'h-full',
 }: EmbeddingCanvasProps) {
   const is3D = dimensions === 3
-  const pickable = !!onSelect
+  const pickable = true
 
   const data = useMemo(() => toScatterplotData(points, searchResults, selectedId), [points, searchResults, selectedId])
 
@@ -106,28 +106,32 @@ export function EmbeddingCanvas({
   }
 
   return (
-    <div className={`${className} relative bg-muted/30 rounded-lg overflow-hidden`}>
+    <div className={`${className} relative bg-muted/30 rounded-lg`}>
       <DeckGL
         views={view}
         initialViewState={initialViewState}
         layers={[layer]}
         controller={true}
-        getTooltip={({ object }: { object?: ScatterplotDatum }) =>
-          object && object.text
-            ? {
-                html: `<div style="max-width:250px">${object.text.replace(/\n/g, '<br/>')}</div>`,
-                style: {
-                  backgroundColor: 'rgba(0,0,0,0.85)',
-                  color: 'white',
-                  padding: '8px 12px',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                },
-              }
-            : object
-              ? `${object.label || `Point #${object.id}`}`
-              : null
-        }
+        getTooltip={({ object }: { object?: ScatterplotDatum }) => {
+          if (!object) return null
+          if (object.text) {
+            const nl = object.text.indexOf('\n')
+            const header = nl >= 0 ? object.text.substring(0, nl) : object.text
+            const body = nl >= 0 ? object.text.substring(nl + 1) : ''
+            const truncated = body.length > 80 ? body.substring(0, 80) + '...' : body
+            return {
+              html: `<div style="max-width:300px"><div style="font-weight:600; margin-bottom:4px">${header}</div>${truncated ? `<div style="font-size:11px; line-height:1.4">${truncated}</div>` : ''}</div>`,
+              style: {
+                backgroundColor: 'rgba(0,0,0,0.85)',
+                color: 'white',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                fontSize: '12px',
+              },
+            }
+          }
+          return `${object.label || `Point #${object.id}`}`
+        }}
       />
     </div>
   )
