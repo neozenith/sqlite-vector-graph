@@ -14,6 +14,7 @@ SQLITE_EXTENSION_INIT1
 #include "graph_tvf.h"
 #include "graph_centrality.h"
 #include "graph_community.h"
+#include "graph_adjacency.h"
 #include "node2vec.h"
 
 #ifdef _WIN32
@@ -44,6 +45,12 @@ int sqlite3_muninn_init(sqlite3 *db, char **pzErrMsg, const sqlite3_api_routines
     rc = community_register_tvfs(db);
     if (rc != SQLITE_OK) {
         *pzErrMsg = sqlite3_mprintf("muninn: failed to register community TVFs");
+        return rc;
+    }
+
+    rc = adjacency_register_module(db);
+    if (rc != SQLITE_OK) {
+        *pzErrMsg = sqlite3_mprintf("muninn: failed to register graph_adjacency module");
         return rc;
     }
 

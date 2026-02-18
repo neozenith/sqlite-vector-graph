@@ -14,6 +14,7 @@
 #include "graph_community.h"
 #include "graph_common.h"
 #include "graph_load.h"
+#include "graph_adjacency.h"
 #include "id_validate.h"
 
 #include <stdlib.h>
@@ -544,7 +545,12 @@ static int lei_filter(sqlite3_vtab_cursor *pCursor, int idxNum, const char *idxS
     GraphData g;
     graph_data_init(&g);
     char *errmsg = NULL;
-    int rc = graph_data_load(vtab->db, &config, &g, &errmsg);
+    int rc;
+    if (config.edge_table && is_graph_adjacency(vtab->db, config.edge_table)) {
+        rc = graph_data_load_from_adjacency(vtab->db, config.edge_table, &g, &errmsg);
+    } else {
+        rc = graph_data_load(vtab->db, &config, &g, &errmsg);
+    }
     if (rc != SQLITE_OK) {
         vtab->base.zErrMsg = errmsg ? errmsg : sqlite3_mprintf("graph_leiden: failed to load graph");
         graph_data_destroy(&g);

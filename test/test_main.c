@@ -49,6 +49,7 @@ extern void test_priority_queue(void);
 extern void test_hnsw_algo(void);
 extern void test_id_validate(void);
 extern void test_graph_load(void);
+extern void test_graph_csr(void);
 
 int main(void) {
     printf("=== sqlite-muninn test suite ===\n\n");
@@ -67,6 +68,9 @@ int main(void) {
 
     printf("\n[graph_load]\n");
     test_graph_load();
+
+    printf("\n[graph_csr]\n");
+    test_graph_csr();
 
     printf("\n=== Results: %d passed, %d failed ===\n", total_passed, total_failed);
 
