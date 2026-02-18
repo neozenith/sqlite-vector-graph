@@ -13,6 +13,11 @@ cl.exe /O2 /MT /W4 /LD /Isrc ^
     src\graph_load.c ^
     src\graph_centrality.c ^
     src\graph_community.c ^
+    src\graph_adjacency.c ^
+    src\graph_csr.c ^
+    src\graph_selector_parse.c ^
+    src\graph_selector_eval.c ^
+    src\graph_select_tvf.c ^
     src\node2vec.c ^
     src\vec_math.c ^
     src\priority_queue.c ^

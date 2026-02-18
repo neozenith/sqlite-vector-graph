@@ -147,7 +147,7 @@ static int parse_adjacency_params(int argc, const char *const *argv, AdjParams *
  * Shadow Table Management
  * ═══════════════════════════════════════════════════════════════ */
 
-static int create_shadow_tables(sqlite3 *db, const char *name) {
+static int adjacency_create_shadow_tables(sqlite3 *db, const char *name) {
     char *sql;
     int rc;
 
@@ -1082,7 +1082,7 @@ static int adj_init(sqlite3 *db, void *pAux, int argc, const char *const *argv, 
 
     if (is_create) {
         /* Create shadow tables */
-        rc = create_shadow_tables(db, argv[2]);
+        rc = adjacency_create_shadow_tables(db, argv[2]);
         if (rc != SQLITE_OK) {
             *pzErr = sqlite3_mprintf("graph_adjacency: failed to create shadow tables");
             sqlite3_free(vtab->vtab_name);
