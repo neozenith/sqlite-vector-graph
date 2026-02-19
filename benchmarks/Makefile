@@ -82,13 +82,13 @@ vss-embeddings-agnews-BAAI-bge-large-en-v1.5: $(EXTENSION)
 	$(BENCH_VSS) --source model:BAAI/bge-large-en-v1.5 --sizes 5000 --dataset ag_news $(BENCH_FLAGS)
 	$(BENCH_VSS) --source model:BAAI/bge-large-en-v1.5 --sizes 10000 --dataset ag_news $(BENCH_FLAGS)
 
-
+# ~ 30 minutes
 vss-embeddings-50k: 
 	$(BENCH_VSS) --source model:all-MiniLM-L6-v2 --sizes 50000 --dataset ag_news $(BENCH_FLAGS)
 	$(BENCH_VSS) --source model:all-mpnet-base-v2 --sizes 50000 --dataset ag_news $(BENCH_FLAGS)
 	$(BENCH_VSS) --source model:BAAI/bge-large-en-v1.5 --sizes 50000 --dataset ag_news $(BENCH_FLAGS)
 	
-
+# ~ 45-60 minutes
 vss-embeddings-100k: 
 	$(BENCH_VSS) --source model:all-MiniLM-L6-v2 --sizes 100000 --dataset ag_news $(BENCH_FLAGS)
 	$(BENCH_VSS) --source model:all-mpnet-base-v2 --sizes 100000 --dataset ag_news $(BENCH_FLAGS)
