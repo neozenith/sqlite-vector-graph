@@ -1,0 +1,132 @@
+{
+  "data": [
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "muninn / barabasi-albert-3",
+      "x": [
+        1000
+      ],
+      "y": [
+        53.662
+      ],
+      "marker": {
+        "color": "hsl(270, 85%, 58%)",
+        "size": 8
+      },
+      "line": {
+        "color": "hsl(270, 85%, 58%)",
+        "width": 3
+      },
+      "opacity": 1.0,
+      "legendgroup": "muninn",
+      "legendgrouptitle": {
+        "text": "muninn"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "muninn / barabasi-albert-5",
+      "x": [
+        5000
+      ],
+      "y": [
+        2487.857
+      ],
+      "marker": {
+        "color": "hsl(270, 80%, 51%)",
+        "size": 8
+      },
+      "line": {
+        "color": "hsl(270, 80%, 51%)",
+        "width": 3
+      },
+      "opacity": 1.0,
+      "legendgroup": "muninn",
+      "legendgrouptitle": {
+        "text": "muninn"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "muninn / erdos-renyi-20",
+      "x": [
+        1000
+      ],
+      "y": [
+        130.058
+      ],
+      "marker": {
+        "color": "hsl(270, 75%, 43%)",
+        "size": 8
+      },
+      "line": {
+        "color": "hsl(270, 75%, 43%)",
+        "width": 3
+      },
+      "opacity": 1.0,
+      "legendgroup": "muninn",
+      "legendgrouptitle": {
+        "text": "muninn"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "muninn / erdos-renyi-5",
+      "x": [
+        100,
+        500,
+        1000,
+        5000
+      ],
+      "y": [
+        0.919,
+        13.493,
+        54.7,
+        1781.276
+      ],
+      "marker": {
+        "color": "hsl(270, 70%, 35%)",
+        "size": 8
+      },
+      "line": {
+        "color": "hsl(270, 70%, 35%)",
+        "width": 3
+      },
+      "opacity": 1.0,
+      "legendgroup": "muninn",
+      "legendgrouptitle": {
+        "text": "muninn"
+      }
+    }
+  ],
+  "layout": {
+    "title": {
+      "text": "Betweenness Centrality"
+    },
+    "xaxis": {
+      "title": {
+        "text": "Number of Nodes"
+      },
+      "type": "log"
+    },
+    "yaxis": {
+      "title": {
+        "text": "Betweenness Centrality Time (ms)"
+      },
+      "type": "log"
+    },
+    "template": "plotly_white",
+    "legend": {
+      "orientation": "v",
+      "yanchor": "top",
+      "y": 0.99,
+      "xanchor": "left",
+      "x": 1.02,
+      "groupclick": "togglegroup"
+    }
+  }
+}

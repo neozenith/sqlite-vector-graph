@@ -1,0 +1,120 @@
+{
+  "data": [
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "CSR blocked-incremental",
+      "x": [
+        500,
+        1000,
+        5000,
+        10000
+      ],
+      "y": [
+        1.356,
+        1.461,
+        7.142,
+        13.759
+      ],
+      "marker": {
+        "color": "hsl(270, 75%, 45%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(270, 75%, 45%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "csr_blocked",
+      "legendgrouptitle": {
+        "text": "CSR blocked-incremental"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "CSR full-rebuild",
+      "x": [
+        500,
+        1000,
+        5000,
+        10000
+      ],
+      "y": [
+        1.827,
+        3.355,
+        28.071,
+        58.081
+      ],
+      "marker": {
+        "color": "hsl(30, 75%, 45%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(30, 75%, 45%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "csr_full_rebuild",
+      "legendgrouptitle": {
+        "text": "CSR full-rebuild"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "CSR incremental",
+      "x": [
+        500,
+        1000,
+        5000,
+        10000
+      ],
+      "y": [
+        1.596,
+        1.373,
+        7.821,
+        18.292
+      ],
+      "marker": {
+        "color": "hsl(160, 75%, 45%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(160, 75%, 45%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "csr_incremental",
+      "legendgrouptitle": {
+        "text": "CSR incremental"
+      }
+    }
+  ],
+  "layout": {
+    "title": {
+      "text": "Rebuild Time"
+    },
+    "xaxis": {
+      "title": {
+        "text": "Graph Size (nodes)"
+      },
+      "type": "log"
+    },
+    "yaxis": {
+      "title": {
+        "text": "Rebuild Time (ms)"
+      },
+      "type": "log"
+    },
+    "template": "plotly_white",
+    "legend": {
+      "orientation": "v",
+      "yanchor": "top",
+      "y": 0.99,
+      "xanchor": "left",
+      "x": 1.02,
+      "groupclick": "togglegroup"
+    }
+  }
+}

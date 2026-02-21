@@ -50,7 +50,7 @@ def bio_to_spans(tokens: list[str], tags: list[str]) -> list[dict]:
         token_starts.append(char_offset)
         char_offset += len(token) + 1  # +1 for space
 
-    for i, (token, tag) in enumerate(zip(tokens, tags)):
+    for i, (_token, tag) in enumerate(zip(tokens, tags, strict=True)):
         if tag.startswith("B-"):
             # Close previous span if open
             if current_start is not None:
@@ -134,7 +134,7 @@ def io_to_spans(tokens: list[str], tags: list[str]) -> list[dict]:
         token_starts.append(char_offset)
         char_offset += len(token) + 1
 
-    for i, (token, tag) in enumerate(zip(tokens, tags)):
+    for i, (_token, tag) in enumerate(zip(tokens, tags, strict=True)):
         if tag == "O":
             if current_start is not None:
                 surface = " ".join(tokens[current_start:i])

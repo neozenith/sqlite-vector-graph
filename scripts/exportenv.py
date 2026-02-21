@@ -12,6 +12,7 @@ Use in combination with `eval` to load environment variables into the current sh
 Or to unset all variables defined in the .env file:
     eval "$(uv run scripts/exportenv.py --unset)"
 """
+
 import argparse
 import logging
 import shlex
@@ -68,7 +69,10 @@ def read_env_file(file_path: str | Path) -> dict[str, str] | None:
     }
 
 
-def main(unset: bool = False, env_dir: Path = Path.cwd()) -> int:
+_DEFAULT_DIR = Path.cwd()
+
+
+def main(unset: bool = False, env_dir: Path = _DEFAULT_DIR) -> int:
     """Export or unset environment variables from a .env file.
 
     Args:
@@ -140,24 +144,28 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "-d", "--dir",
+        "-d",
+        "--dir",
         type=Path,
         default=Path.cwd(),
         metavar="DIR",
         help="Directory containing the .env file (default: current working directory)",
     )
     parser.add_argument(
-        "-u", "--unset",
+        "-u",
+        "--unset",
         action="store_true",
         help="Print unset statements instead of export statements",
     )
     parser.add_argument(
-        "-v", "--verbose",
+        "-v",
+        "--verbose",
         action="store_true",
         help="Enable verbose/debug output",
     )
     parser.add_argument(
-        "-q", "--quiet",
+        "-q",
+        "--quiet",
         action="store_true",
         help="Suppress all output except errors",
     )

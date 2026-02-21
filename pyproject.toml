@@ -5,11 +5,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "sqlite-muninn"
 dynamic = ["version"]
-description = "HNSW vector search + graph traversal + Node2Vec for SQLite"
+description = "HNSW vector search + graph traversal + GGUF embeddings + Node2Vec for SQLite"
 requires-python = ">=3.12,<3.14"
 license = "MIT"
 readme = "README.md"
-keywords = ["sqlite", "vector", "hnsw", "graph", "node2vec", "search"]
+keywords = ["sqlite", "vector", "hnsw", "graph", "node2vec", "search", "gguf", "embeddings", "llama.cpp"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -79,11 +79,13 @@ testpaths = ["pytests"]
 addopts = "--cov=sqlite_muninn --cov=pytests --cov-report=term-missing --cov-fail-under=90 -m 'not integration'"
 markers = [
     "integration: slow install tests that create throwaway projects (deselected by default)",
+    "gguf: tests requiring GGUF model files (auto-downloaded on first run)",
 ]
 
 [tool.ruff]
 line-length = 120
 target-version = "py312"
+exclude = ["vendor/"]
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "B", "C4", "UP"]

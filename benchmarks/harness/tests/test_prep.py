@@ -6,11 +6,17 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 
-from benchmarks.harness.prep.kg_chunks import KGChunksPrepTask, _chunk_text, chunks_prep_tasks, create_chunks_db, prep_kg_chunks
+from benchmarks.harness.prep.kg_chunks import (
+    KGChunksPrepTask,
+    _chunk_text,
+    chunks_prep_tasks,
+    create_chunks_db,
+    prep_kg_chunks,
+)
 from benchmarks.harness.prep.kg_chunks import print_status as kg_status
 from benchmarks.harness.prep.texts import (
-    GutenbergTextPrepTask,
     TEXT_PREP_TASKS,
+    GutenbergTextPrepTask,
     format_book_info,
     get_cached_book_ids,
     list_cached_texts,

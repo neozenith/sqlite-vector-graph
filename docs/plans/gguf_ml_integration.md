@@ -148,6 +148,8 @@ END;
 
 ## 3. Phase 1 — Vendor llama.cpp for GGUF Inference
 
+**Status:** ✅ Complete (2026-02-21). llama.cpp vendored as submodule (b8119), `embed_gguf.c` wrapper implemented, `muninn_models` VT + `muninn_embed`/`muninn_tokenize`/`muninn_model_dim` SQL functions registered.
+
 **Effort:** Medium. New C wrapper code + build system changes.
 
 ### Architecture

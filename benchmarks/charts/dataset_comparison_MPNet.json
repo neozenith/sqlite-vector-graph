@@ -1,0 +1,290 @@
+{
+  "data": [
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "muninn-hnsw / ag-news",
+      "x": [
+        100,
+        500
+      ],
+      "y": [
+        0.059,
+        0.156
+      ],
+      "marker": {
+        "color": "hsl(270, 85%, 58%)",
+        "size": 8
+      },
+      "line": {
+        "color": "hsl(270, 85%, 58%)",
+        "width": 3
+      },
+      "opacity": 1.0,
+      "legendgroup": "muninn_hnsw",
+      "legendgrouptitle": {
+        "text": "muninn-hnsw"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "muninn-hnsw / wealth-of-nations",
+      "x": [
+        100,
+        500
+      ],
+      "y": [
+        0.058,
+        0.109
+      ],
+      "marker": {
+        "color": "hsl(270, 70%, 35%)",
+        "size": 8
+      },
+      "line": {
+        "color": "hsl(270, 70%, 35%)",
+        "width": 3
+      },
+      "opacity": 1.0,
+      "legendgroup": "muninn_hnsw",
+      "legendgrouptitle": {
+        "text": "muninn-hnsw"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "sqlite-vec-brute / ag-news",
+      "x": [
+        100,
+        500
+      ],
+      "y": [
+        0.449,
+        0.417
+      ],
+      "marker": {
+        "color": "hsl(130, 85%, 58%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(130, 85%, 58%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "sqlite_vec_brute_force",
+      "legendgrouptitle": {
+        "text": "sqlite-vec-brute"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "sqlite-vec-brute / wealth-of-nations",
+      "x": [
+        100,
+        500
+      ],
+      "y": [
+        0.401,
+        0.46
+      ],
+      "marker": {
+        "color": "hsl(130, 70%, 35%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(130, 70%, 35%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "sqlite_vec_brute_force",
+      "legendgrouptitle": {
+        "text": "sqlite-vec-brute"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "sqlite-vector-fullscan / ag-news",
+      "x": [
+        100,
+        500
+      ],
+      "y": [
+        0.057,
+        0.249
+      ],
+      "marker": {
+        "color": "hsl(18, 85%, 58%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(18, 85%, 58%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "sqlite_vector_full_scan",
+      "legendgrouptitle": {
+        "text": "sqlite-vector-fullscan"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "sqlite-vector-fullscan / wealth-of-nations",
+      "x": [
+        100,
+        500
+      ],
+      "y": [
+        0.058,
+        0.248
+      ],
+      "marker": {
+        "color": "hsl(18, 70%, 35%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(18, 70%, 35%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "sqlite_vector_full_scan",
+      "legendgrouptitle": {
+        "text": "sqlite-vector-fullscan"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "sqlite-vector-quantize / ag-news",
+      "x": [
+        100,
+        500
+      ],
+      "y": [
+        0.035,
+        0.077
+      ],
+      "marker": {
+        "color": "hsl(175, 85%, 58%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(175, 85%, 58%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "sqlite_vector_quantize_scan",
+      "legendgrouptitle": {
+        "text": "sqlite-vector-quantize"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "sqlite-vector-quantize / wealth-of-nations",
+      "x": [
+        100,
+        500
+      ],
+      "y": [
+        0.037,
+        0.075
+      ],
+      "marker": {
+        "color": "hsl(175, 70%, 35%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(175, 70%, 35%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "sqlite_vector_quantize_scan",
+      "legendgrouptitle": {
+        "text": "sqlite-vector-quantize"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "vectorlite-hnsw / ag-news",
+      "x": [
+        100,
+        500
+      ],
+      "y": [
+        0.028,
+        0.052
+      ],
+      "marker": {
+        "color": "hsl(210, 85%, 58%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(210, 85%, 58%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "vectorlite_hnsw",
+      "legendgrouptitle": {
+        "text": "vectorlite-hnsw"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "vectorlite-hnsw / wealth-of-nations",
+      "x": [
+        100,
+        500
+      ],
+      "y": [
+        0.026,
+        0.043
+      ],
+      "marker": {
+        "color": "hsl(210, 70%, 35%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(210, 70%, 35%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "vectorlite_hnsw",
+      "legendgrouptitle": {
+        "text": "vectorlite-hnsw"
+      }
+    }
+  ],
+  "layout": {
+    "title": {
+      "text": "Dataset Comparison (MPNet)"
+    },
+    "xaxis": {
+      "title": {
+        "text": "Dataset Size (N vectors)"
+      },
+      "type": "log"
+    },
+    "yaxis": {
+      "title": {
+        "text": "Search Latency (ms)"
+      },
+      "type": "log"
+    },
+    "template": "plotly_white",
+    "legend": {
+      "orientation": "v",
+      "yanchor": "top",
+      "y": 0.99,
+      "xanchor": "left",
+      "x": 1.02,
+      "groupclick": "togglegroup"
+    }
+  }
+}

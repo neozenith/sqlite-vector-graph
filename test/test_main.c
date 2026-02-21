@@ -9,11 +9,21 @@
 #include <sqlite3.h>
 
 /*
- * graph_load.c uses SQLITE_EXTENSION_INIT3 which declares sqlite3_api as extern.
- * The test runner links libsqlite3 directly and never calls graph_data_load(),
- * so a NULL pointer is safe here — it just satisfies the linker.
+ * Extension source files use SQLITE_EXTENSION_INIT3 which declares
+ *   extern const sqlite3_api_routines *sqlite3_api;
+ * Normally this pointer is set by sqlite3_load_extension(). For the test
+ * runner (which links libsqlite3 directly), we capture it via
+ * sqlite3_auto_extension() at startup so that embed_register_functions()
+ * and other extension code can call sqlite3_create_function() etc.
  */
 const sqlite3_api_routines *sqlite3_api = NULL;
+
+static int capture_sqlite3_api(sqlite3 *db, char **pzErrMsg, const sqlite3_api_routines *pApi) {
+    (void)db;
+    (void)pzErrMsg;
+    sqlite3_api = pApi;
+    return SQLITE_OK;
+}
 
 /* Test result tracking */
 static int total_passed = 0;
@@ -51,8 +61,18 @@ extern void test_id_validate(void);
 extern void test_graph_load(void);
 extern void test_graph_csr(void);
 extern void test_graph_selector(void);
+extern void test_embed_gguf(void);
 
 int main(void) {
+    /* Capture the real sqlite3_api pointer so extension code works */
+    sqlite3_auto_extension((void (*)(void))capture_sqlite3_api);
+    {
+        sqlite3 *tmp;
+        sqlite3_open(":memory:", &tmp);
+        sqlite3_close(tmp);
+    }
+    sqlite3_reset_auto_extension();
+
     printf("=== sqlite-muninn test suite ===\n\n");
 
     printf("[vec_math]\n");
@@ -75,6 +95,9 @@ int main(void) {
 
     printf("\n[graph_selector]\n");
     test_graph_selector();
+
+    printf("\n[embed_gguf]\n");
+    test_embed_gguf();
 
     printf("\n=== Results: %d passed, %d failed ===\n", total_passed, total_failed);
 

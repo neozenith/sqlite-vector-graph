@@ -651,9 +651,7 @@ def _save_step(
 ) -> None:
     """Save mask, applied, and cumulative images for one pipeline step."""
     mask_file = f"{num:02d}_mask_{slug}.png"
-    Image.fromarray(
-        (np.clip(mask_f32, 0, 1) * 255).astype(np.uint8), mode="L"
-    ).save(output_dir / mask_file)
+    Image.fromarray((np.clip(mask_f32, 0, 1) * 255).astype(np.uint8), mode="L").save(output_dir / mask_file)
 
     result_file = f"{num:02d}_result_{slug}.png"
     _apply_mask_transparent(original, mask_f32).save(output_dir / result_file)
@@ -661,14 +659,16 @@ def _save_step(
     cumulative_file = f"{num:02d}_cumulative_{slug}.png"
     _apply_mask_transparent(original, cumulative_f32).save(output_dir / cumulative_file)
 
-    steps.append({
-        "num": num,
-        "slug": slug,
-        "description": description,
-        "mask_file": mask_file,
-        "result_file": result_file,
-        "cumulative_file": cumulative_file,
-    })
+    steps.append(
+        {
+            "num": num,
+            "slug": slug,
+            "description": description,
+            "mask_file": mask_file,
+            "result_file": result_file,
+            "cumulative_file": cumulative_file,
+        }
+    )
     log.info("Step %02d (%s): saved", num, slug)
 
 
@@ -705,11 +705,16 @@ def generate_pipeline_steps(
     # Step 00: Original input
     orig_file = "00_original.png"
     img.save(output_dir / orig_file)
-    steps.append({
-        "num": 0, "slug": "original",
-        "description": "Original input image",
-        "mask_file": None, "result_file": orig_file, "cumulative_file": None,
-    })
+    steps.append(
+        {
+            "num": 0,
+            "slug": "original",
+            "description": "Original input image",
+            "mask_file": None,
+            "result_file": orig_file,
+            "cumulative_file": None,
+        }
+    )
     log.info("Step 00: saved original")
 
     # Step 01: U2-Net semantic segmentation
@@ -717,9 +722,16 @@ def generate_pipeline_steps(
     fg_result = rembg_remove(img)
     u2net_alpha = np.array(fg_result.convert("RGBA"))[:, :, 3].astype(np.float32) / 255.0
     cumulative = np.maximum(cumulative, u2net_alpha)
-    _save_step(output_dir, 1, "u2net",
-               "U2-Net semantic segmentation — AI model identifies foreground subject",
-               u2net_alpha, arr, cumulative, steps)
+    _save_step(
+        output_dir,
+        1,
+        "u2net",
+        "U2-Net semantic segmentation — AI model identifies foreground subject",
+        u2net_alpha,
+        arr,
+        cumulative,
+        steps,
+    )
 
     # Step 02: Color distance from white
     rgb = arr[:, :, :3].astype(np.float32)
@@ -728,25 +740,39 @@ def generate_pipeline_steps(
     transition = max(float(edge_softness * 5), 1.0)
     color_signal = np.clip((max_dist - tol) / transition, 0.0, 1.0)
     cumulative = np.maximum(cumulative, color_signal)
-    _save_step(output_dir, 2, "color_distance",
-               "Color distance from white — pixels far from pure white are kept",
-               color_signal, arr, cumulative, steps)
+    _save_step(
+        output_dir,
+        2,
+        "color_distance",
+        "Color distance from white — pixels far from pure white are kept",
+        color_signal,
+        arr,
+        cumulative,
+        steps,
+    )
 
     # Step 03: Scharr edge detection
     gray = np.mean(arr[:, :, :3], axis=2).astype(np.float32)
     scharr_x = np.array([[-3, 0, 3], [-10, 0, 10], [-3, 0, 3]], dtype=np.float32)
     scharr_y = np.array([[-3, -10, -3], [0, 0, 0], [3, 10, 3]], dtype=np.float32)
     padded = np.pad(gray, 1, mode="edge")
-    dx = sum(scharr_x[i, j] * padded[i:i + h, j:j + w] for i in range(3) for j in range(3))
-    dy = sum(scharr_y[i, j] * padded[i:i + h, j:j + w] for i in range(3) for j in range(3))
+    dx = sum(scharr_x[i, j] * padded[i : i + h, j : j + w] for i in range(3) for j in range(3))
+    dy = sum(scharr_y[i, j] * padded[i : i + h, j : j + w] for i in range(3) for j in range(3))
     edge_mag = np.sqrt(dx**2 + dy**2)
     edge_max = edge_mag.max() if edge_mag.max() > 0 else 1.0
     edge_norm = edge_mag / edge_max
     edge_viz = np.clip(edge_norm * 4.0, 0, 1)
     cumulative = np.maximum(cumulative, edge_viz)
-    _save_step(output_dir, 3, "edge_scharr",
-               "Scharr edge detection — gradient magnitude reveals structural edges (4x amplified)",
-               edge_viz, arr, cumulative, steps)
+    _save_step(
+        output_dir,
+        3,
+        "edge_scharr",
+        "Scharr edge detection — gradient magnitude reveals structural edges (4x amplified)",
+        edge_viz,
+        arr,
+        cumulative,
+        steps,
+    )
 
     # Step 04: Edge dilation
     edge_threshold = 0.02
@@ -755,9 +781,16 @@ def generate_pipeline_steps(
     edge_dilated_img = edge_dilated_img.filter(ImageFilter.MaxFilter(size=5))
     edge_mask = np.array(edge_dilated_img).astype(np.float32) / 255.0
     cumulative = np.maximum(cumulative, edge_mask)
-    _save_step(output_dir, 4, "edge_dilated",
-               "Edge dilation — binary threshold + 5px MaxFilter creates spatial envelope",
-               edge_mask, arr, cumulative, steps)
+    _save_step(
+        output_dir,
+        4,
+        "edge_dilated",
+        "Edge dilation — binary threshold + 5px MaxFilter creates spatial envelope",
+        edge_mask,
+        arr,
+        cumulative,
+        steps,
+    )
 
     # Step 05: Edge refinement (grey + warmth + darkness)
     grey_ref = float(grey_reference)
@@ -768,15 +801,29 @@ def generate_pipeline_steps(
     element_alpha = np.maximum(np.maximum(grey_alpha, warmth), darkness)
     edge_signal = edge_mask * element_alpha
     cumulative = np.maximum(cumulative, edge_signal)
-    _save_step(output_dir, 5, "edge_refined",
-               "Edge refinement — edge envelope weighted by max(grey, warmth, darkness) alpha",
-               edge_signal, arr, cumulative, steps)
+    _save_step(
+        output_dir,
+        5,
+        "edge_refined",
+        "Edge refinement — edge envelope weighted by max(grey, warmth, darkness) alpha",
+        edge_signal,
+        arr,
+        cumulative,
+        steps,
+    )
 
     # Step 06: Combined mask
     combined = np.maximum(np.maximum(u2net_alpha, color_signal), edge_signal)
-    _save_step(output_dir, 6, "combined",
-               "Combined mask — pixel-wise max of semantic, color, and edge signals",
-               combined, arr, combined, steps)
+    _save_step(
+        output_dir,
+        6,
+        "combined",
+        "Combined mask — pixel-wise max of semantic, color, and edge signals",
+        combined,
+        arr,
+        combined,
+        steps,
+    )
 
     # Step 07: Sigmoid sharpening
     if sharpen > 0:
@@ -791,9 +838,16 @@ def generate_pipeline_steps(
         sharpened = np.array(sharp_img).astype(np.float32) / 255.0
     else:
         sharpened = combined
-    _save_step(output_dir, 7, "sharpened",
-               f"Sigmoid contrast sharpening (k={sharpen}) — pushes soft alpha toward 0 or 1",
-               sharpened, arr, sharpened, steps)
+    _save_step(
+        output_dir,
+        7,
+        "sharpened",
+        f"Sigmoid contrast sharpening (k={sharpen}) — pushes soft alpha toward 0 or 1",
+        sharpened,
+        arr,
+        sharpened,
+        steps,
+    )
 
     # Step 08: Final auto-cropped result
     final = arr.copy()
@@ -801,11 +855,16 @@ def generate_pipeline_steps(
     final = _auto_crop(final)
     final_file = "08_result_final.png"
     Image.fromarray(final).save(output_dir / final_file)
-    steps.append({
-        "num": 8, "slug": "final",
-        "description": "Final result — mask applied and auto-cropped to bounding box",
-        "mask_file": None, "result_file": final_file, "cumulative_file": None,
-    })
+    steps.append(
+        {
+            "num": 8,
+            "slug": "final",
+            "description": "Final result — mask applied and auto-cropped to bounding box",
+            "mask_file": None,
+            "result_file": final_file,
+            "cumulative_file": None,
+        }
+    )
     log.info("Step 08: saved final (%dx%d)", final.shape[1], final.shape[0])
 
     # Generate README.md
@@ -857,7 +916,7 @@ def _write_steps_readme(output_dir: Path, steps: list[dict], input_name: str) ->
         marker = "*Generated by `uv run scripts/process_logo.py steps`*"
         marker_pos = existing.find(marker)
         if marker_pos >= 0:
-            after_marker = existing[marker_pos + len(marker):]
+            after_marker = existing[marker_pos + len(marker) :]
             # Strip leading whitespace but keep the rest
             tail = after_marker.lstrip("\n")
             if tail:

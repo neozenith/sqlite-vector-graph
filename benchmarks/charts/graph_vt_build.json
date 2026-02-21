@@ -1,0 +1,60 @@
+{
+  "data": [
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "CSR",
+      "x": [
+        500,
+        1000,
+        5000,
+        10000
+      ],
+      "y": [
+        2.968,
+        4.322,
+        28.909,
+        55.057
+      ],
+      "marker": {
+        "color": "hsl(30, 75%, 45%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(30, 75%, 45%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "csr",
+      "legendgrouptitle": {
+        "text": "CSR"
+      }
+    }
+  ],
+  "layout": {
+    "title": {
+      "text": "Initial CSR Build Time"
+    },
+    "xaxis": {
+      "title": {
+        "text": "Graph Size (nodes)"
+      },
+      "type": "log"
+    },
+    "yaxis": {
+      "title": {
+        "text": "Build Time (ms)"
+      },
+      "type": "log"
+    },
+    "template": "plotly_white",
+    "legend": {
+      "orientation": "v",
+      "yanchor": "top",
+      "y": 0.99,
+      "xanchor": "left",
+      "x": 1.02,
+      "groupclick": "togglegroup"
+    }
+  }
+}

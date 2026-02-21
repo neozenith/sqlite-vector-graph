@@ -156,7 +156,7 @@ def _build_graph_page() -> dict[str, Any]:
         "sections": [
             {
                 "title": "Traversal",
-                "description": "BFS, DFS, shortest path, connected components, and PageRank. Compared across both engines.",
+                "description": "BFS, DFS, shortest path, components, and PageRank. Both engines.",
             },
             {
                 "title": "Centrality",

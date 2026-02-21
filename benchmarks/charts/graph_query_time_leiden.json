@@ -1,0 +1,132 @@
+{
+  "data": [
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "Barabasi-Albert / 3",
+      "x": [
+        1000
+      ],
+      "y": [
+        350.005
+      ],
+      "marker": {
+        "color": "hsl(200, 85%, 58%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(200, 85%, 58%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "barabasi_albert",
+      "legendgrouptitle": {
+        "text": "Barabasi-Albert"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "Barabasi-Albert / 5",
+      "x": [
+        5000
+      ],
+      "y": [
+        9951.68
+      ],
+      "marker": {
+        "color": "hsl(200, 70%, 35%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(200, 70%, 35%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "barabasi_albert",
+      "legendgrouptitle": {
+        "text": "Barabasi-Albert"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "Erdos-Renyi / 20",
+      "x": [
+        1000
+      ],
+      "y": [
+        1425.389
+      ],
+      "marker": {
+        "color": "hsl(30, 85%, 58%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(30, 85%, 58%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "erdos_renyi",
+      "legendgrouptitle": {
+        "text": "Erdos-Renyi"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "Erdos-Renyi / 5",
+      "x": [
+        100,
+        500,
+        1000,
+        5000
+      ],
+      "y": [
+        0.323,
+        1.814,
+        40.173,
+        299.056
+      ],
+      "marker": {
+        "color": "hsl(30, 70%, 35%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(30, 70%, 35%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "erdos_renyi",
+      "legendgrouptitle": {
+        "text": "Erdos-Renyi"
+      }
+    }
+  ],
+  "layout": {
+    "title": {
+      "text": "Leiden Community Detection"
+    },
+    "xaxis": {
+      "title": {
+        "text": "Number of Nodes"
+      },
+      "type": "log"
+    },
+    "yaxis": {
+      "title": {
+        "text": "Leiden Query Time (ms)"
+      },
+      "type": "log"
+    },
+    "template": "plotly_white",
+    "legend": {
+      "orientation": "v",
+      "yanchor": "top",
+      "y": 0.99,
+      "xanchor": "left",
+      "x": 1.02,
+      "groupclick": "togglegroup"
+    }
+  }
+}

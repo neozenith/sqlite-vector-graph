@@ -9,6 +9,8 @@
  * - graph_adjacency virtual table (persistent CSR adjacency cache)
  * - graph_select TVF (dbt-style node selection)
  * - node2vec_train() scalar function
+ * - muninn_embed, muninn_tokenize, muninn_model_dim, muninn_embed_model (GGUF via llama.cpp)
+ * - muninn_models eponymous virtual table (model lifecycle management)
  */
 #include "sqlite3ext.h"
 SQLITE_EXTENSION_INIT1
@@ -21,6 +23,7 @@ SQLITE_EXTENSION_INIT1
 #include "graph_adjacency.h"
 #include "graph_select_tvf.h"
 #include "node2vec.h"
+#include "embed_gguf.h"
 
 #ifdef _WIN32
 __declspec(dllexport)
@@ -68,6 +71,12 @@ int sqlite3_muninn_init(sqlite3 *db, char **pzErrMsg, const sqlite3_api_routines
     rc = node2vec_register_functions(db);
     if (rc != SQLITE_OK) {
         *pzErrMsg = sqlite3_mprintf("muninn: failed to register node2vec functions");
+        return rc;
+    }
+
+    rc = embed_register_functions(db);
+    if (rc != SQLITE_OK) {
+        *pzErrMsg = sqlite3_mprintf("muninn: failed to register embed functions");
         return rc;
     }
 

@@ -39,9 +39,7 @@ EXTENSION_PATH = str(PROJECT_ROOT / "muninn")
 # GGUF model config — set GGUF_MODEL_PATH to use a custom model file
 DEFAULT_MODEL_DIR = PROJECT_ROOT / "models"
 DEFAULT_MODEL_NAME = "all-MiniLM-L6-v2.Q8_0.gguf"
-DEFAULT_MODEL_URL = (
-    "https://huggingface.co/leliuga/all-MiniLM-L6-v2-GGUF/resolve/main/all-MiniLM-L6-v2.Q8_0.gguf"
-)
+DEFAULT_MODEL_URL = "https://huggingface.co/leliuga/all-MiniLM-L6-v2-GGUF/resolve/main/all-MiniLM-L6-v2.Q8_0.gguf"
 
 _env_model_path = os.environ.get("GGUF_MODEL_PATH", "")
 GGUF_MODEL_PATH = Path(_env_model_path) if _env_model_path else DEFAULT_MODEL_DIR / DEFAULT_MODEL_NAME
@@ -132,7 +130,7 @@ def _download_with_progress(url: str, dest: Path) -> None:
 
 def print_search_results(db: sqlite3.Connection, index_table: str, query_blob: bytes, query_text: str) -> None:
     """Run KNN search and print results joined with document text."""
-    print(f"\n  Query: \"{query_text}\"")
+    print(f'\n  Query: "{query_text}"')
     results = db.execute(
         f"""
         SELECT v.rowid, v.distance, d.content
@@ -223,7 +221,7 @@ def run_lembed_example(db: sqlite3.Connection) -> None:
     ).fetchall()
 
     result_ids = {r[0] for r in results}
-    print(f"\n  Search for \"phenomena in space\" top-3 IDs: {sorted(result_ids)}")
+    print(f'\n  Search for "phenomena in space" top-3 IDs: {sorted(result_ids)}')
     assert 100 in result_ids, "Trigger-inserted document should appear in space-related search"
     print("  Trigger-inserted document found in results.")
 

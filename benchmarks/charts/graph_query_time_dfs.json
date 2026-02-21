@@ -1,0 +1,250 @@
+{
+  "data": [
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "graphqlite / barabasi-albert-3",
+      "x": [
+        1000
+      ],
+      "y": [
+        1.148
+      ],
+      "marker": {
+        "color": "hsl(130, 85%, 58%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(130, 85%, 58%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "graphqlite",
+      "legendgrouptitle": {
+        "text": "graphqlite"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "graphqlite / barabasi-albert-5",
+      "x": [
+        5000,
+        10000
+      ],
+      "y": [
+        7.33,
+        14.733
+      ],
+      "marker": {
+        "color": "hsl(130, 80%, 51%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(130, 80%, 51%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "graphqlite",
+      "legendgrouptitle": {
+        "text": "graphqlite"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "graphqlite / erdos-renyi-20",
+      "x": [
+        1000,
+        5000,
+        10000
+      ],
+      "y": [
+        2.839,
+        13.481,
+        28.914
+      ],
+      "marker": {
+        "color": "hsl(130, 75%, 43%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(130, 75%, 43%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "graphqlite",
+      "legendgrouptitle": {
+        "text": "graphqlite"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "graphqlite / erdos-renyi-5",
+      "x": [
+        100,
+        500,
+        1000,
+        5000,
+        10000
+      ],
+      "y": [
+        0.329,
+        0.623,
+        0.986,
+        4.313,
+        8.75
+      ],
+      "marker": {
+        "color": "hsl(130, 70%, 35%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(130, 70%, 35%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "graphqlite",
+      "legendgrouptitle": {
+        "text": "graphqlite"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "muninn / barabasi-albert-3",
+      "x": [
+        1000
+      ],
+      "y": [
+        4.827
+      ],
+      "marker": {
+        "color": "hsl(270, 85%, 58%)",
+        "size": 8
+      },
+      "line": {
+        "color": "hsl(270, 85%, 58%)",
+        "width": 3
+      },
+      "opacity": 1.0,
+      "legendgroup": "muninn",
+      "legendgrouptitle": {
+        "text": "muninn"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "muninn / barabasi-albert-5",
+      "x": [
+        5000,
+        10000
+      ],
+      "y": [
+        22.198,
+        38.288
+      ],
+      "marker": {
+        "color": "hsl(270, 80%, 51%)",
+        "size": 8
+      },
+      "line": {
+        "color": "hsl(270, 80%, 51%)",
+        "width": 3
+      },
+      "opacity": 1.0,
+      "legendgroup": "muninn",
+      "legendgrouptitle": {
+        "text": "muninn"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "muninn / erdos-renyi-20",
+      "x": [
+        1000,
+        5000,
+        10000
+      ],
+      "y": [
+        13.035,
+        31.453,
+        59.451
+      ],
+      "marker": {
+        "color": "hsl(270, 75%, 43%)",
+        "size": 8
+      },
+      "line": {
+        "color": "hsl(270, 75%, 43%)",
+        "width": 3
+      },
+      "opacity": 1.0,
+      "legendgroup": "muninn",
+      "legendgrouptitle": {
+        "text": "muninn"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "muninn / erdos-renyi-5",
+      "x": [
+        100,
+        500,
+        1000,
+        5000,
+        10000
+      ],
+      "y": [
+        0.381,
+        2.088,
+        4.245,
+        15.184,
+        26.813
+      ],
+      "marker": {
+        "color": "hsl(270, 70%, 35%)",
+        "size": 8
+      },
+      "line": {
+        "color": "hsl(270, 70%, 35%)",
+        "width": 3
+      },
+      "opacity": 1.0,
+      "legendgroup": "muninn",
+      "legendgrouptitle": {
+        "text": "muninn"
+      }
+    }
+  ],
+  "layout": {
+    "title": {
+      "text": "DFS"
+    },
+    "xaxis": {
+      "title": {
+        "text": "Number of Nodes"
+      },
+      "type": "log"
+    },
+    "yaxis": {
+      "title": {
+        "text": "DFS Query Time (ms)"
+      },
+      "type": "log"
+    },
+    "template": "plotly_white",
+    "legend": {
+      "orientation": "v",
+      "yanchor": "top",
+      "y": 0.99,
+      "xanchor": "left",
+      "x": 1.02,
+      "groupclick": "togglegroup"
+    }
+  }
+}

@@ -6,22 +6,59 @@ LDFLAGS = -lm
 # Version from VERSION file
 VERSION := $(shell cat VERSION 2>/dev/null || echo 0.0.0)
 
-# Platform detection
+# Platform detection (needed early for llama.cpp BLAS config)
 UNAME_S := $(shell uname -s)
+
+# llama.cpp vendored dependency (CPU-only static build)
+LLAMA_DIR     = vendor/llama.cpp
+LLAMA_BUILD   = $(LLAMA_DIR)/build
+LLAMA_INCLUDE = -I$(LLAMA_DIR)/include -I$(LLAMA_DIR)/ggml/include
+LLAMA_LIBS_CORE = $(LLAMA_BUILD)/src/libllama.a \
+                  $(LLAMA_BUILD)/ggml/src/libggml.a \
+                  $(LLAMA_BUILD)/ggml/src/libggml-base.a \
+                  $(LLAMA_BUILD)/ggml/src/libggml-cpu.a
+
+# On macOS, BLAS is always available (Accelerate framework) so CMake always
+# builds libggml-blas.a.  Hardcode the path to avoid $(wildcard) failing on
+# clean builds (the file doesn't exist until CMake runs).
+# On Linux, BLAS availability depends on whether OpenBLAS is installed.
+ifeq ($(UNAME_S),Darwin)
+    LLAMA_LIBS = $(LLAMA_LIBS_CORE) $(LLAMA_BUILD)/ggml/src/ggml-blas/libggml-blas.a
+else
+    LLAMA_LIBS = $(LLAMA_LIBS_CORE) $(wildcard $(LLAMA_BUILD)/ggml/src/ggml-blas/libggml-blas.a)
+endif
+
+LLAMA_CMAKE_FLAGS = \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+    -DGGML_NATIVE=OFF \
+    -DGGML_METAL=OFF -DGGML_CUDA=OFF -DGGML_VULKAN=OFF \
+    -DGGML_HIP=OFF -DGGML_SYCL=OFF -DGGML_OPENMP=OFF \
+    -DGGML_BACKEND_DL=OFF \
+    -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF \
+    -DLLAMA_BUILD_SERVER=OFF \
+    -DCMAKE_BUILD_TYPE=MinSizeRel
+
+# Platform-specific flags
 ifeq ($(UNAME_S),Darwin)
     SHARED_FLAGS = -dynamiclib -undefined dynamic_lookup
     EXT = .dylib
     # macOS universal binary support: make ARCH=arm64 or make ARCH=x86_64
     ifdef ARCH
         CFLAGS_BASE += -arch $(ARCH)
+        LLAMA_CMAKE_FLAGS += -DCMAKE_OSX_ARCHITECTURES=$(ARCH)
     endif
     CFLAGS_BASE += -mmacosx-version-min=11.0
+    LLAMA_CMAKE_FLAGS += -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
+    # C++ runtime + Accelerate for llama.cpp
+    LDFLAGS += -lc++ -framework Accelerate
     # SQLite for test linking (extension only needs headers from src/)
     SQLITE_PREFIX ?= $(shell brew --prefix sqlite 2>/dev/null || echo /usr/local)
     SQLITE_LIBS = -L$(SQLITE_PREFIX)/lib -lsqlite3
 else ifeq ($(UNAME_S),Linux)
     SHARED_FLAGS = -shared
     EXT = .so
+    LDFLAGS += -lstdc++ -lpthread
     SQLITE_LIBS ?= $(shell pkg-config --libs sqlite3 2>/dev/null || echo -lsqlite3)
 else
     SHARED_FLAGS = -shared
@@ -38,7 +75,8 @@ SRC = src/muninn.c src/hnsw_vtab.c src/hnsw_algo.c \
       src/graph_selector_parse.c src/graph_selector_eval.c \
       src/graph_select_tvf.c \
       src/node2vec.c src/vec_math.c \
-      src/priority_queue.c src/id_validate.c
+      src/priority_queue.c src/id_validate.c \
+      src/embed_gguf.c
 
 # Internal headers (excludes sqlite3.h / sqlite3ext.h)
 HEADERS = src/vec_math.h src/priority_queue.h src/hnsw_algo.h \
@@ -47,11 +85,12 @@ HEADERS = src/vec_math.h src/priority_queue.h src/hnsw_algo.h \
           src/graph_community.h src/graph_adjacency.h src/graph_csr.h \
           src/graph_selector_parse.h src/graph_selector_eval.h \
           src/graph_select_tvf.h \
-          src/node2vec.h src/muninn.h
+          src/node2vec.h src/muninn.h src/embed_gguf.h
 
 TEST_SRC = test/test_main.c test/test_vec_math.c test/test_priority_queue.c \
            test/test_hnsw_algo.c test/test_id_validate.c test/test_graph_load.c \
-           test/test_graph_csr.c test/test_graph_selector.c
+           test/test_graph_csr.c test/test_graph_selector.c \
+           test/test_embed_gguf.c
 
 .PHONY: all debug test test-python test-js test-install test-all clean help \
         amalgamation install uninstall version version-stamp \
@@ -60,7 +99,7 @@ TEST_SRC = test/test_main.c test/test_vec_math.c test/test_priority_queue.c \
         format format-c format-python format-js \
         lint lint-c lint-python lint-js \
         typecheck typecheck-python typecheck-js \
-        ci ci-all
+        ci ci-all llama-clean muninn-llama muninn-llama-pre-1 muninn-llama-pre-2
 
 help:                                          ## Show this help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -70,14 +109,29 @@ version:                                       ## Print version
 	@echo $(VERSION)
 
 ######################################################################
+# LLAMA.CPP PRE-BUILD
+######################################################################
+muninn-llama: $(LLAMA_LIBS_CORE)
+$(LLAMA_LIBS_CORE): | $(LLAMA_DIR)/CMakeLists.txt
+	@echo "######### Building llama.cpp static libraries (this may take a minute)..."
+	cmake -B $(LLAMA_BUILD) -S $(LLAMA_DIR) $(LLAMA_CMAKE_FLAGS)
+
+	@echo "######### Compiling llama.cpp 1 core..."
+	cmake --build $(LLAMA_BUILD) --config MinSizeRel
+
+llama-clean:                                   ## Clean llama.cpp build artifacts
+	rm -rf $(LLAMA_BUILD)
+
+######################################################################
 # BUILD
 ######################################################################
 
 all: build/muninn$(EXT)                        ## Build the extension
 
-build/muninn$(EXT): $(SRC)
+build/muninn$(EXT): $(SRC) $(LLAMA_LIBS)
 	@mkdir -p build
-	$(CC) $(CFLAGS_BASE) $(CFLAGS_EXTRA) $(SHARED_FLAGS) -Isrc -o $@ $^ $(LDFLAGS)
+	$(CC) $(CFLAGS_BASE) $(CFLAGS_EXTRA) $(SHARED_FLAGS) \
+		-Isrc $(LLAMA_INCLUDE) -o $@ $(SRC) $(LLAMA_LIBS) $(LDFLAGS)
 
 debug: CFLAGS_BASE += -g -fsanitize=address,undefined -DDEBUG -O0
 debug: LDFLAGS += -fsanitize=address,undefined
@@ -97,9 +151,13 @@ test: build/test_runner                        ## Run C unit tests + coverage
 		echo "gcovr not installed — skipping C coverage report"; \
 	fi
 
-build/test_runner: $(TEST_SRC) src/vec_math.c src/priority_queue.c src/hnsw_algo.c src/id_validate.c src/graph_load.c src/graph_csr.c src/graph_selector_parse.c src/graph_selector_eval.c
+build/test_runner: $(TEST_SRC) src/vec_math.c src/priority_queue.c src/hnsw_algo.c src/id_validate.c src/graph_load.c src/graph_csr.c src/graph_selector_parse.c src/graph_selector_eval.c src/embed_gguf.c $(LLAMA_LIBS)
 	@mkdir -p build
-	$(CC) $(CFLAGS_BASE) $(CFLAGS_EXTRA) --coverage -Isrc -o $@ $^ $(LDFLAGS_TEST)
+	$(CC) $(CFLAGS_BASE) $(CFLAGS_EXTRA) --coverage -Isrc $(LLAMA_INCLUDE) -o $@ \
+		$(TEST_SRC) src/vec_math.c src/priority_queue.c src/hnsw_algo.c \
+		src/id_validate.c src/graph_load.c src/graph_csr.c \
+		src/graph_selector_parse.c src/graph_selector_eval.c \
+		src/embed_gguf.c $(LLAMA_LIBS) $(LDFLAGS_TEST)
 
 test-python: build/muninn$(EXT)                ## Run Python integration tests + coverage
 	.venv/bin/python -m pytest pytests/ -v
@@ -188,16 +246,6 @@ changelog: version-stamp                                     ## Generate CHANGEL
 	.venv/bin/git-cliff -o CHANGELOG.md
 	@echo "CHANGELOG.md updated"
 
-release:                                       ## Calculate next version from commits and prepare release
-	$(eval NEW_VERSION := $(shell .venv/bin/git-cliff --bumped-version 2>/dev/null | sed 's/^v//'))
-	@if [ -z "$(NEW_VERSION)" ]; then echo "error: could not determine next version"; exit 1; fi
-	@echo "Next version: $(NEW_VERSION)"
-	@echo "$(NEW_VERSION)" > VERSION
-	$(MAKE) version-stamp
-	.venv/bin/git-cliff --bump -o CHANGELOG.md
-	@echo ""
-	@echo "VERSION, CHANGELOG.md, and package manifests updated to $(NEW_VERSION)"
-	@echo "Review changes, then: git add -A && git commit -m 'chore(release): $(NEW_VERSION)' && git tag v$(NEW_VERSION)"
 
 ######################################################################
 # INSTALL
@@ -227,7 +275,7 @@ docs-serve: docs-build                         ## Serve docs locally with live r
 
 docs-build: version-stamp                      ## Build documentation site
 	uv sync --all-groups
-	make -C benchmarks analyze
+	make -C benchmarks analyse
 	uv run mkdocs build --strict
 	$(MAKE) docs-wasm
 
@@ -263,7 +311,7 @@ ci-all: ci
 # CLEAN
 ######################################################################
 
-clean: docs-clean                              ## Clean build artifacts
+clean: docs-clean llama-clean                  ## Clean build artifacts
 	rm -rf dist/
 	rm -rf build/
 	rm -rf *.egg-info

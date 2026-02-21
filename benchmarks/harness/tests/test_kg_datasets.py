@@ -7,8 +7,8 @@ from benchmarks.harness.prep.kg_datasets import (
     CrossNERPrepTask,
     FebrlPrepTask,
     HFDatasetPrepTask,
-    print_status,
     prep_kg_datasets,
+    print_status,
 )
 
 
@@ -213,7 +213,7 @@ class TestKGPrepTasks:
         """CrossNER should use CrossNERPrepTask, not HFDatasetPrepTask."""
         for task in KG_PREP_TASKS:
             if "cross_ner" in task.task_id:
-                assert False, f"Found HF-based cross_ner task: {task.task_id}"
+                raise AssertionError(f"Found HF-based cross_ner task: {task.task_id}")
 
 
 class TestPrintStatus:

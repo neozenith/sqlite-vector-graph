@@ -1,0 +1,150 @@
+{
+  "data": [
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "CSR",
+      "x": [
+        500,
+        1000,
+        5000,
+        10000
+      ],
+      "y": [
+        0.727,
+        1.215,
+        1.814,
+        1.771
+      ],
+      "marker": {
+        "color": "hsl(30, 75%, 45%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(30, 75%, 45%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "csr",
+      "legendgrouptitle": {
+        "text": "CSR"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "CSR blocked-incremental",
+      "x": [
+        500,
+        1000,
+        5000,
+        10000
+      ],
+      "y": [
+        0.459,
+        1.251,
+        3.823,
+        2.802
+      ],
+      "marker": {
+        "color": "hsl(270, 75%, 45%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(270, 75%, 45%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "csr_blocked",
+      "legendgrouptitle": {
+        "text": "CSR blocked-incremental"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "CSR full-rebuild",
+      "x": [
+        500,
+        1000,
+        5000,
+        10000
+      ],
+      "y": [
+        0.317,
+        1.338,
+        3.974,
+        3.521
+      ],
+      "marker": {
+        "color": "hsl(30, 75%, 45%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(30, 75%, 45%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "csr_full_rebuild",
+      "legendgrouptitle": {
+        "text": "CSR full-rebuild"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "CSR incremental",
+      "x": [
+        500,
+        1000,
+        5000,
+        10000
+      ],
+      "y": [
+        0.47,
+        1.463,
+        3.881,
+        6.128
+      ],
+      "marker": {
+        "color": "hsl(160, 75%, 45%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(160, 75%, 45%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "csr_incremental",
+      "legendgrouptitle": {
+        "text": "CSR incremental"
+      }
+    }
+  ],
+  "layout": {
+    "title": {
+      "text": "Trigger Overhead"
+    },
+    "xaxis": {
+      "title": {
+        "text": "Graph Size (nodes)"
+      },
+      "type": "log"
+    },
+    "yaxis": {
+      "title": {
+        "text": "Overhead (ms)"
+      },
+      "type": "linear"
+    },
+    "template": "plotly_white",
+    "legend": {
+      "orientation": "v",
+      "yanchor": "top",
+      "y": 0.99,
+      "xanchor": "left",
+      "x": 1.02,
+      "groupclick": "togglegroup"
+    }
+  }
+}

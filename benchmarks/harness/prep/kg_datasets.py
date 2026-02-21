@@ -161,9 +161,7 @@ class HFDatasetPrepTask(PrepTask):
         from datasets import load_dataset
 
         try:
-            load_dataset(
-                self._hf_path, self._hf_config, revision=self._revision, download_mode="reuse_cache_only"
-            )
+            load_dataset(self._hf_path, self._hf_config, revision=self._revision, download_mode="reuse_cache_only")
             return "READY"
         except Exception:
             return "MISSING"

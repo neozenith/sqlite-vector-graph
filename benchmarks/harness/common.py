@@ -24,7 +24,6 @@ log = logging.getLogger(__name__)
 # ── Path constants ─────────────────────────────────────────────────
 
 
-
 BENCHMARKS_ROOT = Path(__file__).resolve().parent.parent  # benchmarks/
 OUTPUT_ROOT = BENCHMARKS_ROOT
 RESULTS_DIR = OUTPUT_ROOT / "results"

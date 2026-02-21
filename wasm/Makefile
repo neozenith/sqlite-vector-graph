@@ -15,15 +15,30 @@ help:                                              ## Show this help
 # BUILD
 ######################################################################
 
-AMALGAMATION = ../dist/muninn.c
 SQLITE_SRC   = build/sqlite3.c
 WASM_JS      = build/muninn_sqlite3.js
 WASM_BIN     = build/muninn_sqlite3.wasm
 DEMO_DB	  	 = assets/3300.db
 DEMO_DB_BUILD = ../benchmarks/kg/3300.db
 
-$(AMALGAMATION):
-	$(MAKE) -C .. amalgamation
+# llama.cpp WASM static libraries
+LLAMA_DIR        = ../vendor/llama.cpp
+LLAMA_WASM_BUILD = $(LLAMA_DIR)/build-wasm
+LLAMA_WASM_LIBS  = $(LLAMA_WASM_BUILD)/src/libllama.a \
+                   $(LLAMA_WASM_BUILD)/ggml/src/libggml.a \
+                   $(LLAMA_WASM_BUILD)/ggml/src/libggml-base.a \
+                   $(LLAMA_WASM_BUILD)/ggml/src/libggml-cpu.a
+LLAMA_INCLUDE    = -I$(LLAMA_DIR)/include -I$(LLAMA_DIR)/ggml/include
+
+# Muninn source files (explicit list — globs don't work reliably in Make)
+MUNINN_SRC = ../src/muninn.c ../src/hnsw_vtab.c ../src/hnsw_algo.c \
+             ../src/graph_tvf.c ../src/graph_load.c ../src/graph_centrality.c \
+             ../src/graph_community.c ../src/graph_adjacency.c ../src/graph_csr.c \
+             ../src/graph_selector_parse.c ../src/graph_selector_eval.c \
+             ../src/graph_select_tvf.c \
+             ../src/node2vec.c ../src/vec_math.c \
+             ../src/priority_queue.c ../src/id_validate.c \
+             ../src/embed_gguf.c
 
 $(SQLITE_SRC):                                     ## Download SQLite amalgamation
 	@mkdir -p build
@@ -34,15 +49,29 @@ $(SQLITE_SRC):                                     ## Download SQLite amalgamati
 	cp /tmp/sqlite_wasm_amal/sqlite-amalgamation-*/sqlite3ext.h build/sqlite3ext.h
 	rm -rf /tmp/sqlite_wasm.zip /tmp/sqlite_wasm_amal
 
-$(WASM_JS): $(AMALGAMATION) $(SQLITE_SRC)          ## Build WASM artifacts
+$(LLAMA_WASM_LIBS): | $(LLAMA_DIR)/CMakeLists.txt  ## Build llama.cpp as WASM static libs
+	@command -v emcmake >/dev/null 2>&1 || { echo "error: emcmake not found — install Emscripten SDK"; exit 1; }
+	emcmake cmake -B $(LLAMA_WASM_BUILD) -S $(LLAMA_DIR) \
+		-DBUILD_SHARED_LIBS=OFF \
+		-DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+		-DGGML_NATIVE=OFF \
+		-DGGML_METAL=OFF -DGGML_CUDA=OFF -DGGML_VULKAN=OFF \
+		-DGGML_OPENMP=OFF -DGGML_BACKEND_DL=OFF \
+		-DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF \
+		-DLLAMA_BUILD_SERVER=OFF \
+		-DLLAMA_WASM_MEM64=OFF \
+		-DCMAKE_BUILD_TYPE=MinSizeRel
+	emmake $(MAKE) -C $(LLAMA_WASM_BUILD) llama ggml -j$$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
+
+$(WASM_JS): $(MUNINN_SRC) $(SQLITE_SRC) $(LLAMA_WASM_LIBS) ## Build WASM artifacts
 	@command -v emcc >/dev/null 2>&1 || { echo "error: emcc not found — install Emscripten SDK"; exit 1; }
-	emcc -O2 \
+	emcc -O2 -msimd128 \
 		-s WASM=1 \
 		-s EXPORTED_FUNCTIONS='["_sqlite3_open","_sqlite3_close","_sqlite3_exec","_sqlite3_errmsg","_sqlite3_prepare_v2","_sqlite3_step","_sqlite3_finalize","_sqlite3_column_text","_sqlite3_column_int","_sqlite3_column_double","_sqlite3_column_blob","_sqlite3_column_bytes","_sqlite3_column_count","_sqlite3_column_name","_sqlite3_bind_text","_sqlite3_bind_int","_sqlite3_bind_double","_sqlite3_bind_blob","_sqlite3_bind_null","_sqlite3_reset","_sqlite3_free","_malloc","_free","_sqlite3_wasm_extra_init"]' \
 		-s EXPORTED_RUNTIME_METHODS='["cwrap","ccall","UTF8ToString","stringToUTF8","getValue","setValue","FS","HEAPF32"]' \
 		-s FORCE_FILESYSTEM=1 \
 		-s ALLOW_MEMORY_GROWTH=1 \
-		-s INITIAL_MEMORY=16777216 \
+		-s INITIAL_MEMORY=134217728 \
 		-s MODULARIZE=1 \
 		-s EXPORT_NAME="createMuninnSQLite" \
 		-DSQLITE_ENABLE_FTS5 \
@@ -50,10 +79,12 @@ $(WASM_JS): $(AMALGAMATION) $(SQLITE_SRC)          ## Build WASM artifacts
 		-DSQLITE_ENABLE_RTREE \
 		-DSQLITE_THREADSAFE=0 \
 		-DSQLITE_OMIT_LOAD_EXTENSION \
-		-Ibuild \
+		-Ibuild -I../src \
+		$(LLAMA_INCLUDE) \
 		$(SQLITE_SRC) \
-		$(AMALGAMATION) \
+		$(MUNINN_SRC) \
 		../src/sqlite3_wasm_extra_init.c \
+		$(LLAMA_WASM_LIBS) \
 		-lm \
 		-o $(WASM_JS)
 	@echo "WASM build complete:"
@@ -130,3 +161,4 @@ format:                                            ## Format JS/HTML/CSS with pr
 
 clean:                                             ## Remove build artifacts
 	rm -rf build/ test-results/ screenshots/ node_modules/
+	rm -rf $(LLAMA_WASM_BUILD)

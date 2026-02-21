@@ -200,7 +200,7 @@ def test_rendered_tables_have_no_blank_lines_between_rows(slug):
 
     lines = content.split("\n")
     in_table = False
-    for i, line in enumerate(lines):
+    for _i, line in enumerate(lines):
         stripped = line.strip()
         if stripped.startswith("|") and "---" in stripped:
             # This is a separator line — we're in a table

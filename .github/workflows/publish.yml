@@ -27,6 +27,13 @@ jobs:
     name: Build (${{ matrix.target }})
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/cache@v4
+        with:
+          path: vendor/llama.cpp/build
+          key: llama-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.gitmodules') }}
 
       - name: Build (Unix)
         if: runner.os != 'Windows'
@@ -77,6 +84,8 @@ jobs:
     name: Build (macos-universal)
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Build arm64
         run: make ARCH=arm64 all
@@ -122,6 +131,8 @@ jobs:
     name: Amalgamation
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - run: make amalgamation
       - run: tar czf muninn-amalgamation.tar.gz -C dist muninn.c muninn.h
       - uses: actions/upload-artifact@v4
@@ -135,6 +146,13 @@ jobs:
     name: WASM Build
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/cache@v4
+        with:
+          path: vendor/llama.cpp/build-wasm
+          key: llama-wasm-${{ hashFiles('.gitmodules') }}
 
       - name: Setup Emscripten
         uses: mymindstorm/setup-emsdk@v14

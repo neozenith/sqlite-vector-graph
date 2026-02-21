@@ -1,0 +1,160 @@
+{
+  "data": [
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "muninn-hnsw",
+      "x": [
+        100,
+        500
+      ],
+      "y": [
+        0.07,
+        0.143
+      ],
+      "marker": {
+        "color": "hsl(270, 75%, 45%)",
+        "size": 8
+      },
+      "line": {
+        "color": "hsl(270, 75%, 45%)",
+        "width": 3
+      },
+      "opacity": 1.0,
+      "legendgroup": "muninn_hnsw",
+      "legendgrouptitle": {
+        "text": "muninn-hnsw"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "sqlite-vec-brute",
+      "x": [
+        100,
+        500
+      ],
+      "y": [
+        0.608,
+        0.618
+      ],
+      "marker": {
+        "color": "hsl(130, 75%, 45%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(130, 75%, 45%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "sqlite_vec_brute_force",
+      "legendgrouptitle": {
+        "text": "sqlite-vec-brute"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "sqlite-vector-fullscan",
+      "x": [
+        100,
+        500
+      ],
+      "y": [
+        0.08,
+        0.382
+      ],
+      "marker": {
+        "color": "hsl(18, 75%, 45%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(18, 75%, 45%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "sqlite_vector_full_scan",
+      "legendgrouptitle": {
+        "text": "sqlite-vector-fullscan"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "sqlite-vector-quantize",
+      "x": [
+        100,
+        500
+      ],
+      "y": [
+        0.041,
+        0.107
+      ],
+      "marker": {
+        "color": "hsl(175, 75%, 45%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(175, 75%, 45%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "sqlite_vector_quantize_scan",
+      "legendgrouptitle": {
+        "text": "sqlite-vector-quantize"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "vectorlite-hnsw",
+      "x": [
+        100,
+        500
+      ],
+      "y": [
+        0.03,
+        0.056
+      ],
+      "marker": {
+        "color": "hsl(210, 75%, 45%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(210, 75%, 45%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "vectorlite_hnsw",
+      "legendgrouptitle": {
+        "text": "vectorlite-hnsw"
+      }
+    }
+  ],
+  "layout": {
+    "title": {
+      "text": "Search Latency vs Dataset Size (BGE-Large / Wealth of Nations)"
+    },
+    "xaxis": {
+      "title": {
+        "text": "Dataset Size (N vectors)"
+      },
+      "type": "log"
+    },
+    "yaxis": {
+      "title": {
+        "text": "Search Latency (ms)"
+      },
+      "type": "log"
+    },
+    "template": "plotly_white",
+    "legend": {
+      "orientation": "v",
+      "yanchor": "top",
+      "y": 0.99,
+      "xanchor": "left",
+      "x": 1.02,
+      "groupclick": "togglegroup"
+    }
+  }
+}

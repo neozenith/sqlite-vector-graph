@@ -1,6 +1,11 @@
 #!/bin/bash
 # Generate the muninn amalgamation: a single muninn.c + muninn.h
 # that can be compiled standalone without the full source tree.
+#
+# Note: The amalgamation includes embed_gguf.c which #include "llama.h".
+# To build the amalgamation, users must provide the llama.cpp headers
+# and link against the llama.cpp static libraries. See dist/Makefile
+# for a convenience build script.
 set -euo pipefail
 
 VERSION=$(cat VERSION 2>/dev/null || echo "0.0.0")
@@ -27,6 +32,7 @@ INTERNAL_HEADERS=(
     src/graph_selector_eval.h
     src/graph_select_tvf.h
     src/node2vec.h
+    src/embed_gguf.h
     src/muninn.h
 )
 
@@ -47,6 +53,7 @@ SOURCES=(
     src/graph_selector_eval.c
     src/graph_select_tvf.c
     src/node2vec.c
+    src/embed_gguf.c
     src/muninn.c
 )
 
@@ -56,16 +63,30 @@ cat > "$OUT" <<HEADER
  * muninn amalgamation — v${VERSION}
  * Generated $(date -u +%Y-%m-%d)
  *
- * HNSW vector search + graph traversal + Node2Vec for SQLite.
+ * HNSW vector search + graph traversal + Node2Vec + GGUF embeddings for SQLite.
  * https://github.com/user/sqlite-muninn
  *
- * Build as loadable extension:
- *   gcc -O2 -fPIC -shared muninn.c -o muninn.so -lm           # Linux
- *   cc -O2 -fPIC -dynamiclib muninn.c -o muninn.dylib -lm     # macOS
- *   cl /O2 /MT /LD muninn.c /Fe:muninn.dll                    # Windows (MSVC)
+ * IMPORTANT: This amalgamation requires llama.cpp for GGUF embedding support.
+ * You must provide the llama.cpp headers and link against its static libraries.
  *
- * Or compile into your application:
- *   gcc -O2 myapp.c muninn.c -lsqlite3 -lm -o myapp
+ * Build as loadable extension (requires llama.cpp pre-built):
+ *   # Linux
+ *   cmake -B vendor/llama.cpp/build -S vendor/llama.cpp -DBUILD_SHARED_LIBS=OFF ...
+ *   cmake --build vendor/llama.cpp/build
+ *   gcc -O2 -fPIC -shared muninn.c -o muninn.so \\
+ *       -Ivendor/llama.cpp/include -Ivendor/llama.cpp/ggml/include \\
+ *       vendor/llama.cpp/build/src/libllama.a \\
+ *       vendor/llama.cpp/build/ggml/src/libggml-base.a \\
+ *       vendor/llama.cpp/build/ggml/src/ggml-cpu/libggml-cpu.a \\
+ *       -lstdc++ -lm -lpthread
+ *
+ *   # macOS
+ *   cc -O2 -fPIC -dynamiclib muninn.c -o muninn.dylib \\
+ *       -Ivendor/llama.cpp/include -Ivendor/llama.cpp/ggml/include \\
+ *       vendor/llama.cpp/build/src/libllama.a \\
+ *       vendor/llama.cpp/build/ggml/src/libggml-base.a \\
+ *       vendor/llama.cpp/build/ggml/src/ggml-cpu/libggml-cpu.a \\
+ *       -lc++ -framework Accelerate -lm
  */
 
 /* Enable POSIX functions (strdup) on strict C11 compilers */
@@ -103,6 +124,7 @@ for f in "${SOURCES[@]}"; do
     if [ -f "$f" ]; then
         echo "/* ──── $f ──── */" >> "$OUT"
         # Remove internal #include "..." and SQLITE_EXTENSION_INIT1 (already at top)
+        # Keep #include <llama.h> since it's an external dependency
         grep -v '#include "' "$f" | grep -v 'SQLITE_EXTENSION_INIT1' >> "$OUT"
         echo "" >> "$OUT"
     fi

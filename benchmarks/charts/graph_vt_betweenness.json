@@ -1,0 +1,170 @@
+{
+  "data": [
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "CSR",
+      "x": [
+        500,
+        1000,
+        5000
+      ],
+      "y": [
+        20.299,
+        111.908,
+        4795.417
+      ],
+      "marker": {
+        "color": "hsl(30, 75%, 45%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(30, 75%, 45%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "csr",
+      "legendgrouptitle": {
+        "text": "CSR"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "CSR blocked-incremental",
+      "x": [
+        500,
+        1000,
+        5000
+      ],
+      "y": [
+        20.134,
+        110.522,
+        4780.993
+      ],
+      "marker": {
+        "color": "hsl(270, 75%, 45%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(270, 75%, 45%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "csr_blocked",
+      "legendgrouptitle": {
+        "text": "CSR blocked-incremental"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "CSR full-rebuild",
+      "x": [
+        500,
+        1000,
+        5000
+      ],
+      "y": [
+        20.4,
+        113.283,
+        4770.226
+      ],
+      "marker": {
+        "color": "hsl(30, 75%, 45%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(30, 75%, 45%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "csr_full_rebuild",
+      "legendgrouptitle": {
+        "text": "CSR full-rebuild"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "CSR incremental",
+      "x": [
+        500,
+        1000,
+        5000
+      ],
+      "y": [
+        19.976,
+        111.552,
+        4786.653
+      ],
+      "marker": {
+        "color": "hsl(160, 75%, 45%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(160, 75%, 45%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "csr_incremental",
+      "legendgrouptitle": {
+        "text": "CSR incremental"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "TVF (no cache)",
+      "x": [
+        500,
+        1000,
+        5000
+      ],
+      "y": [
+        20.223,
+        113.778,
+        4781.628
+      ],
+      "marker": {
+        "color": "hsl(0, 75%, 45%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(0, 75%, 45%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "tvf",
+      "legendgrouptitle": {
+        "text": "TVF (no cache)"
+      }
+    }
+  ],
+  "layout": {
+    "title": {
+      "text": "Betweenness Query Time"
+    },
+    "xaxis": {
+      "title": {
+        "text": "Graph Size (nodes)"
+      },
+      "type": "log"
+    },
+    "yaxis": {
+      "title": {
+        "text": "Betweenness Computation (ms)"
+      },
+      "type": "log"
+    },
+    "template": "plotly_white",
+    "legend": {
+      "orientation": "v",
+      "yanchor": "top",
+      "y": 0.99,
+      "xanchor": "left",
+      "x": 1.02,
+      "groupclick": "togglegroup"
+    }
+  }
+}

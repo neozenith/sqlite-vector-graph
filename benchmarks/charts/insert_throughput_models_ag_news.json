@@ -1,0 +1,426 @@
+{
+  "data": [
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "muninn-hnsw / BGE-Large",
+      "x": [
+        100,
+        500
+      ],
+      "y": [
+        373.1,
+        252.7
+      ],
+      "marker": {
+        "color": "hsl(270, 85%, 58%)",
+        "size": 8
+      },
+      "line": {
+        "color": "hsl(270, 85%, 58%)",
+        "width": 3
+      },
+      "opacity": 1.0,
+      "legendgroup": "muninn_hnsw",
+      "legendgrouptitle": {
+        "text": "muninn-hnsw"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "muninn-hnsw / MPNet",
+      "x": [
+        100,
+        500
+      ],
+      "y": [
+        377.8,
+        268.4
+      ],
+      "marker": {
+        "color": "hsl(270, 78%, 47%)",
+        "size": 8
+      },
+      "line": {
+        "color": "hsl(270, 78%, 47%)",
+        "width": 3
+      },
+      "opacity": 1.0,
+      "legendgroup": "muninn_hnsw",
+      "legendgrouptitle": {
+        "text": "muninn-hnsw"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "muninn-hnsw / MiniLM",
+      "x": [
+        100,
+        500,
+        1000
+      ],
+      "y": [
+        435.0,
+        282.8,
+        260.4
+      ],
+      "marker": {
+        "color": "hsl(270, 70%, 35%)",
+        "size": 8
+      },
+      "line": {
+        "color": "hsl(270, 70%, 35%)",
+        "width": 3
+      },
+      "opacity": 1.0,
+      "legendgroup": "muninn_hnsw",
+      "legendgrouptitle": {
+        "text": "muninn-hnsw"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "sqlite-vec-brute / BGE-Large",
+      "x": [
+        100,
+        500
+      ],
+      "y": [
+        19749.2,
+        31436.0
+      ],
+      "marker": {
+        "color": "hsl(130, 85%, 58%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(130, 85%, 58%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "sqlite_vec_brute_force",
+      "legendgrouptitle": {
+        "text": "sqlite-vec-brute"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "sqlite-vec-brute / MPNet",
+      "x": [
+        100,
+        500
+      ],
+      "y": [
+        25802.3,
+        40083.8
+      ],
+      "marker": {
+        "color": "hsl(130, 78%, 47%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(130, 78%, 47%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "sqlite_vec_brute_force",
+      "legendgrouptitle": {
+        "text": "sqlite-vec-brute"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "sqlite-vec-brute / MiniLM",
+      "x": [
+        100,
+        500,
+        1000
+      ],
+      "y": [
+        82152.4,
+        77439.3,
+        55502.5
+      ],
+      "marker": {
+        "color": "hsl(130, 70%, 35%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(130, 70%, 35%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "sqlite_vec_brute_force",
+      "legendgrouptitle": {
+        "text": "sqlite-vec-brute"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "sqlite-vector-fullscan / BGE-Large",
+      "x": [
+        100,
+        500
+      ],
+      "y": [
+        103319.1,
+        103697.7
+      ],
+      "marker": {
+        "color": "hsl(18, 85%, 58%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(18, 85%, 58%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "sqlite_vector_full_scan",
+      "legendgrouptitle": {
+        "text": "sqlite-vector-fullscan"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "sqlite-vector-fullscan / MPNet",
+      "x": [
+        100,
+        500
+      ],
+      "y": [
+        128034.1,
+        124379.4
+      ],
+      "marker": {
+        "color": "hsl(18, 78%, 47%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(18, 78%, 47%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "sqlite_vector_full_scan",
+      "legendgrouptitle": {
+        "text": "sqlite-vector-fullscan"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "sqlite-vector-fullscan / MiniLM",
+      "x": [
+        100,
+        500,
+        1000
+      ],
+      "y": [
+        201850.1,
+        230831.4,
+        184337.5
+      ],
+      "marker": {
+        "color": "hsl(18, 70%, 35%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(18, 70%, 35%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "sqlite_vector_full_scan",
+      "legendgrouptitle": {
+        "text": "sqlite-vector-fullscan"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "sqlite-vector-quantize / BGE-Large",
+      "x": [
+        100,
+        500
+      ],
+      "y": [
+        103443.8,
+        101871.0
+      ],
+      "marker": {
+        "color": "hsl(175, 85%, 58%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(175, 85%, 58%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "sqlite_vector_quantize_scan",
+      "legendgrouptitle": {
+        "text": "sqlite-vector-quantize"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "sqlite-vector-quantize / MPNet",
+      "x": [
+        100,
+        500
+      ],
+      "y": [
+        124378.1,
+        122131.2
+      ],
+      "marker": {
+        "color": "hsl(175, 78%, 47%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(175, 78%, 47%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "sqlite_vector_quantize_scan",
+      "legendgrouptitle": {
+        "text": "sqlite-vector-quantize"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "sqlite-vector-quantize / MiniLM",
+      "x": [
+        100,
+        500
+      ],
+      "y": [
+        199683.7,
+        199893.4
+      ],
+      "marker": {
+        "color": "hsl(175, 70%, 35%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(175, 70%, 35%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "sqlite_vector_quantize_scan",
+      "legendgrouptitle": {
+        "text": "sqlite-vector-quantize"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "vectorlite-hnsw / BGE-Large",
+      "x": [
+        100,
+        500
+      ],
+      "y": [
+        33773.3,
+        11367.8
+      ],
+      "marker": {
+        "color": "hsl(210, 85%, 58%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(210, 85%, 58%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "vectorlite_hnsw",
+      "legendgrouptitle": {
+        "text": "vectorlite-hnsw"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "vectorlite-hnsw / MPNet",
+      "x": [
+        100,
+        500
+      ],
+      "y": [
+        38712.2,
+        12907.7
+      ],
+      "marker": {
+        "color": "hsl(210, 78%, 47%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(210, 78%, 47%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "vectorlite_hnsw",
+      "legendgrouptitle": {
+        "text": "vectorlite-hnsw"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "vectorlite-hnsw / MiniLM",
+      "x": [
+        100,
+        500
+      ],
+      "y": [
+        42110.4,
+        17125.3
+      ],
+      "marker": {
+        "color": "hsl(210, 70%, 35%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(210, 70%, 35%)",
+        "width": 2
+      },
+      "opacity": 0.8,
+      "legendgroup": "vectorlite_hnsw",
+      "legendgrouptitle": {
+        "text": "vectorlite-hnsw"
+      }
+    }
+  ],
+  "layout": {
+    "title": {
+      "text": "Insert Throughput (AG News)"
+    },
+    "xaxis": {
+      "title": {
+        "text": "Dataset Size (N vectors)"
+      },
+      "type": "log"
+    },
+    "yaxis": {
+      "title": {
+        "text": "Insert Rate (vectors/sec)"
+      },
+      "type": "linear"
+    },
+    "template": "plotly_white",
+    "legend": {
+      "orientation": "v",
+      "yanchor": "top",
+      "y": 0.99,
+      "xanchor": "left",
+      "x": 1.02,
+      "groupclick": "togglegroup"
+    }
+  }
+}

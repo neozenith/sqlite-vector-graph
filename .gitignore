@@ -55,6 +55,10 @@ benchmarks/kg/
 # GGUF / ML model files (large binaries, user-downloaded)
 models/
 
+# Vendored dependency build artifacts
+vendor/llama.cpp/build/
+vendor/llama.cpp/build-wasm/
+
 # IDE / OS
 .DS_Store
 

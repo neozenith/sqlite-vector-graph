@@ -58,12 +58,7 @@ nav:
     - VSS: benchmarks/vss.md
     - Graph: benchmarks/graph.md
     - Graph VT: benchmarks/graph_vt.md
-    - Benchmarks (Refactored):
-      - Overview: benchmarks/refactored_output/index.md
-      - VSS: benchmarks/refactored_output/vss.md
-      - Graph: benchmarks/refactored_output/graph.md
-      - Graph VT: benchmarks/refactored_output/graph_vt.md
-      - Knowledge Graph: benchmarks/refactored_output/kg.md
+
 
 markdown_extensions:
   - pymdownx.highlight:

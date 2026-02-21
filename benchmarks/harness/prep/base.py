@@ -42,7 +42,7 @@ class PrepTask(ABC):
     def fetch(self, force: bool = False) -> None:
         """Download or generate source data."""
 
-    def transform(self) -> None:
+    def transform(self) -> None:  # noqa: B027
         """Post-fetch transformation. Override if needed; default is no-op."""
 
     def status(self) -> str:
