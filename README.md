@@ -24,10 +24,11 @@ This project aims to build **agentic memory** and **knowledge graph** primitives
 
 - **HNSW Vector Index** &mdash; O(log N) approximate nearest neighbor search with incremental insert/delete
 - **Graph Traversal** &mdash; BFS, DFS, shortest path, connected components, PageRank on any edge table
+- **`llama.cpp` native models**; Load and use GGUF LLM models natively in sqlite.
 - **Centrality Measures** &mdash; Degree, betweenness (Brandes), and closeness centrality with weighted/temporal support
 - **Community Detection** &mdash; Leiden algorithm for discovering graph communities with modularity scoring
 - **Node2Vec** &mdash; Learn structural node embeddings from graph topology, store in HNSW for similarity search
-- **Zero dependencies** &mdash; Pure C11, compiles to a single `.dylib`/`.so`/`.dll`
+- **Zero dependencies** &mdash; compiles to a single `.dylib`/`.so`/`.dll`
 - **SIMD accelerated** &mdash; ARM NEON and x86 SSE distance functions
 
 ## Build
