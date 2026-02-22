@@ -10,10 +10,9 @@ SQLite extension. Compares three models side-by-side.
 |-------|--------|-----|-------------|------|---------|--------------|
 | **all-MiniLM-L6-v2** | 22M | 384 | Q8_0 | 23 MB | 512 | BERT (mean pooling) |
 | **nomic-embed-text-v1.5** | 137M | 768 | Q8_0 | 146 MB | 8K | BERT (mean pooling) |
-| **Qwen3-Embedding-8B** | 8B | 4096 | Q4_K_M | 4.7 GB | 32K | Decoder (last-token pooling) |
 
-All models are auto-downloaded to `models/` on first run. The Qwen3 model is
-large (4.7 GB) — the example gracefully skips any model that fails to download.
+
+All models are auto-downloaded to `models/` on first run. 
 
 ## What This Demonstrates
 
@@ -78,8 +77,6 @@ muninn automatically handles both architectures through GGUF metadata:
 
 - **BERT models** (MiniLM, Nomic): bidirectional attention, **mean pooling** — the
   embedding is the average of all token hidden states.
-- **Decoder models** (Qwen3-Embedding): causal attention, **last-token pooling** — the
-  embedding lives at the final token position (`<|endoftext|>`).
 
 The pooling type is baked into each GGUF file's metadata, so muninn reads it
 automatically. No configuration needed.
@@ -92,6 +89,106 @@ Some models use prefixes to specialize embeddings for different tasks:
 |-------|----------------|--------------|
 | MiniLM | *(none)* | *(none)* |
 | nomic-embed-text-v1.5 | `search_document: ` | `search_query: ` |
-| Qwen3-Embedding-8B | *(none, optional instructions)* | *(none, optional instructions)* |
 
 The example handles prefixes via `ModelConfig.doc_prefix` / `query_prefix`.
+
+## Example Output
+
+```sh
+=== muninn Text Embeddings Example ===
+
+  Project root:  .
+  Extension:     ./build/muninn
+INFO: Model MiniLM found: ./models/all-MiniLM-L6-v2.Q8_0.gguf (25.0 MB)
+INFO: Model NomicEmbed found: ./models/nomic-embed-text-v1.5.Q8_0.gguf (146.1 MB)
+
+  Models ready: ['MiniLM', 'NomicEmbed']
+  Loaded muninn extension (HNSW + GGUF embedding).
+
+  Created documents table with 8 rows.
+
+============================================================
+Section 1: Model Loading & Inspection
+============================================================
+
+  MiniLM: dim=384, file=all-MiniLM-L6-v2.Q8_0.gguf
+
+  NomicEmbed: dim=768, file=nomic-embed-text-v1.5.Q8_0.gguf
+    doc prefix: 'search_document: '
+    query prefix: 'search_query: '
+
+  All loaded models: [('MiniLM', 384), ('NomicEmbed', 768)]
+
+============================================================
+Section 2: Embed Documents & Build HNSW Indices
+============================================================
+
+  MiniLM: created HNSW index (dim=384)
+  MiniLM: embedded and indexed 8 documents
+  MiniLM: verified vector size = 1536 bytes (384 floats)
+
+  NomicEmbed: created HNSW index (dim=768)
+  NomicEmbed: embedded and indexed 8 documents
+  NomicEmbed: verified vector size = 3072 bytes (768 floats)
+
+============================================================
+Section 3: Comparative Semantic Search
+============================================================
+
+  Query: "animals in the wild"
+  ──────────────────────────────────────────────────────
+
+    MiniLM (dim=384):
+      #6   dist=0.4151  Wolves and bears roam the dense woodland trails
+      #1   dist=0.5264  The quick brown fox jumps over the lazy dog in the forest
+      #4   dist=0.9143  The Mars rover collected soil samples from the crater
+
+    NomicEmbed (dim=768):
+      #6   dist=0.3564  Wolves and bears roam the dense woodland trails
+      #1   dist=0.3728  The quick brown fox jumps over the lazy dog in the forest
+      #2   dist=0.4477  A neural network learns patterns from large datasets
+
+  Query: "machine learning and artificial intelligence"
+  ──────────────────────────────────────────────────────
+
+    MiniLM (dim=384):
+      #2   dist=0.5631  A neural network learns patterns from large datasets
+      #7   dist=0.7358  Gradient descent optimizes the loss function during training
+      #5   dist=0.8395  SQLite is the most widely deployed database engine in the world
+
+    NomicEmbed (dim=768):
+      #2   dist=0.3018  A neural network learns patterns from large datasets
+      #7   dist=0.4072  Gradient descent optimizes the loss function during training
+      #5   dist=0.4730  SQLite is the most widely deployed database engine in the world
+
+  Query: "outer space exploration"
+  ──────────────────────────────────────────────────────
+
+    MiniLM (dim=384):
+      #8   dist=0.7220  Stars and galaxies fill the observable universe
+      #4   dist=0.7655  The Mars rover collected soil samples from the crater
+      #2   dist=0.8278  A neural network learns patterns from large datasets
+
+    NomicEmbed (dim=768):
+      #8   dist=0.4264  Stars and galaxies fill the observable universe
+      #4   dist=0.4682  The Mars rover collected soil samples from the crater
+      #5   dist=0.5448  SQLite is the most widely deployed database engine in the world
+
+============================================================
+Section 4: Auto-Embed Trigger (using MiniLM)
+============================================================
+
+  Created TEMP trigger for auto-embedding on INSERT.
+  Inserted doc #100: 'Black holes warp spacetime near the event horizon'
+
+  Search for "phenomena in space" top-3:
+    #8    dist=0.5579  Stars and galaxies fill the observable universe
+    #100  dist=0.7544  Black holes warp spacetime near the event horizon
+    #4    dist=0.8466  The Mars rover collected soil samples from the crater
+
+  Trigger-inserted document found in results.
+
+============================================================
+Done. All sections completed successfully.
+============================================================
+```
