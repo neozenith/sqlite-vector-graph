@@ -15,10 +15,37 @@ Subclasses MAY override:
     params_dict()   — return all parameters as flat dict for JSONL serialization
 """
 
+import logging
 import sqlite3
+import time
 from abc import ABC, abstractmethod
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
+
+log = logging.getLogger(__name__)
+
+
+class ProgressTracker:
+    """Time-throttled loop progress reporter.
+
+    Logs progress updates (e.g. "  50/500 (10%)") only when at least
+    `interval_s` seconds have elapsed since the last log.
+    """
+
+    def __init__(self, total: int, interval_s: float = 5.0, logger: logging.Logger | None = None) -> None:
+        self._total = total
+        self._interval_s = interval_s
+        self._log = logger or log
+        self._last_log_time = time.monotonic()
+
+    def update(self, current: int) -> None:
+        """Report progress if enough time has elapsed since the last log."""
+        now = time.monotonic()
+        if now - self._last_log_time >= self._interval_s:
+            pct = (current / self._total * 100) if self._total > 0 else 0
+            self._log.info("    %d/%d (%.0f%%)", current, self._total, pct)
+            self._last_log_time = now
 
 
 class Treatment(ABC):
@@ -99,3 +126,22 @@ class Treatment(ABC):
         Default sorts by permutation_id.
         """
         return (self.permutation_id,)
+
+    @contextmanager
+    def step(self, name: str):
+        """Context manager that logs entry/exit of a named step with elapsed time."""
+        log.info("  [STEP] %s ...", name)
+        t0 = time.perf_counter()
+        try:
+            yield
+        except Exception:
+            elapsed = time.perf_counter() - t0
+            log.info("  [STEP] %s failed (%.1fs)", name, elapsed)
+            raise
+        else:
+            elapsed = time.perf_counter() - t0
+            log.info("  [STEP] %s done (%.1fs)", name, elapsed)
+
+    def progress(self, total: int, interval_s: float = 5.0) -> ProgressTracker:
+        """Create a time-throttled progress tracker for loop reporting."""
+        return ProgressTracker(total, interval_s=interval_s, logger=log)

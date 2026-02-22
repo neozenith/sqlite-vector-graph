@@ -369,12 +369,13 @@ class EmbedTreatment(Treatment):
     ) -> dict[str, Any]:
         """Run the full pipeline using muninn_embed as the embedding function."""
         # Task 1: Model load time
-        t0 = time.perf_counter()
-        conn.execute(
-            "INSERT INTO temp.muninn_models(name, model) SELECT ?, muninn_embed_model(?)",
-            (self._model_name, gguf_path),
-        )
-        model_load_time_ms = (time.perf_counter() - t0) * 1000
+        with self.step("Model load (muninn_embed)"):
+            t0 = time.perf_counter()
+            conn.execute(
+                "INSERT INTO temp.muninn_models(name, model) SELECT ?, muninn_embed_model(?)",
+                (self._model_name, gguf_path),
+            )
+            model_load_time_ms = (time.perf_counter() - t0) * 1000
 
         embed_sql_doc = f"muninn_embed('{self._model_name}', '{doc_prefix}' || ?)"
         embed_sql_query = f"muninn_embed('{self._model_name}', '{query_prefix}' || ?)"
@@ -389,12 +390,13 @@ class EmbedTreatment(Treatment):
         _load_lembed(conn)
 
         # Task 1: Model load time
-        t0 = time.perf_counter()
-        conn.execute(
-            "INSERT INTO temp.lembed_models(name, model) SELECT ?, lembed_model_from_file(?)",
-            (self._model_name, gguf_path),
-        )
-        model_load_time_ms = (time.perf_counter() - t0) * 1000
+        with self.step("Model load (lembed)"):
+            t0 = time.perf_counter()
+            conn.execute(
+                "INSERT INTO temp.lembed_models(name, model) SELECT ?, lembed_model_from_file(?)",
+                (self._model_name, gguf_path),
+            )
+            model_load_time_ms = (time.perf_counter() - t0) * 1000
 
         embed_sql_doc = f"lembed('{self._model_name}', '{doc_prefix}' || ?)"
         embed_sql_query = f"lembed('{self._model_name}', '{query_prefix}' || ?)"
@@ -455,62 +457,69 @@ class EmbedTreatment(Treatment):
         )
 
         # Task 2: Bulk embed + insert
-        t0 = time.perf_counter()
-        for pos, text in enumerate(self._doc_texts):
-            conn.execute("INSERT INTO documents(id, content) VALUES (?, ?)", (pos + 1, text))
-            embed_blob = conn.execute(f"SELECT {embed_sql_doc}", (text,)).fetchone()[0]
-            conn.execute("INSERT INTO bench_vec(rowid, vector) VALUES (?, ?)", (pos + 1, embed_blob))
-        bulk_time = time.perf_counter() - t0
+        n = self._actual_n
+        with self.step(f"Bulk embed + insert ({n} items)"):
+            tracker = self.progress(n)
+            t0 = time.perf_counter()
+            for pos, text in enumerate(self._doc_texts):
+                conn.execute("INSERT INTO documents(id, content) VALUES (?, ?)", (pos + 1, text))
+                embed_blob = conn.execute(f"SELECT {embed_sql_doc}", (text,)).fetchone()[0]
+                conn.execute("INSERT INTO bench_vec(rowid, vector) VALUES (?, ?)", (pos + 1, embed_blob))
+                tracker.update(pos + 1)
+            bulk_time = time.perf_counter() - t0
 
         # Task 3: Trigger-based incremental embedding
-        trigger_prefix_expr = f"'{doc_prefix}' || " if doc_prefix else ""
-        embed_fn_name = embed_sql_doc.split("(")[0]  # muninn_embed or lembed
-        conn.execute(
-            f"""
-            CREATE TEMP TRIGGER auto_embed AFTER INSERT ON documents
-            BEGIN
-              INSERT INTO bench_vec(rowid, vector)
-                VALUES (NEW.id, {embed_fn_name}('{self._model_name}', {trigger_prefix_expr}NEW.content));
-            END
-            """
-        )
+        with self.step(f"Trigger embed ({TRIGGER_SAMPLE_SIZE} inserts)"):
+            trigger_prefix_expr = f"'{doc_prefix}' || " if doc_prefix else ""
+            embed_fn_name = embed_sql_doc.split("(")[0]  # muninn_embed or lembed
+            conn.execute(
+                f"""
+                CREATE TEMP TRIGGER auto_embed AFTER INSERT ON documents
+                BEGIN
+                  INSERT INTO bench_vec(rowid, vector)
+                    VALUES (NEW.id, {embed_fn_name}('{self._model_name}', {trigger_prefix_expr}NEW.content));
+                END
+                """
+            )
 
-        trigger_latencies: list[float] = []
-        base_id = self._actual_n + 1
-        sample_texts = self._doc_texts[:TRIGGER_SAMPLE_SIZE]
-        for i, text in enumerate(sample_texts):
-            row_id = base_id + i
-            t0 = time.perf_counter()
-            conn.execute("INSERT INTO documents(id, content) VALUES (?, ?)", (row_id, text))
-            trigger_latencies.append((time.perf_counter() - t0) * 1000)
+            trigger_latencies: list[float] = []
+            base_id = self._actual_n + 1
+            sample_texts = self._doc_texts[:TRIGGER_SAMPLE_SIZE]
+            for i, text in enumerate(sample_texts):
+                row_id = base_id + i
+                t0 = time.perf_counter()
+                conn.execute("INSERT INTO documents(id, content) VALUES (?, ?)", (row_id, text))
+                trigger_latencies.append((time.perf_counter() - t0) * 1000)
 
-        conn.execute("DROP TRIGGER auto_embed")
-        trigger_embed_latency_ms = sum(trigger_latencies) / len(trigger_latencies) if trigger_latencies else 0
+            conn.execute("DROP TRIGGER auto_embed")
+            trigger_embed_latency_ms = sum(trigger_latencies) / len(trigger_latencies) if trigger_latencies else 0
 
         # Task 4: Live query embed + search
-        query_latencies: list[float] = []
-        embed_latencies: list[float] = []
-        search_results: list[set[int]] = []
+        n_queries = len(self._query_texts)
+        with self.step(f"Query embed + search ({n_queries} queries)"):
+            query_latencies: list[float] = []
+            embed_latencies: list[float] = []
+            search_results: list[set[int]] = []
 
-        for query_text in self._query_texts:
-            # Time embedding only
-            t0 = time.perf_counter()
-            query_blob = conn.execute(f"SELECT {embed_sql_query}", (query_text,)).fetchone()[0]
-            embed_ms = (time.perf_counter() - t0) * 1000
-            embed_latencies.append(embed_ms)
+            for query_text in self._query_texts:
+                # Time embedding only
+                t0 = time.perf_counter()
+                query_blob = conn.execute(f"SELECT {embed_sql_query}", (query_text,)).fetchone()[0]
+                embed_ms = (time.perf_counter() - t0) * 1000
+                embed_latencies.append(embed_ms)
 
-            # Time search only
-            t0 = time.perf_counter()
-            rows = conn.execute(
-                "SELECT rowid, distance FROM bench_vec WHERE vector MATCH ? AND k = ? AND ef_search = ?",
-                (query_blob, K, HNSW_EF_SEARCH),
-            ).fetchall()
-            search_ms = (time.perf_counter() - t0) * 1000
+                # Time search only
+                t0 = time.perf_counter()
+                rows = conn.execute(
+                    "SELECT rowid, distance FROM bench_vec WHERE vector MATCH ? AND k = ? AND ef_search = ?",
+                    (query_blob, K, HNSW_EF_SEARCH),
+                ).fetchall()
+                search_ms = (time.perf_counter() - t0) * 1000
 
-            query_latencies.append(embed_ms + search_ms)
-            search_results.append({r[0] for r in rows})
+                query_latencies.append(embed_ms + search_ms)
+                search_results.append({r[0] for r in rows})
 
-        conn.commit()
+            conn.commit()
 
         # Recall computation via pre-cached pools
         recall = self._compute_recall_if_possible(search_results)
@@ -549,66 +558,73 @@ class EmbedTreatment(Treatment):
         conn.execute("CREATE TABLE bench(id INTEGER PRIMARY KEY, embedding BLOB)")
 
         # Task 2: Bulk embed + insert
-        t0 = time.perf_counter()
-        for pos, text in enumerate(self._doc_texts):
-            conn.execute("INSERT INTO documents(id, content) VALUES (?, ?)", (pos + 1, text))
-            embed_blob = conn.execute(f"SELECT {embed_sql_doc}", (text,)).fetchone()[0]
-            conn.execute("INSERT INTO bench(id, embedding) VALUES (?, ?)", (pos + 1, embed_blob))
-        bulk_time = time.perf_counter() - t0
+        n = self._actual_n
+        with self.step(f"Bulk embed + insert ({n} items)"):
+            tracker = self.progress(n)
+            t0 = time.perf_counter()
+            for pos, text in enumerate(self._doc_texts):
+                conn.execute("INSERT INTO documents(id, content) VALUES (?, ?)", (pos + 1, text))
+                embed_blob = conn.execute(f"SELECT {embed_sql_doc}", (text,)).fetchone()[0]
+                conn.execute("INSERT INTO bench(id, embedding) VALUES (?, ?)", (pos + 1, embed_blob))
+                tracker.update(pos + 1)
+            bulk_time = time.perf_counter() - t0
 
         # Initialize and quantize
         conn.execute(f"SELECT vector_init('bench', 'embedding', 'dimension={dim},type=FLOAT32,distance=L2')")
         conn.execute("SELECT vector_quantize('bench', 'embedding')")
 
         # Task 3: Trigger-based incremental embedding
-        trigger_prefix_expr = f"'{doc_prefix}' || " if doc_prefix else ""
-        embed_fn_name = embed_sql_doc.split("(")[0]
-        conn.execute(
-            f"""
-            CREATE TEMP TRIGGER auto_embed AFTER INSERT ON documents
-            BEGIN
-              INSERT INTO bench(id, embedding)
-                VALUES (NEW.id, {embed_fn_name}('{self._model_name}', {trigger_prefix_expr}NEW.content));
-            END
-            """
-        )
+        with self.step(f"Trigger embed ({TRIGGER_SAMPLE_SIZE} inserts)"):
+            trigger_prefix_expr = f"'{doc_prefix}' || " if doc_prefix else ""
+            embed_fn_name = embed_sql_doc.split("(")[0]
+            conn.execute(
+                f"""
+                CREATE TEMP TRIGGER auto_embed AFTER INSERT ON documents
+                BEGIN
+                  INSERT INTO bench(id, embedding)
+                    VALUES (NEW.id, {embed_fn_name}('{self._model_name}', {trigger_prefix_expr}NEW.content));
+                END
+                """
+            )
 
-        trigger_latencies: list[float] = []
-        base_id = self._actual_n + 1
-        sample_texts = self._doc_texts[:TRIGGER_SAMPLE_SIZE]
-        for i, text in enumerate(sample_texts):
-            row_id = base_id + i
-            t0 = time.perf_counter()
-            conn.execute("INSERT INTO documents(id, content) VALUES (?, ?)", (row_id, text))
-            trigger_latencies.append((time.perf_counter() - t0) * 1000)
+            trigger_latencies: list[float] = []
+            base_id = self._actual_n + 1
+            sample_texts = self._doc_texts[:TRIGGER_SAMPLE_SIZE]
+            for i, text in enumerate(sample_texts):
+                row_id = base_id + i
+                t0 = time.perf_counter()
+                conn.execute("INSERT INTO documents(id, content) VALUES (?, ?)", (row_id, text))
+                trigger_latencies.append((time.perf_counter() - t0) * 1000)
 
-        conn.execute("DROP TRIGGER auto_embed")
-        # Re-quantize after trigger inserts
-        conn.execute("SELECT vector_quantize('bench', 'embedding')")
-        trigger_embed_latency_ms = sum(trigger_latencies) / len(trigger_latencies) if trigger_latencies else 0
+            conn.execute("DROP TRIGGER auto_embed")
+            # Re-quantize after trigger inserts
+            conn.execute("SELECT vector_quantize('bench', 'embedding')")
+            trigger_embed_latency_ms = sum(trigger_latencies) / len(trigger_latencies) if trigger_latencies else 0
 
         # Task 4: Live query embed + search
-        query_latencies: list[float] = []
-        embed_latencies: list[float] = []
-        search_results: list[set[int]] = []
+        n_queries = len(self._query_texts)
+        with self.step(f"Query embed + search ({n_queries} queries)"):
+            query_latencies: list[float] = []
+            embed_latencies: list[float] = []
+            search_results: list[set[int]] = []
 
-        for query_text in self._query_texts:
-            t0 = time.perf_counter()
-            query_blob = conn.execute(f"SELECT {embed_sql_query}", (query_text,)).fetchone()[0]
-            embed_ms = (time.perf_counter() - t0) * 1000
-            embed_latencies.append(embed_ms)
+            for query_text in self._query_texts:
+                t0 = time.perf_counter()
+                query_blob = conn.execute(f"SELECT {embed_sql_query}", (query_text,)).fetchone()[0]
+                embed_ms = (time.perf_counter() - t0) * 1000
+                embed_latencies.append(embed_ms)
 
-            t0 = time.perf_counter()
-            rows = conn.execute(
-                "SELECT rowid, distance FROM vector_quantize_scan('bench', 'embedding', ?, ?)",
-                (query_blob, K),
-            ).fetchall()
-            search_ms = (time.perf_counter() - t0) * 1000
+                t0 = time.perf_counter()
+                rows = conn.execute(
+                    "SELECT rowid, distance FROM vector_quantize_scan('bench', 'embedding', ?, ?)",
+                    (query_blob, K),
+                ).fetchall()
+                search_ms = (time.perf_counter() - t0) * 1000
 
-            query_latencies.append(embed_ms + search_ms)
-            search_results.append({r[0] for r in rows})
+                query_latencies.append(embed_ms + search_ms)
+                search_results.append({r[0] for r in rows})
 
-        conn.commit()
+            conn.commit()
 
         recall = self._compute_recall_if_possible(search_results)
 
@@ -646,60 +662,67 @@ class EmbedTreatment(Treatment):
         conn.execute(f"CREATE VIRTUAL TABLE bench_sv USING vec0(embedding float[{dim}])")
 
         # Task 2: Bulk embed + insert
-        t0 = time.perf_counter()
-        for pos, text in enumerate(self._doc_texts):
-            conn.execute("INSERT INTO documents(id, content) VALUES (?, ?)", (pos + 1, text))
-            embed_blob = conn.execute(f"SELECT {embed_sql_doc}", (text,)).fetchone()[0]
-            conn.execute("INSERT INTO bench_sv(rowid, embedding) VALUES (?, ?)", (pos + 1, embed_blob))
-        bulk_time = time.perf_counter() - t0
+        n = self._actual_n
+        with self.step(f"Bulk embed + insert ({n} items)"):
+            tracker = self.progress(n)
+            t0 = time.perf_counter()
+            for pos, text in enumerate(self._doc_texts):
+                conn.execute("INSERT INTO documents(id, content) VALUES (?, ?)", (pos + 1, text))
+                embed_blob = conn.execute(f"SELECT {embed_sql_doc}", (text,)).fetchone()[0]
+                conn.execute("INSERT INTO bench_sv(rowid, embedding) VALUES (?, ?)", (pos + 1, embed_blob))
+                tracker.update(pos + 1)
+            bulk_time = time.perf_counter() - t0
 
         # Task 3: Trigger-based incremental embedding
-        trigger_prefix_expr = f"'{doc_prefix}' || " if doc_prefix else ""
-        embed_fn_name = embed_sql_doc.split("(")[0]
-        conn.execute(
-            f"""
-            CREATE TEMP TRIGGER auto_embed AFTER INSERT ON documents
-            BEGIN
-              INSERT INTO bench_sv(rowid, embedding)
-                VALUES (NEW.id, {embed_fn_name}('{self._model_name}', {trigger_prefix_expr}NEW.content));
-            END
-            """
-        )
+        with self.step(f"Trigger embed ({TRIGGER_SAMPLE_SIZE} inserts)"):
+            trigger_prefix_expr = f"'{doc_prefix}' || " if doc_prefix else ""
+            embed_fn_name = embed_sql_doc.split("(")[0]
+            conn.execute(
+                f"""
+                CREATE TEMP TRIGGER auto_embed AFTER INSERT ON documents
+                BEGIN
+                  INSERT INTO bench_sv(rowid, embedding)
+                    VALUES (NEW.id, {embed_fn_name}('{self._model_name}', {trigger_prefix_expr}NEW.content));
+                END
+                """
+            )
 
-        trigger_latencies: list[float] = []
-        base_id = self._actual_n + 1
-        sample_texts = self._doc_texts[:TRIGGER_SAMPLE_SIZE]
-        for i, text in enumerate(sample_texts):
-            row_id = base_id + i
-            t0 = time.perf_counter()
-            conn.execute("INSERT INTO documents(id, content) VALUES (?, ?)", (row_id, text))
-            trigger_latencies.append((time.perf_counter() - t0) * 1000)
+            trigger_latencies: list[float] = []
+            base_id = self._actual_n + 1
+            sample_texts = self._doc_texts[:TRIGGER_SAMPLE_SIZE]
+            for i, text in enumerate(sample_texts):
+                row_id = base_id + i
+                t0 = time.perf_counter()
+                conn.execute("INSERT INTO documents(id, content) VALUES (?, ?)", (row_id, text))
+                trigger_latencies.append((time.perf_counter() - t0) * 1000)
 
-        conn.execute("DROP TRIGGER auto_embed")
-        trigger_embed_latency_ms = sum(trigger_latencies) / len(trigger_latencies) if trigger_latencies else 0
+            conn.execute("DROP TRIGGER auto_embed")
+            trigger_embed_latency_ms = sum(trigger_latencies) / len(trigger_latencies) if trigger_latencies else 0
 
         # Task 4: Live query embed + search
-        query_latencies: list[float] = []
-        embed_latencies: list[float] = []
-        search_results: list[set[int]] = []
+        n_queries = len(self._query_texts)
+        with self.step(f"Query embed + search ({n_queries} queries)"):
+            query_latencies: list[float] = []
+            embed_latencies: list[float] = []
+            search_results: list[set[int]] = []
 
-        for query_text in self._query_texts:
-            t0 = time.perf_counter()
-            query_blob = conn.execute(f"SELECT {embed_sql_query}", (query_text,)).fetchone()[0]
-            embed_ms = (time.perf_counter() - t0) * 1000
-            embed_latencies.append(embed_ms)
+            for query_text in self._query_texts:
+                t0 = time.perf_counter()
+                query_blob = conn.execute(f"SELECT {embed_sql_query}", (query_text,)).fetchone()[0]
+                embed_ms = (time.perf_counter() - t0) * 1000
+                embed_latencies.append(embed_ms)
 
-            t0 = time.perf_counter()
-            rows = conn.execute(
-                "SELECT rowid, distance FROM bench_sv WHERE embedding MATCH ? ORDER BY distance LIMIT ?",
-                (query_blob, K),
-            ).fetchall()
-            search_ms = (time.perf_counter() - t0) * 1000
+                t0 = time.perf_counter()
+                rows = conn.execute(
+                    "SELECT rowid, distance FROM bench_sv WHERE embedding MATCH ? ORDER BY distance LIMIT ?",
+                    (query_blob, K),
+                ).fetchall()
+                search_ms = (time.perf_counter() - t0) * 1000
 
-            query_latencies.append(embed_ms + search_ms)
-            search_results.append({r[0] for r in rows})
+                query_latencies.append(embed_ms + search_ms)
+                search_results.append({r[0] for r in rows})
 
-        conn.commit()
+            conn.commit()
 
         recall = self._compute_recall_if_possible(search_results)
 

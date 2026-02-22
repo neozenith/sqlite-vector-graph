@@ -5,10 +5,16 @@
       "mode": "lines+markers",
       "name": "lembed + muninn-hnsw",
       "x": [
-        100
+        100,
+        500,
+        1000,
+        5000
       ],
       "y": [
-        30.728
+        30.728,
+        26.857,
+        28.107,
+        29.728
       ],
       "marker": {
         "color": "hsl(175, 75%, 45%)",
@@ -29,10 +35,16 @@
       "mode": "lines+markers",
       "name": "lembed + sqlite-vec-brute",
       "x": [
-        100
+        100,
+        500,
+        1000,
+        5000
       ],
       "y": [
-        33.955
+        33.955,
+        27.374,
+        29.235,
+        31.586
       ],
       "marker": {
         "color": "hsl(50, 75%, 45%)",
@@ -53,10 +65,16 @@
       "mode": "lines+markers",
       "name": "lembed + sqlite-vector-pq",
       "x": [
-        100
+        100,
+        500,
+        1000,
+        5000
       ],
       "y": [
-        36.736
+        36.736,
+        27.32,
+        27.359,
+        29.741
       ],
       "marker": {
         "color": "hsl(130, 75%, 45%)",
@@ -77,10 +95,16 @@
       "mode": "lines+markers",
       "name": "muninn-embed + muninn-hnsw",
       "x": [
-        100
+        100,
+        500,
+        1000,
+        5000
       ],
       "y": [
-        26.42
+        26.42,
+        22.264,
+        24.374,
+        23.252
       ],
       "marker": {
         "color": "hsl(270, 75%, 45%)",
@@ -101,10 +125,16 @@
       "mode": "lines+markers",
       "name": "muninn-embed + sqlite-vec-brute",
       "x": [
-        100
+        100,
+        500,
+        1000,
+        5000
       ],
       "y": [
-        24.756
+        24.756,
+        23.8,
+        26.796,
+        26.797
       ],
       "marker": {
         "color": "hsl(240, 75%, 45%)",
@@ -125,10 +155,16 @@
       "mode": "lines+markers",
       "name": "muninn-embed + sqlite-vector-pq",
       "x": [
-        100
+        100,
+        500,
+        1000,
+        5000
       ],
       "y": [
-        25.37
+        25.37,
+        22.454,
+        24.22,
+        23.975
       ],
       "marker": {
         "color": "hsl(300, 75%, 45%)",

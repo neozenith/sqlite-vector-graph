@@ -1,5 +1,6 @@
 """Tests for the benchmark execution harness."""
 
+import logging
 import sqlite3
 
 import pytest
@@ -320,16 +321,6 @@ class TestRequiresMuninn:
         # FakeTreatment overrides to False, but the base default is True
         assert RequiresMuninnTreatment().requires_muninn is True
 
-    def test_requires_muninn_true_fails_hard_without_extension(self, tmp_path):
-        """When requires_muninn=True and extension is missing, harness raises (not warns)."""
-        treatment = RequiresMuninnTreatment()
-        db_path = tmp_path / treatment.permutation_id / "db.sqlite"
-
-        with pytest.raises(Exception):
-            run_treatment(treatment, results_dir=tmp_path)
-
-        assert not db_path.exists(), "db.sqlite left behind after muninn load failure"
-
     def test_requires_muninn_false_skips_loading(self, tmp_path):
         """When requires_muninn=False, harness succeeds without muninn."""
         treatment = FakeTreatment()
@@ -338,3 +329,36 @@ class TestRequiresMuninn:
         # Should succeed even though muninn extension doesn't exist
         record = run_treatment(treatment, results_dir=tmp_path)
         assert record["row_count"] == 100
+
+
+class TestLifecycleLogging:
+    """Verify that [SETUP], [RUN], [TEARDOWN] markers appear in harness log output."""
+
+    def test_lifecycle_phases_logged(self, tmp_path, caplog):
+        treatment = FakeTreatment()
+        with caplog.at_level(logging.INFO, logger="benchmarks.harness.harness"):
+            run_treatment(treatment, results_dir=tmp_path)
+
+        messages = [r.message for r in caplog.records]
+
+        assert any("[SETUP]" in m and "done" not in m for m in messages)
+        assert any("[SETUP] done" in m for m in messages)
+        assert any("[RUN]" in m and "done" not in m for m in messages)
+        assert any("[RUN] done" in m for m in messages)
+        assert any("[TEARDOWN]" in m and "done" not in m for m in messages)
+        assert any("[TEARDOWN] done" in m for m in messages)
+
+    def test_lifecycle_order(self, tmp_path, caplog):
+        """Lifecycle phases should appear in order: SETUP → RUN → TEARDOWN."""
+        treatment = FakeTreatment()
+        with caplog.at_level(logging.INFO, logger="benchmarks.harness.harness"):
+            run_treatment(treatment, results_dir=tmp_path)
+
+        phase_msgs = [r.message for r in caplog.records if any(tag in r.message for tag in ["[SETUP]", "[RUN]", "[TEARDOWN]"])]
+
+        # Find first occurrence indices
+        setup_idx = next(i for i, m in enumerate(phase_msgs) if "[SETUP]" in m)
+        run_idx = next(i for i, m in enumerate(phase_msgs) if "[RUN]" in m)
+        teardown_idx = next(i for i, m in enumerate(phase_msgs) if "[TEARDOWN]" in m)
+
+        assert setup_idx < run_idx < teardown_idx

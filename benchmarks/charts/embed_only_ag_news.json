@@ -30,11 +30,15 @@
       "name": "lembed + muninn-hnsw / MiniLM",
       "x": [
         100,
-        500
+        500,
+        1000,
+        5000
       ],
       "y": [
         3.716,
-        4.588
+        4.588,
+        3.511,
+        3.92
       ],
       "marker": {
         "color": "hsl(175, 78%, 47%)",
@@ -55,10 +59,16 @@
       "mode": "lines+markers",
       "name": "lembed + muninn-hnsw / NomicEmbed",
       "x": [
-        100
+        100,
+        500,
+        1000,
+        5000
       ],
       "y": [
-        30.603
+        30.603,
+        26.642,
+        27.821,
+        29.238
       ],
       "marker": {
         "color": "hsl(175, 70%, 35%)",
@@ -79,10 +89,16 @@
       "mode": "lines+markers",
       "name": "lembed + sqlite-vec-brute / MiniLM",
       "x": [
-        100
+        100,
+        500,
+        1000,
+        5000
       ],
       "y": [
-        3.607
+        3.607,
+        3.7785,
+        3.848,
+        3.924
       ],
       "marker": {
         "color": "hsl(50, 85%, 58%)",
@@ -96,6 +112,23 @@
       "legendgroup": "lembed_sqlite-vec-brute",
       "legendgrouptitle": {
         "text": "lembed + sqlite-vec-brute"
+      },
+      "error_y": {
+        "type": "data",
+        "symmetric": false,
+        "array": [
+          0.0,
+          0.2214999999999998,
+          0.0,
+          0.0
+        ],
+        "arrayminus": [
+          0.0,
+          0.22150000000000025,
+          0.0,
+          0.0
+        ],
+        "visible": true
       }
     },
     {
@@ -103,10 +136,16 @@
       "mode": "lines+markers",
       "name": "lembed + sqlite-vec-brute / NomicEmbed",
       "x": [
-        100
+        100,
+        500,
+        1000,
+        5000
       ],
       "y": [
-        33.207
+        33.207,
+        26.761,
+        27.944,
+        28.281
       ],
       "marker": {
         "color": "hsl(50, 70%, 35%)",
@@ -127,10 +166,16 @@
       "mode": "lines+markers",
       "name": "lembed + sqlite-vector-pq / MiniLM",
       "x": [
-        100
+        100,
+        500,
+        1000,
+        5000
       ],
       "y": [
-        3.992
+        3.992,
+        3.764,
+        3.718,
+        3.87
       ],
       "marker": {
         "color": "hsl(130, 85%, 58%)",
@@ -151,10 +196,16 @@
       "mode": "lines+markers",
       "name": "lembed + sqlite-vector-pq / NomicEmbed",
       "x": [
-        100
+        100,
+        500,
+        1000,
+        5000
       ],
       "y": [
-        36.6
+        36.6,
+        27.176,
+        27.141,
+        28.55
       ],
       "marker": {
         "color": "hsl(130, 70%, 35%)",
@@ -175,10 +226,16 @@
       "mode": "lines+markers",
       "name": "muninn-embed + muninn-hnsw / MiniLM",
       "x": [
-        100
+        100,
+        500,
+        1000,
+        5000
       ],
       "y": [
-        3.629
+        3.4779999999999998,
+        4.148,
+        3.375,
+        3.367
       ],
       "marker": {
         "color": "hsl(270, 85%, 58%)",
@@ -192,6 +249,23 @@
       "legendgroup": "muninn_embed_muninn-hnsw",
       "legendgrouptitle": {
         "text": "muninn-embed + muninn-hnsw"
+      },
+      "error_y": {
+        "type": "data",
+        "symmetric": false,
+        "array": [
+          0.15100000000000025,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "arrayminus": [
+          0.1509999999999998,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "visible": true
       }
     },
     {
@@ -199,10 +273,16 @@
       "mode": "lines+markers",
       "name": "muninn-embed + muninn-hnsw / NomicEmbed",
       "x": [
-        100
+        100,
+        500,
+        1000,
+        5000
       ],
       "y": [
-        26.288
+        26.288,
+        22.045,
+        24.105,
+        22.819
       ],
       "marker": {
         "color": "hsl(270, 70%, 35%)",
@@ -223,10 +303,16 @@
       "mode": "lines+markers",
       "name": "muninn-embed + sqlite-vec-brute / MiniLM",
       "x": [
-        100
+        100,
+        500,
+        1000,
+        5000
       ],
       "y": [
-        3.326
+        3.326,
+        3.199,
+        3.434,
+        3.125
       ],
       "marker": {
         "color": "hsl(240, 85%, 58%)",
@@ -247,10 +333,16 @@
       "mode": "lines+markers",
       "name": "muninn-embed + sqlite-vec-brute / NomicEmbed",
       "x": [
-        100
+        100,
+        500,
+        1000,
+        5000
       ],
       "y": [
-        23.977
+        23.977,
+        23.147,
+        25.492,
+        23.635
       ],
       "marker": {
         "color": "hsl(240, 70%, 35%)",
@@ -271,10 +363,16 @@
       "mode": "lines+markers",
       "name": "muninn-embed + sqlite-vector-pq / MiniLM",
       "x": [
-        100
+        100,
+        500,
+        1000,
+        5000
       ],
       "y": [
-        3.485
+        3.485,
+        3.134,
+        3.707,
+        3.271
       ],
       "marker": {
         "color": "hsl(300, 85%, 58%)",
@@ -295,10 +393,16 @@
       "mode": "lines+markers",
       "name": "muninn-embed + sqlite-vector-pq / NomicEmbed",
       "x": [
-        100
+        100,
+        500,
+        1000,
+        5000
       ],
       "y": [
-        25.272
+        25.272,
+        22.323,
+        24.024,
+        22.701
       ],
       "marker": {
         "color": "hsl(300, 70%, 35%)",

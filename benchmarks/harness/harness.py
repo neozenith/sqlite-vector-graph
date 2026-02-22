@@ -112,6 +112,7 @@ def run_treatment(treatment: Treatment, results_dir: Path | None = None, force: 
     rss_before = peak_rss_mb()
 
     # Setup
+    log.info("  [SETUP]")
     t0 = time.perf_counter()
     try:
         setup_metrics = treatment.setup(conn, db_path) or {}
@@ -121,8 +122,10 @@ def run_treatment(treatment: Treatment, results_dir: Path | None = None, force: 
         _cleanup_failed_db(db_path)
         raise
     wall_time_setup_ms = (time.perf_counter() - t0) * 1000
+    log.info("  [SETUP] done (%.1fs)", wall_time_setup_ms / 1000)
 
     # Run
+    log.info("  [RUN]")
     t0 = time.perf_counter()
     try:
         run_metrics = treatment.run(conn) or {}
@@ -133,9 +136,12 @@ def run_treatment(treatment: Treatment, results_dir: Path | None = None, force: 
         _cleanup_failed_db(db_path)
         raise
     wall_time_run_ms = (time.perf_counter() - t0) * 1000
+    log.info("  [RUN] done (%.1fs)", wall_time_run_ms / 1000)
 
     # Teardown
+    log.info("  [TEARDOWN]")
     treatment.teardown(conn)
+    log.info("  [TEARDOWN] done")
 
     # Record RSS after and DB size
     rss_after = peak_rss_mb()

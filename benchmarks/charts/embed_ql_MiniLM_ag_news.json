@@ -6,11 +6,15 @@
       "name": "lembed + muninn-hnsw",
       "x": [
         100,
-        500
+        500,
+        1000,
+        5000
       ],
       "y": [
         3.796,
-        4.79
+        4.79,
+        3.756,
+        4.287
       ],
       "marker": {
         "color": "hsl(175, 75%, 45%)",
@@ -31,10 +35,16 @@
       "mode": "lines+markers",
       "name": "lembed + sqlite-vec-brute",
       "x": [
-        100
+        100,
+        500,
+        1000,
+        5000
       ],
       "y": [
-        3.803
+        3.803,
+        3.9755,
+        4.344,
+        5.434
       ],
       "marker": {
         "color": "hsl(50, 75%, 45%)",
@@ -48,6 +58,23 @@
       "legendgroup": "lembed_sqlite-vec-brute",
       "legendgrouptitle": {
         "text": "lembed + sqlite-vec-brute"
+      },
+      "error_y": {
+        "type": "data",
+        "symmetric": false,
+        "array": [
+          0.0,
+          0.22849999999999993,
+          0.0,
+          0.0
+        ],
+        "arrayminus": [
+          0.0,
+          0.22849999999999993,
+          0.0,
+          0.0
+        ],
+        "visible": true
       }
     },
     {
@@ -55,10 +82,16 @@
       "mode": "lines+markers",
       "name": "lembed + sqlite-vector-pq",
       "x": [
-        100
+        100,
+        500,
+        1000,
+        5000
       ],
       "y": [
-        4.044
+        4.044,
+        3.837,
+        3.832,
+        4.296
       ],
       "marker": {
         "color": "hsl(130, 75%, 45%)",
@@ -79,10 +112,16 @@
       "mode": "lines+markers",
       "name": "muninn-embed + muninn-hnsw",
       "x": [
-        100
+        100,
+        500,
+        1000,
+        5000
       ],
       "y": [
-        3.717
+        3.5575,
+        4.304,
+        3.575,
+        3.661
       ],
       "marker": {
         "color": "hsl(270, 75%, 45%)",
@@ -96,6 +135,23 @@
       "legendgroup": "muninn_embed_muninn-hnsw",
       "legendgrouptitle": {
         "text": "muninn-embed + muninn-hnsw"
+      },
+      "error_y": {
+        "type": "data",
+        "symmetric": false,
+        "array": [
+          0.15949999999999998,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "arrayminus": [
+          0.15949999999999998,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "visible": true
       }
     },
     {
@@ -103,10 +159,16 @@
       "mode": "lines+markers",
       "name": "muninn-embed + sqlite-vec-brute",
       "x": [
-        100
+        100,
+        500,
+        1000,
+        5000
       ],
       "y": [
-        3.561
+        3.561,
+        3.392,
+        3.9,
+        4.483
       ],
       "marker": {
         "color": "hsl(240, 75%, 45%)",
@@ -127,10 +189,16 @@
       "mode": "lines+markers",
       "name": "muninn-embed + sqlite-vector-pq",
       "x": [
-        100
+        100,
+        500,
+        1000,
+        5000
       ],
       "y": [
-        3.526
+        3.526,
+        3.183,
+        3.785,
+        3.666
       ],
       "marker": {
         "color": "hsl(300, 75%, 45%)",

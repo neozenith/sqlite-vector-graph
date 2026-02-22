@@ -245,10 +245,14 @@
       "mode": "lines+markers",
       "name": "muninn-embed + sqlite-vector-pq / MiniLM",
       "x": [
-        100
+        100,
+        500,
+        1000
       ],
       "y": [
-        25.1
+        25.1,
+        25.6,
+        25.6
       ],
       "marker": {
         "color": "hsl(300, 85%, 58%)",
