@@ -15,7 +15,6 @@ from benchmarks.harness.common import (
     GRAPH_VT_BLOCK_SIZE,
     generate_barabasi_albert,
     generate_erdos_renyi,
-    load_muninn,
 )
 from benchmarks.harness.treatments.base import Treatment
 
@@ -63,8 +62,6 @@ class GraphVtTreatment(Treatment):
         }
 
     def setup(self, conn: sqlite3.Connection, db_path: Path) -> dict[str, Any]:
-        load_muninn(conn)
-
         avg_degree = self._target_edges / self._n_nodes
         if self._graph_model == "erdos_renyi":
             self._edges, _ = generate_erdos_renyi(self._n_nodes, avg_degree, weighted=True, seed=42)

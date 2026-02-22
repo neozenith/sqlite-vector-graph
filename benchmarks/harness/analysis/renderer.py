@@ -47,7 +47,7 @@ def render_chart(spec: ChartSpec, series_list: list[ChartSeries], charts_dir: Pa
             "y": y_values,
             "marker": {"color": s.color, "size": 8 if is_muninn else 7},
             "line": {"color": s.color, "width": 3 if is_muninn else 2},
-            "opacity": 1.0 if is_muninn else 0.8,
+            "opacity": 1.0 if is_muninn else 0.6,
             "legendgroup": s.group_key,
             "legendgrouptitle": {"text": group_display},
         }
@@ -100,7 +100,7 @@ def render_docs() -> None:
     Templates are in benchmarks/harness/templates/*.md.j2.
     Each template receives the full catalog context from doc_page_context().
     """
-    from benchmarks.harness.registry import DOC_PAGES, doc_page_context
+    from benchmarks.harness.analysis.doc_pages import DOC_PAGES, doc_page_context
 
     DOCS_BENCHMARKS_DIR.mkdir(parents=True, exist_ok=True)
 

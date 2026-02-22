@@ -28,7 +28,7 @@ Graphs are tested at multiple sizes (100 to 10,000 nodes) and average degrees (3
 
 ### Traversal
 
-BFS, DFS, shortest path, connected components, and PageRank. Compared across both engines.
+BFS, DFS, shortest path, components, and PageRank. Both engines.
 
 
 ### Centrality

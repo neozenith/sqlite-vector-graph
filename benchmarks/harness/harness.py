@@ -2,10 +2,13 @@
 
 Executes a single Treatment:
 1. Creates RESULTS_DIR / treatment.permutation_id / db.sqlite
-2. Opens SQLite connection, loads muninn
+2. Opens SQLite connection, loads muninn if treatment.requires_muninn is True
 3. Records RSS before, calls setup + run + teardown with timing
 4. Merges common metrics + treatment metrics into JSONL record
 5. Appends record to RESULTS_DIR / {category}_{variant}.jsonl
+
+On failure at any stage, the db.sqlite file is cleaned up to prevent
+ghost 'DONE' entries in the manifest.
 """
 
 import logging
@@ -24,6 +27,21 @@ from benchmarks.harness.common import (
 from benchmarks.harness.treatments.base import Treatment
 
 log = logging.getLogger(__name__)
+
+
+def _cleanup_failed_db(db_path: Path) -> None:
+    """Remove a db.sqlite left behind by a failed treatment.
+
+    Without this, the manifest would incorrectly mark the permutation as 'DONE'
+    because it checks for the existence of db.sqlite on disk.
+    """
+    if db_path.exists():
+        log.warning("  Cleaning up failed benchmark DB: %s", db_path)
+        db_path.unlink()
+        # Also remove the parent directory if it's now empty
+        perm_dir = db_path.parent
+        if perm_dir.exists() and not any(perm_dir.iterdir()):
+            perm_dir.rmdir()
 
 
 def _handle_existing_db(db_path: Path, force: bool = False) -> None:
@@ -75,14 +93,20 @@ def run_treatment(treatment: Treatment, results_dir: Path | None = None, force: 
     log.info("Running: %s", treatment.label)
     log.info("  DB: %s", db_path)
 
-    # Open connection and load extension
+    # Open connection and conditionally load muninn
     import sqlite3
 
     conn = sqlite3.connect(str(db_path))
-    try:
-        load_muninn(conn)
-    except Exception:
-        log.warning("  Could not load muninn extension — treatment may handle its own extensions")
+    if treatment.requires_muninn:
+        try:
+            load_muninn(conn)
+        except Exception as e:
+            log.error("  Failed to load muninn extension (required by %s): %s", treatment.category, e)
+            conn.close()
+            _cleanup_failed_db(db_path)
+            raise
+    else:
+        log.debug("  Skipping muninn — treatment manages its own extensions")
 
     # Record RSS before
     rss_before = peak_rss_mb()
@@ -94,6 +118,7 @@ def run_treatment(treatment: Treatment, results_dir: Path | None = None, force: 
     except Exception as e:
         log.error("  Setup failed: %s", e)
         conn.close()
+        _cleanup_failed_db(db_path)
         raise
     wall_time_setup_ms = (time.perf_counter() - t0) * 1000
 
@@ -105,6 +130,7 @@ def run_treatment(treatment: Treatment, results_dir: Path | None = None, force: 
         log.error("  Run failed: %s", e)
         treatment.teardown(conn)
         conn.close()
+        _cleanup_failed_db(db_path)
         raise
     wall_time_run_ms = (time.perf_counter() - t0) * 1000
 

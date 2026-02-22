@@ -1,57 +1,70 @@
 """
-Text Embeddings — Semantic Search with Real Embedding Models
+Text Embeddings — Semantic Search with muninn
 
-Demonstrates: sqlite-lembed (GGUF local models) and sqlite-rembed (OpenAI API)
-paired with muninn's HNSW index for end-to-end text-in, semantic-search-out.
+Zero-dependency end-to-end example: load GGUF embedding models, embed
+documents, build HNSW indices, and perform semantic similarity search —
+all inside a single SQLite extension.
 
-Sections run conditionally based on available dependencies:
-  - lembed:  requires `pip install sqlite-lembed` + a GGUF model file
-  - rembed:  requires `pip install sqlite-rembed` + OPENAI_API_KEY env var
+Demonstrates two models side-by-side:
+  - all-MiniLM-L6-v2 (22M params, 384-dim, 23 MB) — fast baseline
+  - nomic-embed-text-v1.5 (137M params, 768-dim, 146 MB) — higher quality
+
+Only requires:
+  - muninn extension (make all)
+  - GGUF model files (auto-downloaded on first run)
 """
 
 import logging
-import os
 import sqlite3
+import struct
 import urllib.request
+from dataclasses import dataclass
 from pathlib import Path
-
-# Optional dependencies — top-level try/except per project convention
-try:
-    import sqlite_lembed
-
-    HAS_LEMBED = True
-except ImportError:
-    HAS_LEMBED = False
-
-try:
-    import sqlite_rembed
-
-    HAS_REMBED = True
-except ImportError:
-    HAS_REMBED = False
 
 log = logging.getLogger(__name__)
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent.parent
-EXTENSION_PATH = str(PROJECT_ROOT / "muninn")
+EXTENSION_PATH = str(PROJECT_ROOT / "build" / "muninn")
+MODELS_DIR = PROJECT_ROOT / "models"
 
-# GGUF model config — set GGUF_MODEL_PATH to use a custom model file
-DEFAULT_MODEL_DIR = PROJECT_ROOT / "models"
-DEFAULT_MODEL_NAME = "all-MiniLM-L6-v2.Q8_0.gguf"
-DEFAULT_MODEL_URL = "https://huggingface.co/leliuga/all-MiniLM-L6-v2-GGUF/resolve/main/all-MiniLM-L6-v2.Q8_0.gguf"
 
-_env_model_path = os.environ.get("GGUF_MODEL_PATH", "")
-GGUF_MODEL_PATH = Path(_env_model_path) if _env_model_path else DEFAULT_MODEL_DIR / DEFAULT_MODEL_NAME
-GGUF_IS_CUSTOM = bool(_env_model_path)
+# ── Model Definitions ──────────────────────────────────────────────
+@dataclass
+class ModelConfig:
+    """Configuration for a GGUF embedding model."""
+    name: str           # Registry name used in SQL
+    filename: str       # GGUF file in models/
+    url: str            # Download URL
+    doc_prefix: str     # Prefix prepended to documents before embedding
+    query_prefix: str   # Prefix prepended to queries before embedding
 
-# OpenAI config
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
-OPENAI_MODEL = "text-embedding-3-small"
-OPENAI_DIM = 1536
 
-# MiniLM GGUF model produces 384-dimensional embeddings
-LEMBED_DIM = 384
+MODELS = [
+    ModelConfig(
+        name="MiniLM",
+        filename="all-MiniLM-L6-v2.Q8_0.gguf",
+        url="https://huggingface.co/leliuga/all-MiniLM-L6-v2-GGUF/resolve/main/all-MiniLM-L6-v2.Q8_0.gguf",
+        doc_prefix="",
+        query_prefix="",
+    ),
+    ModelConfig(
+        name="NomicEmbed",
+        filename="nomic-embed-text-v1.5.Q8_0.gguf",
+        url="https://huggingface.co/nomic-ai/nomic-embed-text-v1.5-GGUF/resolve/main/nomic-embed-text-v1.5.Q8_0.gguf",
+        doc_prefix="search_document: ",
+        query_prefix="search_query: ",
+    ),
+    # Qwen3-Embedding-8B disabled — 4.7 GB download, slow to load and embed
+    # ModelConfig(
+    #     name="Qwen3Embed8B",
+    #     filename="Qwen3-Embedding-8B-Q4_K_M.gguf",
+    #     url="https://huggingface.co/Qwen/Qwen3-Embedding-8B-GGUF/resolve/main/Qwen3-Embedding-8B-Q4_K_M.gguf",
+    #     doc_prefix="",
+    #     query_prefix="",
+    # ),
+]
+
 
 # ── Sample documents ────────────────────────────────────────────────
 DOCUMENTS = [
@@ -72,34 +85,25 @@ QUERIES = [
 ]
 
 
-def ensure_gguf_model() -> bool:
-    """Ensure the GGUF model file is available, downloading if needed.
-
-    Returns True if the model is ready, False if it could not be obtained.
-    """
-    if GGUF_MODEL_PATH.exists():
-        log.info("GGUF model found: %s", GGUF_MODEL_PATH)
+def ensure_model(model: ModelConfig) -> bool:
+    """Ensure a GGUF model file is available, downloading if needed."""
+    path = MODELS_DIR / model.filename
+    if path.exists():
+        log.info("Model %s found: %s (%.1f MB)", model.name, path, path.stat().st_size / 1e6)
         return True
 
-    if GGUF_IS_CUSTOM:
-        # User specified a custom path that doesn't exist — don't auto-download
-        log.warning("GGUF_MODEL_PATH is set but file not found: %s", GGUF_MODEL_PATH)
-        return False
-
-    # Default path: create directory and download
-    log.info("GGUF model not found at %s — downloading...", GGUF_MODEL_PATH)
-    GGUF_MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
+    log.info("Model %s not found — downloading %s...", model.name, model.filename)
+    MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
     try:
-        _download_with_progress(DEFAULT_MODEL_URL, GGUF_MODEL_PATH)
+        _download_with_progress(model.url, path)
     except Exception:
-        log.exception("Failed to download GGUF model from %s", DEFAULT_MODEL_URL)
-        # Clean up partial download
-        if GGUF_MODEL_PATH.exists():
-            GGUF_MODEL_PATH.unlink()
+        log.exception("Failed to download %s", model.filename)
+        if path.exists():
+            path.unlink()
         return False
 
-    log.info("Downloaded model to %s (%.1f MB)", GGUF_MODEL_PATH, GGUF_MODEL_PATH.stat().st_size / 1e6)
+    log.info("Downloaded %s (%.1f MB)", model.filename, path.stat().st_size / 1e6)
     return True
 
 
@@ -109,7 +113,7 @@ def _download_with_progress(url: str, dest: Path) -> None:
     with urllib.request.urlopen(req) as resp:
         total = int(resp.headers.get("Content-Length", 0))
         downloaded = 0
-        chunk_size = 256 * 1024  # 256 KB chunks
+        chunk_size = 256 * 1024
 
         with dest.open("wb") as f:
             while True:
@@ -125,95 +129,146 @@ def _download_with_progress(url: str, dest: Path) -> None:
                     print(f"\r  Downloading {dest.name}: {mb:.1f}/{total_mb:.1f} MB ({pct}%)", end="", flush=True)
 
         if total > 0:
-            print()  # newline after progress
+            print()
 
 
-def print_search_results(db: sqlite3.Connection, index_table: str, query_blob: bytes, query_text: str) -> None:
-    """Run KNN search and print results joined with document text."""
-    print(f'\n  Query: "{query_text}"')
-    results = db.execute(
-        f"""
-        SELECT v.rowid, v.distance, d.content
-        FROM {index_table} v
-        JOIN documents d ON d.id = v.rowid
-        WHERE v.vector MATCH ? AND k = 3
-        """,
-        (query_blob,),
-    ).fetchall()
-
-    for rowid, distance, content in results:
-        print(f"    #{rowid:<2d}  dist={distance:.4f}  {content}")
+def blob_to_floats(blob: bytes) -> list[float]:
+    """Convert a float32 blob to a list of Python floats."""
+    n = len(blob) // 4
+    return list(struct.unpack(f"{n}f", blob))
 
 
-# ── Section: sqlite-lembed (local GGUF model) ──────────────────────
-def run_lembed_example(db: sqlite3.Connection) -> None:
-    """Embed documents using a local GGUF model via sqlite-lembed."""
+# ── Section 1: Model Loading & Inspection ────────────────────────────
+def section_model_loading(db: sqlite3.Connection, models: list[ModelConfig]) -> dict[str, int]:
+    """Load GGUF models and inspect their properties."""
     print("\n" + "=" * 60)
-    print("Section: sqlite-lembed (local GGUF embedding)")
+    print("Section 1: Model Loading & Inspection")
     print("=" * 60)
 
-    sqlite_lembed.load(db)
-    print("\n  Loaded sqlite-lembed extension.")
+    dims: dict[str, int] = {}
+    for model in models:
+        path = MODELS_DIR / model.filename
+        db.execute(
+            "INSERT INTO temp.muninn_models(name, model) SELECT ?, muninn_embed_model(?)",
+            (model.name, str(path)),
+        )
+        (dim,) = db.execute("SELECT muninn_model_dim(?)", (model.name,)).fetchone()
+        dims[model.name] = dim
+        print(f"\n  {model.name}: dim={dim}, file={model.filename}")
+        if model.doc_prefix:
+            print(f"    doc prefix: '{model.doc_prefix}'")
+            print(f"    query prefix: '{model.query_prefix}'")
 
-    # Register the GGUF model
-    db.execute(
-        "INSERT INTO temp.lembed_models(name, model) SELECT 'MiniLM', lembed_model_from_file(?)",
-        (str(GGUF_MODEL_PATH),),
-    )
-    print(f"  Registered model: {GGUF_MODEL_PATH.name}")
+    # List all loaded models
+    rows = db.execute("SELECT name, dim FROM muninn_models").fetchall()
+    print(f"\n  All loaded models: {rows}")
 
-    # Create HNSW index
+    return dims
+
+
+# ── Section 2: Embed Documents & Build HNSW Indices ─────────────────
+def section_embed_and_index(db: sqlite3.Connection, models: list[ModelConfig], dims: dict[str, int]) -> None:
+    """Embed all documents into per-model HNSW indices."""
+    print("\n" + "=" * 60)
+    print("Section 2: Embed Documents & Build HNSW Indices")
+    print("=" * 60)
+
+    for model in models:
+        dim = dims[model.name]
+        table = f"vectors_{model.name}"
+
+        db.execute(f"CREATE VIRTUAL TABLE [{table}] USING hnsw_index(dimensions={dim}, metric=cosine)")
+        print(f"\n  {model.name}: created HNSW index (dim={dim})")
+
+        # Embed with doc_prefix prepended to each document
+        if model.doc_prefix:
+            db.execute(
+                f"INSERT INTO [{table}](rowid, vector) "
+                f"SELECT id, muninn_embed(?, ? || content) FROM documents",
+                (model.name, model.doc_prefix),
+            )
+        else:
+            db.execute(
+                f"INSERT INTO [{table}](rowid, vector) "
+                f"SELECT id, muninn_embed(?, content) FROM documents",
+                (model.name,),
+            )
+        print(f"  {model.name}: embedded and indexed {len(DOCUMENTS)} documents")
+
+        # Verify one vector
+        row = db.execute(f"SELECT vector FROM [{table}] WHERE rowid = 1").fetchone()
+        assert row is not None
+        assert len(row[0]) == dim * 4
+        print(f"  {model.name}: verified vector size = {len(row[0])} bytes ({dim} floats)")
+
+
+# ── Section 3: Comparative Semantic Search ───────────────────────────
+def section_semantic_search(db: sqlite3.Connection, models: list[ModelConfig]) -> None:
+    """Perform KNN search with each model and compare rankings."""
+    print("\n" + "=" * 60)
+    print("Section 3: Comparative Semantic Search")
+    print("=" * 60)
+
+    for query_text in QUERIES:
+        print(f'\n  Query: "{query_text}"')
+        print(f"  {'─' * 54}")
+
+        for model in models:
+            table = f"vectors_{model.name}"
+            prefixed_query = model.query_prefix + query_text
+
+            query_blob = db.execute(
+                "SELECT muninn_embed(?, ?)", (model.name, prefixed_query)
+            ).fetchone()[0]
+
+            results = db.execute(
+                f"""
+                SELECT v.rowid, v.distance, d.content
+                FROM [{table}] v
+                JOIN documents d ON d.id = v.rowid
+                WHERE v.vector MATCH ? AND k = 3
+                """,
+                (query_blob,),
+            ).fetchall()
+
+            print(f"\n    {model.name} (dim={len(query_blob) // 4}):")
+            for rowid, distance, content in results:
+                print(f"      #{rowid:<2d}  dist={distance:.4f}  {content}")
+
+
+# ── Section 4: Auto-Embed Trigger ───────────────────────────────────
+def section_auto_embed_trigger(db: sqlite3.Connection, model: ModelConfig) -> None:
+    """Demonstrate automatic embedding on INSERT via a SQLite trigger."""
+    print("\n" + "=" * 60)
+    print(f"Section 4: Auto-Embed Trigger (using {model.name})")
+    print("=" * 60)
+
+    table = f"vectors_{model.name}"
+    prefix_expr = f"'{model.doc_prefix}' || " if model.doc_prefix else ""
+
     db.execute(
         f"""
-        CREATE VIRTUAL TABLE lembed_vectors USING hnsw_index(
-            dimensions={LEMBED_DIM}, metric='cosine'
-        )
-        """
-    )
-    print(f"  Created HNSW index: dim={LEMBED_DIM}, metric=cosine")
-
-    # Embed and insert all documents
-    db.execute(
-        """
-        INSERT INTO lembed_vectors(rowid, vector)
-          SELECT id, lembed('MiniLM', content) FROM documents
-        """
-    )
-    print(f"  Embedded and indexed {len(DOCUMENTS)} documents.")
-
-    # Verify blob dimensions
-    row = db.execute("SELECT vector FROM lembed_vectors WHERE rowid = 1").fetchone()
-    assert row is not None, "Point lookup failed"
-    assert len(row[0]) == LEMBED_DIM * 4, f"Expected {LEMBED_DIM * 4} bytes, got {len(row[0])}"
-
-    # Semantic search
-    print("\n  --- Semantic Search (lembed) ---")
-    for query_text in QUERIES:
-        query_blob = db.execute("SELECT lembed('MiniLM', ?)", (query_text,)).fetchone()[0]
-        print_search_results(db, "lembed_vectors", query_blob, query_text)
-
-    # Demonstrate auto-embed trigger
-    print("\n  --- Auto-Embed Trigger ---")
-    db.execute(
-        """
-        CREATE TEMP TRIGGER lembed_auto_embed AFTER INSERT ON documents
+        CREATE TEMP TRIGGER auto_embed AFTER INSERT ON documents
         BEGIN
-          INSERT INTO lembed_vectors(rowid, vector)
-            VALUES (NEW.id, lembed('MiniLM', NEW.content));
+          INSERT INTO [{table}](rowid, vector)
+            VALUES (NEW.id, muninn_embed('{model.name}', {prefix_expr}NEW.content));
         END
         """
     )
-    print("  Created TEMP trigger for auto-embedding.")
+    print("\n  Created TEMP trigger for auto-embedding on INSERT.")
 
     db.execute("INSERT INTO documents(id, content) VALUES (100, 'Black holes warp spacetime near the event horizon')")
-    print("  Inserted new document via trigger: 'Black holes warp spacetime near the event horizon'")
+    print("  Inserted doc #100: 'Black holes warp spacetime near the event horizon'")
 
-    # Search should now find the new document for space queries
-    query_blob = db.execute("SELECT lembed('MiniLM', 'phenomena in space')", ()).fetchone()[0]
+    prefixed_query = model.query_prefix + "phenomena in space"
+    query_blob = db.execute(
+        "SELECT muninn_embed(?, ?)", (model.name, prefixed_query)
+    ).fetchone()[0]
+
     results = db.execute(
-        """
+        f"""
         SELECT v.rowid, v.distance, d.content
-        FROM lembed_vectors v
+        FROM [{table}] v
         JOIN documents d ON d.id = v.rowid
         WHERE v.vector MATCH ? AND k = 3
         """,
@@ -221,126 +276,56 @@ def run_lembed_example(db: sqlite3.Connection) -> None:
     ).fetchall()
 
     result_ids = {r[0] for r in results}
-    print(f'\n  Search for "phenomena in space" top-3 IDs: {sorted(result_ids)}')
+    print('\n  Search for "phenomena in space" top-3:')
+    for rowid, distance, content in results:
+        print(f"    #{rowid:<3d}  dist={distance:.4f}  {content}")
+
     assert 100 in result_ids, "Trigger-inserted document should appear in space-related search"
-    print("  Trigger-inserted document found in results.")
+    print("\n  Trigger-inserted document found in results.")
 
-    # Clean up trigger
-    db.execute("DROP TRIGGER lembed_auto_embed")
+    # Clean up
+    db.execute("DROP TRIGGER auto_embed")
     db.execute("DELETE FROM documents WHERE id = 100")
-    db.execute("DELETE FROM lembed_vectors WHERE rowid = 100")
-
-    print("\n  lembed section complete.")
-
-
-# ── Section: sqlite-rembed (OpenAI API) ─────────────────────────────
-def run_rembed_example(db: sqlite3.Connection) -> None:
-    """Embed documents using OpenAI's API via sqlite-rembed."""
-    print("\n" + "=" * 60)
-    print("Section: sqlite-rembed (OpenAI API embedding)")
-    print("=" * 60)
-
-    sqlite_rembed.load(db)
-    print("\n  Loaded sqlite-rembed extension.")
-
-    # Register OpenAI client (reads OPENAI_API_KEY from environment)
-    db.execute("INSERT INTO temp.rembed_clients(name, options) VALUES (?, 'openai')", (OPENAI_MODEL,))
-    print(f"  Registered client: {OPENAI_MODEL}")
-
-    # Create HNSW index for OpenAI dimensions
-    db.execute(
-        f"""
-        CREATE VIRTUAL TABLE rembed_vectors USING hnsw_index(
-            dimensions={OPENAI_DIM}, metric='cosine'
-        )
-        """
-    )
-    print(f"  Created HNSW index: dim={OPENAI_DIM}, metric=cosine")
-
-    # Embed and insert all documents (one API call per row)
-    print(f"  Embedding {len(DOCUMENTS)} documents via OpenAI API...")
-    for doc_id, content in DOCUMENTS:
-        embedding = db.execute("SELECT rembed(?, ?)", (OPENAI_MODEL, content)).fetchone()[0]
-        db.execute("INSERT INTO rembed_vectors(rowid, vector) VALUES (?, ?)", (doc_id, embedding))
-    print(f"  Indexed {len(DOCUMENTS)} documents.")
-
-    # Verify blob dimensions
-    row = db.execute("SELECT vector FROM rembed_vectors WHERE rowid = 1").fetchone()
-    assert row is not None, "Point lookup failed"
-    assert len(row[0]) == OPENAI_DIM * 4, f"Expected {OPENAI_DIM * 4} bytes, got {len(row[0])}"
-
-    # Semantic search
-    print("\n  --- Semantic Search (rembed / OpenAI) ---")
-    for query_text in QUERIES:
-        query_blob = db.execute("SELECT rembed(?, ?)", (OPENAI_MODEL, query_text)).fetchone()[0]
-        print_search_results(db, "rembed_vectors", query_blob, query_text)
-
-    print("\n  rembed section complete.")
+    db.execute(f"DELETE FROM [{table}] WHERE rowid = 100")
 
 
 # ── Main ────────────────────────────────────────────────────────────
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
-    print("=== Text Embeddings Example ===")
+    print("=== muninn Text Embeddings Example ===")
     print(f"\n  Project root:  {PROJECT_ROOT}")
     print(f"  Extension:     {EXTENSION_PATH}")
 
-    # ── Dependency checks ───────────────────────────────────────────
-    can_lembed = True
-    can_rembed = True
-
-    if not HAS_LEMBED:
-        log.warning("sqlite-lembed not installed. Install with: pip install sqlite-lembed")
-        can_lembed = False
-    elif not ensure_gguf_model():
-        can_lembed = False
-
-    if not HAS_REMBED:
-        log.warning("sqlite-rembed not installed. Install with: pip install sqlite-rembed")
-        can_rembed = False
-    elif not OPENAI_API_KEY:
-        log.warning("OPENAI_API_KEY is not set or empty. Skipping rembed examples.")
-        can_rembed = False
-
-    if not can_lembed and not can_rembed:
-        log.warning(
-            "Neither sqlite-lembed nor sqlite-rembed is available. "
-            "Install at least one to run this example:\n"
-            "  pip install sqlite-lembed   # for local GGUF models\n"
-            "  pip install sqlite-rembed   # for OpenAI/Ollama API"
-        )
+    # Ensure all models are available (download if needed)
+    available_models = [m for m in MODELS if ensure_model(m)]
+    if not available_models:
+        log.error("No models available. Cannot proceed.")
         return
 
-    # ── Setup database ──────────────────────────────────────────────
+    print(f"\n  Models ready: {[m.name for m in available_models]}")
+
+    # Connect and load muninn — that's all we need
     db = sqlite3.connect(":memory:")
     db.enable_load_extension(True)
     db.load_extension(EXTENSION_PATH)
-    print("  Loaded muninn extension.\n")
+    print("  Loaded muninn extension (HNSW + GGUF embedding).\n")
 
+    # Create documents table
     db.execute("CREATE TABLE documents (id INTEGER PRIMARY KEY, content TEXT NOT NULL)")
     db.executemany("INSERT INTO documents(id, content) VALUES (?, ?)", DOCUMENTS)
     print(f"  Created documents table with {len(DOCUMENTS)} rows.")
 
-    # ── Run available sections ──────────────────────────────────────
-    sections_run = 0
+    # Run all sections
+    dims = section_model_loading(db, available_models)
+    section_embed_and_index(db, available_models, dims)
+    section_semantic_search(db, available_models)
+    section_auto_embed_trigger(db, available_models[0])
 
-    if can_lembed:
-        run_lembed_example(db)
-        sections_run += 1
-
-    if can_rembed:
-        run_rembed_example(db)
-        sections_run += 1
-
-    # ── Summary ─────────────────────────────────────────────────────
+    # Done
     db.close()
     print("\n" + "=" * 60)
-    print(f"Done. Ran {sections_run} section(s).")
-    if not can_lembed:
-        print("  Skipped: lembed (missing dependency or model)")
-    if not can_rembed:
-        print("  Skipped: rembed (missing dependency or OPENAI_API_KEY)")
+    print("Done. All sections completed successfully.")
     print("=" * 60)
 
 

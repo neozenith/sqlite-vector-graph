@@ -20,7 +20,7 @@
         "color": "hsl(0, 85%, 58%)",
         "width": 2
       },
-      "opacity": 0.8,
+      "opacity": 0.6,
       "legendgroup": "None",
       "legendgrouptitle": {
         "text": "None"
@@ -59,7 +59,7 @@
         "color": "hsl(0, 70%, 35%)",
         "width": 2
       },
-      "opacity": 0.8,
+      "opacity": 0.6,
       "legendgroup": "None",
       "legendgrouptitle": {
         "text": "None"
@@ -96,7 +96,7 @@
         "color": "hsl(130, 85%, 58%)",
         "width": 2
       },
-      "opacity": 0.8,
+      "opacity": 0.6,
       "legendgroup": "graphqlite",
       "legendgrouptitle": {
         "text": "graphqlite"
@@ -133,7 +133,7 @@
         "color": "hsl(130, 80%, 51%)",
         "width": 2
       },
-      "opacity": 0.8,
+      "opacity": 0.6,
       "legendgroup": "graphqlite",
       "legendgrouptitle": {
         "text": "graphqlite"
@@ -174,7 +174,7 @@
         "color": "hsl(130, 75%, 43%)",
         "width": 2
       },
-      "opacity": 0.8,
+      "opacity": 0.6,
       "legendgroup": "graphqlite",
       "legendgrouptitle": {
         "text": "graphqlite"
@@ -221,7 +221,7 @@
         "color": "hsl(130, 70%, 35%)",
         "width": 2
       },
-      "opacity": 0.8,
+      "opacity": 0.6,
       "legendgroup": "graphqlite",
       "legendgrouptitle": {
         "text": "graphqlite"

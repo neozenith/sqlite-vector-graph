@@ -32,10 +32,17 @@ LLAMA_CMAKE_FLAGS = \
     -DBUILD_SHARED_LIBS=OFF \
     -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
     -DGGML_NATIVE=OFF \
-    -DGGML_METAL=OFF -DGGML_CUDA=OFF -DGGML_VULKAN=OFF \
-    -DGGML_HIP=OFF -DGGML_SYCL=OFF -DGGML_OPENMP=OFF \
+    -DGGML_METAL=ON \
+    -DGGML_CUDA=OFF \
+    -DGGML_VULKAN=OFF \
+    -DGGML_HIP=OFF \
+    -DGGML_SYCL=OFF \
+    -DGGML_OPENMP=OFF \
     -DGGML_BACKEND_DL=OFF \
-    -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF \
+    -DLLAMA_BUILD_COMMON=OFF \
+    -DLLAMA_BUILD_TESTS=OFF \
+    -DLLAMA_BUILD_TOOLS=OFF \
+    -DLLAMA_BUILD_EXAMPLES=OFF \
     -DLLAMA_BUILD_SERVER=OFF \
     -DCMAKE_BUILD_TYPE=MinSizeRel
 
@@ -48,8 +55,8 @@ ifeq ($(UNAME_S),Darwin)
         CFLAGS_BASE += -arch $(ARCH)
         LLAMA_CMAKE_FLAGS += -DCMAKE_OSX_ARCHITECTURES=$(ARCH)
     endif
-    CFLAGS_BASE += -mmacosx-version-min=11.0
-    LLAMA_CMAKE_FLAGS += -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
+    CFLAGS_BASE += -mmacosx-version-min=13.3
+    LLAMA_CMAKE_FLAGS += -DCMAKE_OSX_DEPLOYMENT_TARGET=13.3
     # C++ runtime + Accelerate for llama.cpp
     LDFLAGS += -lc++ -framework Accelerate
     # SQLite for test linking (extension only needs headers from src/)
@@ -92,14 +99,14 @@ TEST_SRC = test/test_main.c test/test_vec_math.c test/test_priority_queue.c \
            test/test_graph_csr.c test/test_graph_selector.c \
            test/test_embed_gguf.c
 
-.PHONY: all debug test test-python test-js test-install test-all clean help \
+.PHONY: all debug build test test-python test-js test-install test-all clean help \
         amalgamation install uninstall version version-stamp \
         dist dist-extension dist-python dist-npm dist-wasm changelog release \
         docs-serve docs-build docs-wasm docs-clean \
         format format-c format-python format-js \
         lint lint-c lint-python lint-js \
         typecheck typecheck-python typecheck-js \
-        ci ci-all llama-clean muninn-llama muninn-llama-pre-1 muninn-llama-pre-2
+        ci ci-all llama-clean llamacpp
 
 help:                                          ## Show this help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -111,13 +118,13 @@ version:                                       ## Print version
 ######################################################################
 # LLAMA.CPP PRE-BUILD
 ######################################################################
-muninn-llama: $(LLAMA_LIBS_CORE)
+llamacpp: $(LLAMA_LIBS_CORE)
 $(LLAMA_LIBS_CORE): | $(LLAMA_DIR)/CMakeLists.txt
 	@echo "######### Building llama.cpp static libraries (this may take a minute)..."
 	cmake -B $(LLAMA_BUILD) -S $(LLAMA_DIR) $(LLAMA_CMAKE_FLAGS)
 
 	@echo "######### Compiling llama.cpp 1 core..."
-	cmake --build $(LLAMA_BUILD) --config MinSizeRel
+	cmake --build $(LLAMA_BUILD) --config MinSizeRel -j
 
 llama-clean:                                   ## Clean llama.cpp build artifacts
 	rm -rf $(LLAMA_BUILD)
@@ -128,6 +135,7 @@ llama-clean:                                   ## Clean llama.cpp build artifact
 
 all: build/muninn$(EXT)                        ## Build the extension
 
+build: build/muninn$(EXT)
 build/muninn$(EXT): $(SRC) $(LLAMA_LIBS)
 	@mkdir -p build
 	$(CC) $(CFLAGS_BASE) $(CFLAGS_EXTRA) $(SHARED_FLAGS) \
@@ -176,7 +184,13 @@ format: format-c format-python format-js       ## Format all code
 format-c:                                      ## Format C code with clang-format
 	clang-format -i src/*.c src/*.h test/*.c test/*.h
 
-format-python:                                 ## Format Python code with ruff
+init-python: .venv/.init-python                       ## Set up Python virtual environment and install dependencies
+.venv/.init-python: pyproject.toml
+	# Unfortunately llama.cpp's CMake hangs on a SVE check so we need to specify these flags here as well to get a working venv for the Python bindings.
+	CMAKE_ARGS="-DGGML_NATIVE=OFF -DGGML_METAL=ON" uv sync --all-groups
+	@touch $@
+
+format-python: .venv/.init-python                       ## Format Python code with ruff
 	.venv/bin/ruff format .
 	.venv/bin/ruff check --fix-only .
 
@@ -193,7 +207,7 @@ lint-c:                                        ## Lint C code with clang-format 
 		echo "clang-format not installed — skipping C lint"; \
 	fi
 
-lint-python:                                   ## Lint Python code with ruff
+lint-python: .venv/.init-python                       ## Lint Python code with ruff
 	.venv/bin/ruff check .
 	.venv/bin/ruff format --check .
 
@@ -202,7 +216,7 @@ lint-js:                                       ## Lint TypeScript code with biom
 
 typecheck: typecheck-python typecheck-js format       ## Type-check all code
 
-typecheck-python:                              ## Type-check Python with mypy
+typecheck-python: .venv/.init-python                       ## Type-check Python with mypy
 	.venv/bin/mypy sqlite_muninn/
 
 typecheck-js:                                  ## Type-check TypeScript with tsc
@@ -217,7 +231,7 @@ amalgamation: dist/muninn.c dist/muninn.h      ## Create single-file amalgamatio
 dist/muninn.c dist/muninn.h: $(SRC) $(HEADERS)
 	bash scripts/amalgamate.sh
 
-version-stamp:                                 ## Stamp VERSION into skill files + package.json
+version-stamp: .venv/.init-python                                 ## Stamp VERSION into skill files + package.json
 	.venv/bin/python scripts/version_stamp.py
 	npm --prefix ./npm install # update package-lock.json with new version
 
@@ -317,3 +331,6 @@ clean: docs-clean llama-clean                  ## Clean build artifacts
 	rm -rf *.egg-info
 	rm -rf .coverage
 	rm -f *.gcda *.gcno src/*.gcda src/*.gcno test/*.gcda test/*.gcno
+	rm -rf .venv
+	make -C wasm clean
+	make -C viz clean

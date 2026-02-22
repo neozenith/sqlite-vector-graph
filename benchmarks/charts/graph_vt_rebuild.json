@@ -24,7 +24,7 @@
         "color": "hsl(270, 75%, 45%)",
         "width": 2
       },
-      "opacity": 0.8,
+      "opacity": 0.6,
       "legendgroup": "csr_blocked",
       "legendgrouptitle": {
         "text": "CSR blocked-incremental"
@@ -54,7 +54,7 @@
         "color": "hsl(30, 75%, 45%)",
         "width": 2
       },
-      "opacity": 0.8,
+      "opacity": 0.6,
       "legendgroup": "csr_full_rebuild",
       "legendgrouptitle": {
         "text": "CSR full-rebuild"
@@ -84,7 +84,7 @@
         "color": "hsl(160, 75%, 45%)",
         "width": 2
       },
-      "opacity": 0.8,
+      "opacity": 0.6,
       "legendgroup": "csr_incremental",
       "legendgrouptitle": {
         "text": "CSR incremental"

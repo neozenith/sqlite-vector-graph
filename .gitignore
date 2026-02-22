@@ -46,7 +46,10 @@ site/
 benchmarks/charts/*.html
 benchmarks/results/*.jsonl
 benchmarks/results/*/*.sqlite
+
 benchmarks/vectors/*.npy
+benchmarks/vectors/*.json
+
 benchmarks/texts/
 benchmarks/kg/
 # NOTE: benchmarks/charts/*.json is NOT ignored — those Plotly specs

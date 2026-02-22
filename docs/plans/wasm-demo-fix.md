@@ -1,0 +1,1 @@
+The assets/3300.db from the old make -C benchmarks kg-demo no longer exists after the benchmarks cli pipeline refactor and needs to be address since the wasm and viz demo rely on it.

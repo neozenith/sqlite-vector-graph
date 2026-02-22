@@ -60,6 +60,10 @@ class KGRelationExtractionTreatment(Treatment):
         self._adapter = None
 
     @property
+    def requires_muninn(self) -> bool:
+        return False
+
+    @property
     def category(self):
         return "kg-re"
 

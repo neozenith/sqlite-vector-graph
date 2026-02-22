@@ -345,41 +345,59 @@ class TestVectorStatus:
         with patch("benchmarks.harness.prep.vectors.VECTORS_DIR", vectors_dir):
             from benchmarks.harness.prep.vectors import _print_vector_status
 
-            _print_vector_status(["ag_news"], {"MiniLM": {"model_id": "test", "dim": 384}})
+            _print_vector_status(["ag_news"], {"MiniLM": {"dim": 384}})
         captured = capsys.readouterr()
         assert "Vector Cache Status" in captured.out
         assert "MISSING" in captured.out
 
-    def test_status_shows_cached(self, tmp_path, capsys):
+    def test_status_shows_cached_docs(self, tmp_path, capsys):
         vectors_dir = tmp_path / "vectors"
         vectors_dir.mkdir()
         arr = np.random.rand(100, 384).astype(np.float32)
-        np.save(vectors_dir / "MiniLM_ag_news.npy", arr)
+        np.save(vectors_dir / "MiniLM_ag_news_docs.npy", arr)
 
         with patch("benchmarks.harness.prep.vectors.VECTORS_DIR", vectors_dir):
             from benchmarks.harness.prep.vectors import _print_vector_status
 
-            _print_vector_status(["ag_news"], {"MiniLM": {"model_id": "test", "dim": 384}})
+            _print_vector_status(["ag_news"], {"MiniLM": {"dim": 384}})
         captured = capsys.readouterr()
         assert "CACHED" in captured.out
         assert "100" in captured.out
+        assert "docs" in captured.out
+
+    def test_status_shows_cached_queries(self, tmp_path, capsys):
+        vectors_dir = tmp_path / "vectors"
+        vectors_dir.mkdir()
+        arr = np.random.rand(50, 384).astype(np.float32)
+        np.save(vectors_dir / "MiniLM_ag_news_queries.npy", arr)
+
+        with patch("benchmarks.harness.prep.vectors.VECTORS_DIR", vectors_dir):
+            from benchmarks.harness.prep.vectors import _print_vector_status
+
+            _print_vector_status(["ag_news"], {"MiniLM": {"dim": 384}})
+        captured = capsys.readouterr()
+        assert "CACHED" in captured.out
+        assert "50" in captured.out
+        assert "queries" in captured.out
 
 
 class TestVectorPrepTask:
     def test_task_id(self):
-        t = VectorPrepTask("MiniLM", {"model_id": "test", "dim": 384}, "ag_news")
+        t = VectorPrepTask("MiniLM", {"dim": 384}, "ag_news")
         assert t.task_id == "vector:MiniLM:ag_news"
 
     def test_label(self):
-        t = VectorPrepTask("MiniLM", {"model_id": "test", "dim": 384}, "ag_news")
+        t = VectorPrepTask("MiniLM", {"dim": 384}, "ag_news")
         assert t.label == "MiniLM / ag_news"
 
-    def test_outputs(self, tmp_path):
+    def test_outputs_has_docs_and_queries(self, tmp_path):
         with patch("benchmarks.harness.prep.vectors.VECTORS_DIR", tmp_path / "vectors"):
-            t = VectorPrepTask("MiniLM", {"model_id": "test", "dim": 384}, "ag_news")
+            t = VectorPrepTask("MiniLM", {"dim": 384}, "ag_news")
             outputs = t.outputs()
-        assert len(outputs) == 1
-        assert "MiniLM_ag_news.npy" in outputs[0].name
+        assert len(outputs) == 2
+        names = {o.name for o in outputs}
+        assert "MiniLM_ag_news_docs.npy" in names
+        assert "MiniLM_ag_news_queries.npy" in names
 
     def test_vector_prep_tasks_count(self):
         """Should have 6 tasks: 3 models × 2 datasets."""

@@ -58,6 +58,7 @@ nav:
     - VSS: benchmarks/vss.md
     - Graph: benchmarks/graph.md
     - Graph VT: benchmarks/graph_vt.md
+    - KG: benchmarks/kg.md
 
 
 markdown_extensions:

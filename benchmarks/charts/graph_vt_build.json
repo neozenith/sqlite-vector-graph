@@ -24,7 +24,7 @@
         "color": "hsl(30, 75%, 45%)",
         "width": 2
       },
-      "opacity": 0.8,
+      "opacity": 0.6,
       "legendgroup": "csr",
       "legendgrouptitle": {
         "text": "CSR"

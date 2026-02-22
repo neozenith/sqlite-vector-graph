@@ -105,9 +105,9 @@ VSS_CHARTS = [
         **_TP_COMMON,
     ),
     ChartSpec(
-        name="tipping_point_MPNet_ag_news",
-        title="Search Latency vs Dataset Size (MPNet / AG News)",
-        filters={"model_name": "MPNet", "dataset": "ag_news"},
+        name="tipping_point_NomicEmbed_ag_news",
+        title="Search Latency vs Dataset Size (NomicEmbed / AG News)",
+        filters={"model_name": "NomicEmbed", "dataset": "ag_news"},
         **_TP_COMMON,
     ),
     ChartSpec(
@@ -131,9 +131,9 @@ VSS_CHARTS = [
         **_TP_COMMON,
     ),
     ChartSpec(
-        name="tipping_point_MPNet_wealth_of_nations",
-        title="Search Latency vs Dataset Size (MPNet / Wealth of Nations)",
-        filters={"model_name": "MPNet", "dataset": "wealth_of_nations"},
+        name="tipping_point_NomicEmbed_wealth_of_nations",
+        title="Search Latency vs Dataset Size (NomicEmbed / Wealth of Nations)",
+        filters={"model_name": "NomicEmbed", "dataset": "wealth_of_nations"},
         **_TP_COMMON,
     ),
     ChartSpec(
@@ -157,9 +157,9 @@ VSS_CHARTS = [
         **_DS_COMMON,
     ),
     ChartSpec(
-        name="dataset_comparison_MPNet",
-        title="Dataset Comparison (MPNet)",
-        filters={"model_name": "MPNet", "dataset": ["ag_news", "wealth_of_nations"]},
+        name="dataset_comparison_NomicEmbed",
+        title="Dataset Comparison (NomicEmbed)",
+        filters={"model_name": "NomicEmbed", "dataset": ["ag_news", "wealth_of_nations"]},
         **_DS_COMMON,
     ),
     ChartSpec(

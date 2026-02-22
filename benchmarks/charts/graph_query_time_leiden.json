@@ -18,7 +18,7 @@
         "color": "hsl(200, 85%, 58%)",
         "width": 2
       },
-      "opacity": 0.8,
+      "opacity": 0.6,
       "legendgroup": "barabasi_albert",
       "legendgrouptitle": {
         "text": "Barabasi-Albert"
@@ -42,7 +42,7 @@
         "color": "hsl(200, 70%, 35%)",
         "width": 2
       },
-      "opacity": 0.8,
+      "opacity": 0.6,
       "legendgroup": "barabasi_albert",
       "legendgrouptitle": {
         "text": "Barabasi-Albert"
@@ -66,7 +66,7 @@
         "color": "hsl(30, 85%, 58%)",
         "width": 2
       },
-      "opacity": 0.8,
+      "opacity": 0.6,
       "legendgroup": "erdos_renyi",
       "legendgrouptitle": {
         "text": "Erdos-Renyi"
@@ -96,7 +96,7 @@
         "color": "hsl(30, 70%, 35%)",
         "width": 2
       },
-      "opacity": 0.8,
+      "opacity": 0.6,
       "legendgroup": "erdos_renyi",
       "legendgrouptitle": {
         "text": "Erdos-Renyi"

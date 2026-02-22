@@ -1,9 +1,30 @@
 """Shared fixtures for benchmark harness tests."""
 
 import sqlite3
+import subprocess
+import sys
 
 import numpy as np
 import pytest
+
+from benchmarks.harness.common import PROJECT_ROOT
+
+
+def run_cli(*args, timeout=30):
+    """Run benchmarks.harness.cli as a subprocess with correct CWD.
+
+    When tests are invoked via `make -C benchmarks/harness`, the CWD is
+    benchmarks/harness/ — but `python -m benchmarks.harness.cli` needs
+    the project root on sys.path.  This helper ensures the subprocess
+    always starts from the project root.
+    """
+    return subprocess.run(
+        [sys.executable, "-m", "benchmarks.harness.cli", *args],
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        cwd=PROJECT_ROOT,
+    )
 
 
 @pytest.fixture

@@ -21,7 +21,7 @@ def _cmd_prep(args):
     target = args.prep_target
 
     if target is None:
-        print("Usage: benchmarks.harness.cli prep {vectors,texts,kg-chunks,kg,all}")
+        print("Usage: benchmarks.harness.cli prep {vectors,texts,kg-chunks,kg,gguf,all}")
         print("Run 'benchmarks.harness.cli prep --help' for details.")
         sys.exit(1)
 
@@ -64,6 +64,15 @@ def _cmd_prep(args):
 
         prep_kg_datasets(
             dataset=getattr(args, "dataset", None),
+            status_only=status_only,
+            force=force,
+        )
+
+    if target in ("gguf", "all"):
+        from benchmarks.harness.prep.gguf_models import prep_gguf
+
+        prep_gguf(
+            model_name=getattr(args, "model", None),
             status_only=status_only,
             force=force,
         )
@@ -250,8 +259,17 @@ def main():
     prep_kg_ds_p.add_argument("--force", action="store_true", help="Re-download datasets even if they exist")
     prep_kg_ds_p.add_argument("--dataset", choices=kg_task_ids, help="Specific dataset to download")
 
+    # prep gguf
+    from benchmarks.harness.prep.gguf_models import GGUF_MODELS
+
+    gguf_model_names = [m["name"] for m in GGUF_MODELS]
+    prep_gguf_p = prep_subs.add_parser("gguf", help="Download GGUF embedding models to models/")
+    prep_gguf_p.add_argument("--status", action="store_true", help="Show GGUF model download status")
+    prep_gguf_p.add_argument("--force", action="store_true", help="Re-download models even if they exist")
+    prep_gguf_p.add_argument("--model", choices=gguf_model_names, help="Specific model to download")
+
     # prep all
-    prep_all_p = prep_subs.add_parser("all", help="Prep everything (vectors + texts + kg-chunks + kg)")
+    prep_all_p = prep_subs.add_parser("all", help="Prep everything (vectors + texts + kg-chunks + kg + gguf)")
     prep_all_p.add_argument("--status", action="store_true", help="Show status of all prep targets")
     prep_all_p.add_argument("--force", action="store_true", help="Force re-creation of all prep targets")
 
@@ -265,7 +283,7 @@ def main():
         const="",
         default=None,
         help="Filter by category (omit value to list available categories). "
-        "Categories: vss, graph, centrality, community, graph_vt, "
+        "Categories: vss, embed, graph, centrality, community, graph_vt, "
         "kg-extract, kg-re, kg-resolve, kg-graphrag, node2vec",
     )
     manifest_parser.add_argument("--commands", action="store_true", help="Print runnable commands")

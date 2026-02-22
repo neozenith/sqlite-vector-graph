@@ -23,11 +23,11 @@ Compares vector similarity search engines on insert throughput, search latency, 
 
 ## Embedding Models
 
-| Model | Dimension | Params | Size | Use Case | 
+| Model | Dimension | Params | Doc Prefix | Query Prefix | 
 |---------|---------|---------|---------|---------|
-| [MiniLM](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) | 384 | 22M | 80 MB | Fast, lightweight semantic search | 
-| [MPNet](https://huggingface.co/sentence-transformers/all-mpnet-base-v2) | 768 | 110M | 420 MB | Balanced quality/speed | 
-| [BGE-Large](https://huggingface.co/BAAI/bge-large-en-v1.5) | 1024 | 335M | 1340 MB | High-quality retrieval | 
+| **MiniLM** | 384 | 22M | _(none)_ | _(none)_ | 
+| **NomicEmbed** | 768 | 137M | `"search_document: "` | `"search_query: "` | 
+| **BGE-Large** | 1024 | 335M | _(none)_ | `"Represent this sentence for se..."` | 
 
 
 
@@ -42,10 +42,10 @@ Compares vector similarity search engines on insert throughput, search latency, 
 ```
 
 
-### Search Latency vs Dataset Size (MPNet / AG News)
+### Search Latency vs Dataset Size (NomicEmbed / AG News)
 
 ```plotly
---8<-- "benchmarks/charts/tipping_point_MPNet_ag_news.json"
+--8<-- "benchmarks/charts/tipping_point_NomicEmbed_ag_news.json"
 ```
 
 
@@ -78,10 +78,10 @@ Compares vector similarity search engines on insert throughput, search latency, 
 ```
 
 
-### Search Latency vs Dataset Size (MPNet / Wealth of Nations)
+### Search Latency vs Dataset Size (NomicEmbed / Wealth of Nations)
 
 ```plotly
---8<-- "benchmarks/charts/tipping_point_MPNet_wealth_of_nations.json"
+--8<-- "benchmarks/charts/tipping_point_NomicEmbed_wealth_of_nations.json"
 ```
 
 
@@ -114,10 +114,10 @@ Compares vector similarity search engines on insert throughput, search latency, 
 ```
 
 
-### Dataset Comparison (MPNet)
+### Dataset Comparison (NomicEmbed)
 
 ```plotly
---8<-- "benchmarks/charts/dataset_comparison_MPNet.json"
+--8<-- "benchmarks/charts/dataset_comparison_NomicEmbed.json"
 ```
 
 

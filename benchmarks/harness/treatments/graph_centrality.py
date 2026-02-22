@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from benchmarks.harness.common import generate_barabasi_albert, generate_erdos_renyi, load_muninn
+from benchmarks.harness.common import generate_barabasi_albert, generate_erdos_renyi
 from benchmarks.harness.treatments.base import Treatment
 
 log = logging.getLogger(__name__)
@@ -57,7 +57,6 @@ class GraphCentralityTreatment(Treatment):
             self._edges, _ = generate_barabasi_albert(self._n_nodes, int(self._avg_degree), seed=42)
 
         n_edges = len(self._edges)
-        load_muninn(conn)
 
         conn.execute("CREATE TABLE IF NOT EXISTS bench_edges(src INTEGER, dst INTEGER, weight REAL)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_src ON bench_edges(src)")

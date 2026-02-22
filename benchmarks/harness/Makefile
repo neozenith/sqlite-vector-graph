@@ -52,10 +52,10 @@ typecheck:               ## Run type checking with mypy
 
 # ── Testing ───────────────────────────────────────────────────────
 test: $(EXTENSION)       ## Run all harness tests
-	uv run -m pytest $(HARNESS_ABS)/tests/ -v
+	uv run -m pytest $(HARNESS_ABS)/tests/ -v --no-cov
 
 test-quick:              ## Run tests excluding slow/integration tests
-	uv run -m pytest $(HARNESS_ABS)/tests/ -v -x -m "not slow"
+	uv run -m pytest $(HARNESS_ABS)/tests/ -v -x -m "not slow" --no-cov
 
 # ── Coverage ──────────────────────────────────────────────────────
 coverage: $(EXTENSION)   ## Run tests with coverage report

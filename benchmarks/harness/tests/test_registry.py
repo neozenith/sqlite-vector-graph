@@ -18,8 +18,8 @@ class TestRegistry:
     def test_permutation_ids_are_valid_path_components(self):
         """All permutation IDs should be safe for use as directory names."""
         perms = all_permutations()
-        # Allow alphanumeric, hyphens, underscores, dots
-        valid_pattern = re.compile(r"^[a-zA-Z0-9._-]+$")
+        # Allow alphanumeric, hyphens, underscores, dots, plus signs
+        valid_pattern = re.compile(r"^[a-zA-Z0-9._+\-]+$")
         for p in perms:
             assert valid_pattern.match(p.permutation_id), (
                 f"Invalid permutation ID (not filesystem-safe): {p.permutation_id}"
@@ -41,6 +41,7 @@ class TestRegistry:
         categories = {p.category for p in perms}
         expected = {
             "vss",
+            "embed",
             "graph",
             "centrality",
             "community",

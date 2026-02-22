@@ -1,46 +1,63 @@
-# Text Embeddings — Semantic Search with Real Models
+# Text Embeddings — Semantic Search with muninn
 
-End-to-end text-in, semantic-search-out using muninn's HNSW index with real embedding models.
+Zero-dependency end-to-end example: load GGUF embedding models, embed documents,
+build HNSW indices, and perform semantic similarity search — all inside a single
+SQLite extension. Compares three models side-by-side.
+
+## Models
+
+| Model | Params | Dim | Quantization | Size | Context | Architecture |
+|-------|--------|-----|-------------|------|---------|--------------|
+| **all-MiniLM-L6-v2** | 22M | 384 | Q8_0 | 23 MB | 512 | BERT (mean pooling) |
+| **nomic-embed-text-v1.5** | 137M | 768 | Q8_0 | 146 MB | 8K | BERT (mean pooling) |
+| **Qwen3-Embedding-8B** | 8B | 4096 | Q4_K_M | 4.7 GB | 32K | Decoder (last-token pooling) |
+
+All models are auto-downloaded to `models/` on first run. The Qwen3 model is
+large (4.7 GB) — the example gracefully skips any model that fails to download.
 
 ## What This Demonstrates
 
-| Feature | How |
+| Feature | SQL |
 |---------|-----|
-| Local GGUF embedding | `lembed('MiniLM', text)` via sqlite-lembed |
-| OpenAI API embedding | `rembed('text-embedding-3-small', text)` via sqlite-rembed |
-| Embed + insert in one SQL statement | `INSERT INTO idx(rowid, vector) SELECT id, lembed(...) FROM docs` |
-| Auto-embed trigger | `CREATE TEMP TRIGGER ... lembed(...)` on INSERT |
-| KNN semantic search | `WHERE vector MATCH lembed('MiniLM', 'query') AND k = 3` |
+| Load GGUF model | `INSERT INTO temp.muninn_models(name, model) SELECT 'name', muninn_embed_model('path.gguf')` |
+| Query dimension | `SELECT muninn_model_dim('MiniLM')` |
+| Generate embedding | `SELECT muninn_embed('MiniLM', 'hello world')` |
+| Prefixed embedding | `SELECT muninn_embed('NomicEmbed', 'search_query: hello world')` |
+| Bulk embed + index | `INSERT INTO idx(rowid, vector) SELECT id, muninn_embed('MiniLM', content) FROM docs` |
+| KNN semantic search | `WHERE vector MATCH muninn_embed('MiniLM', 'query') AND k = 3` |
+| Auto-embed trigger | `CREATE TEMP TRIGGER ... muninn_embed(...)` on INSERT |
+| Multi-model compare | Side-by-side search results from all models |
 
 ## Prerequisites
 
-Build the muninn extension and install at least one embedding extension:
+Build the muninn extension — that's it. No `pip install` needed.
 
 ```bash
 make all
-pip install sqlite-lembed    # Local GGUF models (no API key needed)
-pip install sqlite-rembed    # Remote API (requires OPENAI_API_KEY)
 ```
-
-The GGUF model file (`all-MiniLM-L6-v2.Q8_0.gguf`, 36 MB) is **downloaded automatically** on first run into `models/`. No manual setup needed.
 
 ## Run
 
 ```bash
-# lembed only (local, no API key needed — model auto-downloads)
+# Run the example (models auto-download on first run)
 python examples/text_embeddings/example.py
 
-# Both lembed and rembed
-export OPENAI_API_KEY="sk-..."
-python examples/text_embeddings/example.py
-
-# Use a different GGUF model file (skips auto-download)
-GGUF_MODEL_PATH=/path/to/custom-model.gguf python examples/text_embeddings/example.py
+# See llama.cpp internals (model loading, tensor info, etc.)
+MUNINN_LOG_LEVEL=verbose python examples/text_embeddings/example.py
 ```
+
+## Sections
+
+| # | Section | What It Shows |
+|---|---------|---------------|
+| 1 | **Model Loading & Inspection** | Load all models, query dimensions, show prefixes |
+| 2 | **Embed & Build HNSW Indices** | Per-model HNSW indices with bulk INSERT...SELECT |
+| 3 | **Comparative Semantic Search** | Side-by-side KNN results for each query across all models |
+| 4 | **Auto-Embed Trigger** | TEMP trigger that auto-embeds new rows on INSERT |
 
 ## Data
 
-8 sentences across 4 topics, embedded with real models:
+8 sentences across 4 topics:
 
 - **Nature:** fox in the forest, wolves and bears
 - **AI/ML:** neural networks, gradient descent
@@ -53,52 +70,28 @@ GGUF_MODEL_PATH=/path/to/custom-model.gguf python examples/text_embeddings/examp
 - "machine learning and artificial intelligence" — should match AI documents
 - "outer space exploration" — should match space documents
 
-## Sections
+## Model Architecture Notes
 
-The example runs sections conditionally based on available dependencies:
+### BERT vs Decoder embedding models
 
-| Section | Requires | Auto-Setup | Skipped When |
-|---------|----------|-----------|-------------|
-| **lembed** | `pip install sqlite-lembed` | GGUF model auto-downloaded to `models/` | Package not installed, or download fails |
-| **rembed** | `pip install sqlite-rembed` + `OPENAI_API_KEY` | None | Package not installed, or API key empty |
+muninn automatically handles both architectures through GGUF metadata:
 
-Warnings are logged for each skipped section with install instructions.
-When `GGUF_MODEL_PATH` is set to a custom path, auto-download is skipped and the file must exist.
+- **BERT models** (MiniLM, Nomic): bidirectional attention, **mean pooling** — the
+  embedding is the average of all token hidden states.
+- **Decoder models** (Qwen3-Embedding): causal attention, **last-token pooling** — the
+  embedding lives at the final token position (`<|endoftext|>`).
 
-## Expected Output (first run, lembed only)
+The pooling type is baked into each GGUF file's metadata, so muninn reads it
+automatically. No configuration needed.
 
-```
-=== Text Embeddings Example ===
+### Task instruction prefixes
 
-  Project root:  /path/to/sqlite-muninn
-  Extension:     /path/to/sqlite-muninn/muninn
-INFO: GGUF model not found at /path/to/sqlite-muninn/models/all-MiniLM-L6-v2.Q8_0.gguf — downloading...
-  Downloading all-MiniLM-L6-v2.Q8_0.gguf: 36.2/36.2 MB (100%)
-INFO: Downloaded model to .../models/all-MiniLM-L6-v2.Q8_0.gguf (36.2 MB)
-WARNING: OPENAI_API_KEY is not set or empty. Skipping rembed examples.
-  Loaded muninn extension.
+Some models use prefixes to specialize embeddings for different tasks:
 
-  Created documents table with 8 rows.
+| Model | Document prefix | Query prefix |
+|-------|----------------|--------------|
+| MiniLM | *(none)* | *(none)* |
+| nomic-embed-text-v1.5 | `search_document: ` | `search_query: ` |
+| Qwen3-Embedding-8B | *(none, optional instructions)* | *(none, optional instructions)* |
 
-============================================================
-Section: sqlite-lembed (local GGUF embedding)
-============================================================
-
-  Loaded sqlite-lembed extension.
-  Registered model: all-MiniLM-L6-v2.Q8_0.gguf
-  Created HNSW index: dim=384, metric=cosine
-  Embedded and indexed 8 documents.
-
-  --- Semantic Search (lembed) ---
-
-  Query: "animals in the wild"
-    #1   dist=0.5678  The quick brown fox jumps over the lazy dog in the forest
-    #6   dist=0.6012  Wolves and bears roam the dense woodland trails
-    ...
-```
-
-On subsequent runs, the model is found immediately:
-
-```
-INFO: GGUF model found: .../models/all-MiniLM-L6-v2.Q8_0.gguf
-```
+The example handles prefixes via `ModelConfig.doc_prefix` / `query_prefix`.

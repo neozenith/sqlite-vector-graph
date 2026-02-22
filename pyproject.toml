@@ -40,14 +40,12 @@ benchmark = [
     "umap-learn>=0.5.7",
     "plotly>=6.5.2",
     "jinja2>=3.1.0",
-    
     # Competitors / peers depending how you look at it
     "apsw",
     "sqliteai-vector>=0.9.70",
     "vectorlite-py",
     "sqlite-vec",
     "graphqlite",
-    
     # Models and Benchmarking Datasets
     "datasets>=4.5.0",
     "sentence-transformers>=5.2.2",
@@ -55,6 +53,7 @@ benchmark = [
     "spacy",
     "textacy",
     "recordlinkage",
+    "llama-cpp-python>=0.3.16",
 ]
 docs = [
     "mkdocs>=1.6.0",

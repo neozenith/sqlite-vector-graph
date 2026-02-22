@@ -101,4 +101,5 @@ clean:                                             ## Remove build artifacts
 	rm -rf frontend/dist frontend/node_modules/.cache
 	rm -rf frontend/screenshots frontend/test-results
 	rm -rf .pytest_cache __pycache__ server/__pycache__ tests/__pycache__
-	find . -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+	rm -rf .coverage
+	rm -rf .venv

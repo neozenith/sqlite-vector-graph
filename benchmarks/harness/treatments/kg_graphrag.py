@@ -9,7 +9,7 @@ Source: docs/plans/benchmark_backlog.md (sections 3d, 3e)
 import logging
 import time
 
-from benchmarks.harness.common import KG_DIR, load_muninn
+from benchmarks.harness.common import KG_DIR
 from benchmarks.harness.treatments.base import Treatment
 
 log = logging.getLogger(__name__)
@@ -47,7 +47,6 @@ class KGGraphRAGTreatment(Treatment):
         }
 
     def setup(self, conn, db_path):
-        load_muninn(conn)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS retrieval_results (
                 query_id INTEGER,

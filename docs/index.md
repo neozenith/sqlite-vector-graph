@@ -5,7 +5,17 @@
     <p><i>Odin's mythic <a href="https://en.wikipedia.org/wiki/Huginn_and_Muninn">raven of Memory</a>.</i></p>
 </div>
 
-A zero-dependency C extension for SQLite to add an advanced collection of knowledge graph primitives like Vector Similarity Search, HNSW Indexes, Graph database, Centrality Measures, Community Detection, and Node2Vec capabilities.
+```text
+Huginn and Muninn fly each day over the wide world.
+I fear for Huginn that he may not return,
+yet I worry more for Muninn.
+
+- Poetic Edda (Grimnismal, stanza 20)
+```
+
+_Odin fears losing Memory more than Thought._
+
+This project aims to build **agentic memory** and **knowledge graph** primitives for sqlite as a native C extension. It is an advanced collection of knowledge graph primitives like Vector Similarity Search, HNSW Indexes, Graph database, Community Detection, Node2Vec capabilities and loading GGUF models via llama.cpp integration.
 
 ## Features
 

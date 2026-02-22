@@ -78,6 +78,18 @@ class Treatment(ABC):
         return {}
 
     @property
+    def requires_muninn(self) -> bool:
+        """Whether the harness should load the muninn extension before setup().
+
+        When True (default), the harness loads muninn and treats failure as fatal.
+        When False, the harness skips loading — the treatment handles its own
+        extensions (e.g., sqlite-vector, vectorlite, sqlite-vec).
+
+        Subclasses that don't need muninn should override this to return False.
+        """
+        return True
+
+    @property
     def sort_key(self) -> tuple[Any, ...]:
         """Return a tuple for sorting permutations by size (ascending).
 

@@ -41,9 +41,33 @@ typedef struct {
 
 static ModelEntry g_models[MAX_MODELS];
 static int g_backend_initialized = 0;
+static enum ggml_log_level g_log_level = GGML_LOG_LEVEL_NONE;
+
+/*
+ * Log callback that filters by g_log_level.
+ * Default level is NONE (silent). Set MUNINN_LOG_LEVEL=verbose
+ * to see all llama.cpp output on stderr.
+ */
+static void muninn_log_callback(enum ggml_log_level level, const char *text, void *user_data) {
+    (void)user_data;
+    if (level >= g_log_level && g_log_level != GGML_LOG_LEVEL_NONE) {
+        fputs(text, stderr);
+    }
+}
 
 static void ensure_backend(void) {
     if (!g_backend_initialized) {
+        /* Check env var before first init — this is the only chance
+         * to suppress the model-loading chatter from llama.cpp */
+        const char *env = getenv("MUNINN_LOG_LEVEL");
+        if (env && strcmp(env, "verbose") == 0) {
+            g_log_level = GGML_LOG_LEVEL_DEBUG;
+        } else if (env && strcmp(env, "warn") == 0) {
+            g_log_level = GGML_LOG_LEVEL_WARN;
+        } else if (env && strcmp(env, "error") == 0) {
+            g_log_level = GGML_LOG_LEVEL_ERROR;
+        }
+        llama_log_set(muninn_log_callback, NULL);
         llama_backend_init();
         g_backend_initialized = 1;
     }
@@ -126,16 +150,22 @@ static int load_gguf_model(const char *path, LoadedModel *out, char *errbuf, int
         return -1;
     }
 
-    /* Determine context size: use model's training context or default 512 */
+    /* Determine context size: use model's training context, capped for
+     * memory sanity. Embedding queries are typically short, so 8K suffices
+     * even for models trained with 32K+ context. */
     int n_ctx_train = (int)llama_model_n_ctx_train(model);
-    int n_ctx = (n_ctx_train > 0 && n_ctx_train <= 8192) ? n_ctx_train : 512;
+    int n_ctx = (n_ctx_train > 0) ? n_ctx_train : 512;
+    if (n_ctx > 8192) n_ctx = 8192;
 
     struct llama_context_params cparams = llama_context_default_params();
     cparams.n_ctx = (uint32_t)n_ctx;
     cparams.n_batch = (uint32_t)n_ctx;
     cparams.n_ubatch = (uint32_t)n_ctx;
     cparams.embeddings = 1;
-    cparams.pooling_type = LLAMA_POOLING_TYPE_MEAN;
+    /* Let each model's GGUF metadata control pooling type:
+     *   BERT models (MiniLM, Nomic) → MEAN pooling
+     *   Decoder models (Qwen3-Embedding) → LAST token pooling */
+    cparams.pooling_type = LLAMA_POOLING_TYPE_UNSPECIFIED;
     cparams.n_threads = 4;
 
     struct llama_context *ctx = llama_init_from_model(model, cparams);

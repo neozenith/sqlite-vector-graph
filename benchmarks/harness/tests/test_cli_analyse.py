@@ -1,33 +1,22 @@
 """Tests for the analyse subcommand end-to-end."""
 
 import json
-import subprocess
-import sys
 
 from benchmarks.harness.analysis.aggregator import ChartSpec, aggregate_chart
 from benchmarks.harness.analysis.renderer import render_chart
 from benchmarks.harness.common import write_jsonl
+from benchmarks.harness.tests.conftest import run_cli
 
 
 class TestAnalyseCLI:
     def test_analyse_help(self):
-        result = subprocess.run(
-            [sys.executable, "-m", "benchmarks.harness.cli", "analyse", "--help"],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
+        result = run_cli("analyse", "--help")
         assert result.returncode == 0
         assert "--category" in result.stdout
 
     def test_analyse_with_no_data_runs(self):
         """Analyse should succeed even with no data (just logs 'no data')."""
-        result = subprocess.run(
-            [sys.executable, "-m", "benchmarks.harness.cli", "analyse"],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
+        result = run_cli("analyse")
         assert result.returncode == 0
 
 

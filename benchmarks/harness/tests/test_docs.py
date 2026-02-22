@@ -8,7 +8,7 @@ from benchmarks.harness.analysis.charts_graph import GRAPH_CHARTS
 from benchmarks.harness.analysis.charts_graph_vt import GRAPH_VT_CHARTS
 from benchmarks.harness.analysis.charts_kg import KG_CHARTS
 from benchmarks.harness.analysis.charts_vss import VSS_CHARTS
-from benchmarks.harness.registry import DOC_PAGES, doc_page_context
+from benchmarks.harness.analysis.doc_pages import DOC_PAGES, doc_page_context
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
@@ -38,12 +38,12 @@ def test_mkdocs_nav_has_benchmarks_section():
     assert "Benchmarks:" in content, "mkdocs.yml should have a Benchmarks nav section"
 
 
-def test_mkdocs_nav_has_refactored():
-    """After Phase 8, mkdocs.yml should reference refactored benchmark pages."""
+def test_mkdocs_nav_has_benchmark_pages():
+    """mkdocs.yml should reference benchmark doc pages under benchmarks/."""
     mkdocs_path = PROJECT_ROOT / "mkdocs.yml"
     content = mkdocs_path.read_text(encoding="utf-8")
-    # Check for refactored_output in the content
-    assert "refactored_output" in content, "mkdocs.yml should reference refactored_output pages"
+    for slug in ALL_PAGE_SLUGS:
+        assert f"benchmarks/{slug}.md" in content, f"mkdocs.yml should reference benchmarks/{slug}.md"
 
 
 # ── DOC_PAGES catalog ─────────────────────────────────────────────

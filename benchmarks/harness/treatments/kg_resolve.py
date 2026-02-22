@@ -9,7 +9,7 @@ Source: docs/plans/entity_resolution_benchmarks.md
 import logging
 import time
 
-from benchmarks.harness.common import KG_DIR, load_muninn
+from benchmarks.harness.common import KG_DIR
 from benchmarks.harness.treatments.base import Treatment
 
 log = logging.getLogger(__name__)
@@ -41,8 +41,6 @@ class KGEntityResolutionTreatment(Treatment):
         return {"dataset": self._dataset}
 
     def setup(self, conn, db_path):
-        load_muninn(conn)
-
         conn.execute("""
             CREATE TABLE IF NOT EXISTS entities (
                 id INTEGER PRIMARY KEY,

@@ -34,6 +34,7 @@ KG_DIR = OUTPUT_ROOT / "kg"
 
 PROJECT_ROOT = BENCHMARKS_ROOT.parent  # project root
 MUNINN_PATH = str(PROJECT_ROOT / "build" / "muninn")
+GGUF_MODELS_DIR = PROJECT_ROOT / "models"
 DOCS_BENCHMARKS_DIR = PROJECT_ROOT / "docs" / "benchmarks"
 
 # ── Benchmark defaults ─────────────────────────────────────────────
@@ -57,31 +58,28 @@ MAX_N_BY_DIM: dict[int, int] = {
     1536: 100_000,
 }
 
-# Model definitions — operational + doc annotation fields
+# Model definitions — GGUF-native with asymmetric prefix support
 EMBEDDING_MODELS: dict[str, dict[str, Any]] = {
     "MiniLM": {
-        "model_id": "all-MiniLM-L6-v2",
+        "gguf_filename": "all-MiniLM-L6-v2.Q8_0.gguf",
         "dim": 384,
         "params": "22M",
-        "size_mb": 80,
-        "url": "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2",
-        "use_case": "Fast, lightweight semantic search",
+        "doc_prefix": "",
+        "query_prefix": "",
     },
-    "MPNet": {
-        "model_id": "all-mpnet-base-v2",
+    "NomicEmbed": {
+        "gguf_filename": "nomic-embed-text-v1.5.Q8_0.gguf",
         "dim": 768,
-        "params": "110M",
-        "size_mb": 420,
-        "url": "https://huggingface.co/sentence-transformers/all-mpnet-base-v2",
-        "use_case": "Balanced quality/speed",
+        "params": "137M",
+        "doc_prefix": "search_document: ",
+        "query_prefix": "search_query: ",
     },
     "BGE-Large": {
-        "model_id": "BAAI/bge-large-en-v1.5",
+        "gguf_filename": "bge-large-en-v1.5-q8_0.gguf",
         "dim": 1024,
         "params": "335M",
-        "size_mb": 1340,
-        "url": "https://huggingface.co/BAAI/bge-large-en-v1.5",
-        "use_case": "High-quality retrieval",
+        "doc_prefix": "",
+        "query_prefix": "Represent this sentence for searching relevant passages: ",
     },
 }
 
@@ -112,7 +110,46 @@ DATASETS: dict[str, dict[str, Any]] = {
 }
 
 # VSS profile sizes
-VSS_SIZES = [100, 500, 1_000, 5_000, 10_000, 50_000, 100_000, 250_000]
+VSS_SIZES = [100, 500, 1_000, 5_000, 10_000, 50_000, 100_000]
+
+# Embed benchmark sizes (smaller range — embedding is expensive)
+EMBED_SIZES = [100, 500, 1_000, 5_000]
+
+# Embed benchmark embedding functions
+EMBED_FNS: list[dict[str, Any]] = [
+    {
+        "slug": "muninn_embed",
+        "display": "muninn_embed",
+        "description": "muninn native llama.cpp embedding wrapper",
+    },
+    {
+        "slug": "lembed",
+        "display": "lembed",
+        "description": "sqlite-lembed llama.cpp embedding wrapper",
+    },
+]
+
+# Embed benchmark search backends (subset of VSS_ENGINES relevant for embed benchmarks)
+EMBED_SEARCH_BACKENDS: list[dict[str, Any]] = [
+    {
+        "slug": "muninn-hnsw",
+        "display": "muninn HNSW",
+        "method": "HNSW graph index",
+        "strategy": "Approximate, O(log N) search",
+    },
+    {
+        "slug": "sqlite-vector-pq",
+        "display": "sqlite-vector PQ",
+        "method": "Product Quantization",
+        "strategy": "Approximate, O(N) scan",
+    },
+    {
+        "slug": "sqlite-vec-brute",
+        "display": "sqlite-vec brute",
+        "method": "Brute-force KNN",
+        "strategy": "Exact, O(N) scan",
+    },
+]
 
 
 # ── VSS dimensional axes ──────────────────────────────────────────
@@ -221,6 +258,8 @@ GRAPH_CONFIGS_TRAVERSAL: list[tuple[str, int, int]] = [
     ("erdos_renyi", 5000, 20),
     ("erdos_renyi", 10000, 5),
     ("erdos_renyi", 10000, 20),
+    ("erdos_renyi", 50000, 5),
+    ("erdos_renyi", 50000, 20),
     ("barabasi_albert", 1000, 3),
     ("barabasi_albert", 5000, 5),
     ("barabasi_albert", 10000, 5),
@@ -231,10 +270,23 @@ GRAPH_CONFIGS_CENTRALITY: list[tuple[str, int, int]] = [
     ("erdos_renyi", 100, 5),
     ("erdos_renyi", 500, 5),
     ("erdos_renyi", 1000, 5),
-    ("erdos_renyi", 1000, 20),
     ("erdos_renyi", 5000, 5),
+    ("erdos_renyi", 10000, 5),
+    ("erdos_renyi", 100, 20),
+    ("erdos_renyi", 500, 20),
+    ("erdos_renyi", 1000, 20),
+    ("erdos_renyi", 5000, 20),
+    ("erdos_renyi", 10000, 20),
+    ("barabasi_albert", 100, 3),
+    ("barabasi_albert", 500, 3),
     ("barabasi_albert", 1000, 3),
+    ("barabasi_albert", 5000, 3),
+    ("barabasi_albert", 10000, 3),
+    ("barabasi_albert", 100, 5),
+    ("barabasi_albert", 500, 5),
+    ("barabasi_albert", 1000, 5),
     ("barabasi_albert", 5000, 5),
+    ("barabasi_albert", 10000, 5),
 ]
 
 GRAPH_CONFIGS_COMMUNITY = GRAPH_CONFIGS_CENTRALITY

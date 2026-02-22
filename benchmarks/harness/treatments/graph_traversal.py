@@ -10,7 +10,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from benchmarks.harness.common import generate_barabasi_albert, generate_erdos_renyi, load_muninn
+from benchmarks.harness.common import generate_barabasi_albert, generate_erdos_renyi
 from benchmarks.harness.treatments.base import Treatment
 
 log = logging.getLogger(__name__)
@@ -31,6 +31,10 @@ class GraphTraversalTreatment(Treatment):
         self._adj: dict[int, list[tuple[int, float]]] | None = None
         self._start_nodes: list[int] | None = None
         self._end_nodes: list[int] | None = None
+
+    @property
+    def requires_muninn(self) -> bool:
+        return self._engine == "muninn"
 
     @property
     def category(self) -> str:
@@ -75,10 +79,7 @@ class GraphTraversalTreatment(Treatment):
         self._start_nodes = rng.sample(node_list, n_queries)
         self._end_nodes = rng.sample(node_list, n_queries)
 
-        # Load edges into table
-        if self._engine == "muninn":
-            load_muninn(conn)
-
+        # Load edges into table (muninn extension already loaded by harness when required)
         conn.execute("CREATE TABLE IF NOT EXISTS bench_edges(src INTEGER, dst INTEGER, weight REAL)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_src ON bench_edges(src)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_dst ON bench_edges(dst)")

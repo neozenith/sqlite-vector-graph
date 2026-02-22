@@ -7,12 +7,20 @@
       "x": [
         100,
         500,
-        1000
+        1000,
+        5000,
+        10000,
+        50000,
+        100000
       ],
       "y": [
         0.044,
-        0.14,
-        0.159
+        0.124,
+        0.153,
+        0.207,
+        0.251,
+        0.385,
+        0.41
       ],
       "marker": {
         "color": "hsl(270, 75%, 45%)",
@@ -35,12 +43,20 @@
       "x": [
         100,
         500,
-        1000
+        1000,
+        5000,
+        10000,
+        50000,
+        100000
       ],
       "y": [
         0.125,
-        0.146,
-        0.168
+        0.14,
+        0.202,
+        1.232,
+        3.252,
+        13.921,
+        28.88
       ],
       "marker": {
         "color": "hsl(130, 75%, 45%)",
@@ -50,7 +66,7 @@
         "color": "hsl(130, 75%, 45%)",
         "width": 2
       },
-      "opacity": 0.8,
+      "opacity": 0.6,
       "legendgroup": "sqlite_vec_brute_force",
       "legendgrouptitle": {
         "text": "sqlite-vec-brute"
@@ -63,12 +79,20 @@
       "x": [
         100,
         500,
-        1000
+        1000,
+        5000,
+        10000,
+        50000,
+        100000
       ],
       "y": [
-        0.041,
-        0.144,
-        0.336
+        0.035,
+        0.134,
+        0.308,
+        2.369,
+        5.495,
+        27.219,
+        56.638
       ],
       "marker": {
         "color": "hsl(18, 75%, 45%)",
@@ -78,7 +102,7 @@
         "color": "hsl(18, 75%, 45%)",
         "width": 2
       },
-      "opacity": 0.8,
+      "opacity": 0.6,
       "legendgroup": "sqlite_vector_full_scan",
       "legendgrouptitle": {
         "text": "sqlite-vector-fullscan"
@@ -90,11 +114,21 @@
       "name": "sqlite-vector-quantize",
       "x": [
         100,
-        500
+        500,
+        1000,
+        5000,
+        10000,
+        50000,
+        100000
       ],
       "y": [
-        0.024,
-        0.041
+        0.023,
+        0.05,
+        0.055,
+        0.252,
+        0.788,
+        4.522,
+        11.561
       ],
       "marker": {
         "color": "hsl(175, 75%, 45%)",
@@ -104,7 +138,7 @@
         "color": "hsl(175, 75%, 45%)",
         "width": 2
       },
-      "opacity": 0.8,
+      "opacity": 0.6,
       "legendgroup": "sqlite_vector_quantize_scan",
       "legendgrouptitle": {
         "text": "sqlite-vector-quantize"
@@ -116,11 +150,21 @@
       "name": "vectorlite-hnsw",
       "x": [
         100,
-        500
+        500,
+        1000,
+        5000,
+        10000,
+        50000,
+        100000
       ],
       "y": [
-        0.021,
-        0.036
+        0.024,
+        0.035,
+        0.042,
+        0.055,
+        0.073,
+        0.171,
+        0.203
       ],
       "marker": {
         "color": "hsl(210, 75%, 45%)",
@@ -130,7 +174,7 @@
         "color": "hsl(210, 75%, 45%)",
         "width": 2
       },
-      "opacity": 0.8,
+      "opacity": 0.6,
       "legendgroup": "vectorlite_hnsw",
       "legendgrouptitle": {
         "text": "vectorlite-hnsw"

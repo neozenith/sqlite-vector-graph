@@ -91,7 +91,7 @@ class TestColorSystem:
     def test_assign_colors_to_series(self):
         series = [
             ChartSeries(label="a", group_key="muninn_hnsw", variant_key="MiniLM", points=[]),
-            ChartSeries(label="b", group_key="muninn_hnsw", variant_key="MPNet", points=[]),
+            ChartSeries(label="b", group_key="muninn_hnsw", variant_key="NomicEmbed", points=[]),
             ChartSeries(label="c", group_key="sqlite_vector_quantize_scan", variant_key="MiniLM", points=[]),
         ]
         assign_colors(series)

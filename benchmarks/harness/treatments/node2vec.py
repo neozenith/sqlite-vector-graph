@@ -8,7 +8,7 @@ Source: docs/plans/benchmark_backlog.md (section 2a)
 import logging
 import time
 
-from benchmarks.harness.common import generate_barabasi_albert, generate_erdos_renyi, load_muninn
+from benchmarks.harness.common import generate_barabasi_albert, generate_erdos_renyi
 from benchmarks.harness.treatments.base import Treatment
 
 log = logging.getLogger(__name__)
@@ -60,8 +60,6 @@ class Node2VecTreatment(Treatment):
             self._edges, _ = generate_erdos_renyi(self._n_nodes, self._avg_degree, seed=42)
         else:
             self._edges, _ = generate_barabasi_albert(self._n_nodes, int(self._avg_degree), seed=42)
-
-        load_muninn(conn)
 
         # Create edge table for node2vec
         conn.execute("CREATE TABLE bench_edges(src INTEGER, dst INTEGER, weight REAL)")
