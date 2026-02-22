@@ -80,6 +80,7 @@ EMBEDDING_MODELS: dict[str, dict[str, Any]] = {
         "params": "335M",
         "doc_prefix": "",
         "query_prefix": "Represent this sentence for searching relevant passages: ",
+        "embed_enabled": False,  # Too slow for live-embed benchmarks (335M hangs)
     },
 }
 

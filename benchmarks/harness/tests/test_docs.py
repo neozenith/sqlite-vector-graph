@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from benchmarks.harness.analysis.charts_embed import EMBED_CHARTS
 from benchmarks.harness.analysis.charts_graph import GRAPH_CHARTS
 from benchmarks.harness.analysis.charts_graph_vt import GRAPH_VT_CHARTS
 from benchmarks.harness.analysis.charts_kg import KG_CHARTS
@@ -13,10 +14,11 @@ from benchmarks.harness.analysis.doc_pages import DOC_PAGES, doc_page_context
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 
-ALL_PAGE_SLUGS = ["vss", "graph", "graph_vt", "kg"]
+ALL_PAGE_SLUGS = ["vss", "embed", "graph", "graph_vt", "kg"]
 
 CHART_MAP = {
     "vss": VSS_CHARTS,
+    "embed": EMBED_CHARTS,
     "graph": GRAPH_CHARTS,
     "graph_vt": GRAPH_VT_CHARTS,
     "kg": KG_CHARTS,

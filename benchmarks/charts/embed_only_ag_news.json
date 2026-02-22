@@ -1,0 +1,344 @@
+{
+  "data": [
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "lembed + muninn-hnsw / BGE-Large",
+      "x": [
+        100
+      ],
+      "y": [
+        99.823
+      ],
+      "marker": {
+        "color": "hsl(175, 85%, 58%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(175, 85%, 58%)",
+        "width": 2
+      },
+      "opacity": 0.6,
+      "legendgroup": "lembed_muninn-hnsw",
+      "legendgrouptitle": {
+        "text": "lembed + muninn-hnsw"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "lembed + muninn-hnsw / MiniLM",
+      "x": [
+        100,
+        500
+      ],
+      "y": [
+        3.716,
+        4.588
+      ],
+      "marker": {
+        "color": "hsl(175, 78%, 47%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(175, 78%, 47%)",
+        "width": 2
+      },
+      "opacity": 0.6,
+      "legendgroup": "lembed_muninn-hnsw",
+      "legendgrouptitle": {
+        "text": "lembed + muninn-hnsw"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "lembed + muninn-hnsw / NomicEmbed",
+      "x": [
+        100
+      ],
+      "y": [
+        30.603
+      ],
+      "marker": {
+        "color": "hsl(175, 70%, 35%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(175, 70%, 35%)",
+        "width": 2
+      },
+      "opacity": 0.6,
+      "legendgroup": "lembed_muninn-hnsw",
+      "legendgrouptitle": {
+        "text": "lembed + muninn-hnsw"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "lembed + sqlite-vec-brute / MiniLM",
+      "x": [
+        100
+      ],
+      "y": [
+        3.607
+      ],
+      "marker": {
+        "color": "hsl(50, 85%, 58%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(50, 85%, 58%)",
+        "width": 2
+      },
+      "opacity": 0.6,
+      "legendgroup": "lembed_sqlite-vec-brute",
+      "legendgrouptitle": {
+        "text": "lembed + sqlite-vec-brute"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "lembed + sqlite-vec-brute / NomicEmbed",
+      "x": [
+        100
+      ],
+      "y": [
+        33.207
+      ],
+      "marker": {
+        "color": "hsl(50, 70%, 35%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(50, 70%, 35%)",
+        "width": 2
+      },
+      "opacity": 0.6,
+      "legendgroup": "lembed_sqlite-vec-brute",
+      "legendgrouptitle": {
+        "text": "lembed + sqlite-vec-brute"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "lembed + sqlite-vector-pq / MiniLM",
+      "x": [
+        100
+      ],
+      "y": [
+        3.992
+      ],
+      "marker": {
+        "color": "hsl(130, 85%, 58%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(130, 85%, 58%)",
+        "width": 2
+      },
+      "opacity": 0.6,
+      "legendgroup": "lembed_sqlite-vector-pq",
+      "legendgrouptitle": {
+        "text": "lembed + sqlite-vector-pq"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "lembed + sqlite-vector-pq / NomicEmbed",
+      "x": [
+        100
+      ],
+      "y": [
+        36.6
+      ],
+      "marker": {
+        "color": "hsl(130, 70%, 35%)",
+        "size": 7
+      },
+      "line": {
+        "color": "hsl(130, 70%, 35%)",
+        "width": 2
+      },
+      "opacity": 0.6,
+      "legendgroup": "lembed_sqlite-vector-pq",
+      "legendgrouptitle": {
+        "text": "lembed + sqlite-vector-pq"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "muninn-embed + muninn-hnsw / MiniLM",
+      "x": [
+        100
+      ],
+      "y": [
+        3.629
+      ],
+      "marker": {
+        "color": "hsl(270, 85%, 58%)",
+        "size": 8
+      },
+      "line": {
+        "color": "hsl(270, 85%, 58%)",
+        "width": 3
+      },
+      "opacity": 1.0,
+      "legendgroup": "muninn_embed_muninn-hnsw",
+      "legendgrouptitle": {
+        "text": "muninn-embed + muninn-hnsw"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "muninn-embed + muninn-hnsw / NomicEmbed",
+      "x": [
+        100
+      ],
+      "y": [
+        26.288
+      ],
+      "marker": {
+        "color": "hsl(270, 70%, 35%)",
+        "size": 8
+      },
+      "line": {
+        "color": "hsl(270, 70%, 35%)",
+        "width": 3
+      },
+      "opacity": 1.0,
+      "legendgroup": "muninn_embed_muninn-hnsw",
+      "legendgrouptitle": {
+        "text": "muninn-embed + muninn-hnsw"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "muninn-embed + sqlite-vec-brute / MiniLM",
+      "x": [
+        100
+      ],
+      "y": [
+        3.326
+      ],
+      "marker": {
+        "color": "hsl(240, 85%, 58%)",
+        "size": 8
+      },
+      "line": {
+        "color": "hsl(240, 85%, 58%)",
+        "width": 3
+      },
+      "opacity": 1.0,
+      "legendgroup": "muninn_embed_sqlite-vec-brute",
+      "legendgrouptitle": {
+        "text": "muninn-embed + sqlite-vec-brute"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "muninn-embed + sqlite-vec-brute / NomicEmbed",
+      "x": [
+        100
+      ],
+      "y": [
+        23.977
+      ],
+      "marker": {
+        "color": "hsl(240, 70%, 35%)",
+        "size": 8
+      },
+      "line": {
+        "color": "hsl(240, 70%, 35%)",
+        "width": 3
+      },
+      "opacity": 1.0,
+      "legendgroup": "muninn_embed_sqlite-vec-brute",
+      "legendgrouptitle": {
+        "text": "muninn-embed + sqlite-vec-brute"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "muninn-embed + sqlite-vector-pq / MiniLM",
+      "x": [
+        100
+      ],
+      "y": [
+        3.485
+      ],
+      "marker": {
+        "color": "hsl(300, 85%, 58%)",
+        "size": 8
+      },
+      "line": {
+        "color": "hsl(300, 85%, 58%)",
+        "width": 3
+      },
+      "opacity": 1.0,
+      "legendgroup": "muninn_embed_sqlite-vector-pq",
+      "legendgrouptitle": {
+        "text": "muninn-embed + sqlite-vector-pq"
+      }
+    },
+    {
+      "type": "scatter",
+      "mode": "lines+markers",
+      "name": "muninn-embed + sqlite-vector-pq / NomicEmbed",
+      "x": [
+        100
+      ],
+      "y": [
+        25.272
+      ],
+      "marker": {
+        "color": "hsl(300, 70%, 35%)",
+        "size": 8
+      },
+      "line": {
+        "color": "hsl(300, 70%, 35%)",
+        "width": 3
+      },
+      "opacity": 1.0,
+      "legendgroup": "muninn_embed_sqlite-vector-pq",
+      "legendgrouptitle": {
+        "text": "muninn-embed + sqlite-vector-pq"
+      }
+    }
+  ],
+  "layout": {
+    "title": {
+      "text": "Embedding-Only Latency (AG News)"
+    },
+    "xaxis": {
+      "title": {
+        "text": "Dataset Size (N vectors)"
+      },
+      "type": "log"
+    },
+    "yaxis": {
+      "title": {
+        "text": "Embedding-Only Latency (ms)"
+      },
+      "type": "log"
+    },
+    "template": "plotly_white",
+    "legend": {
+      "orientation": "v",
+      "yanchor": "top",
+      "y": 0.99,
+      "xanchor": "left",
+      "x": 1.02,
+      "groupclick": "togglegroup"
+    }
+  }
+}

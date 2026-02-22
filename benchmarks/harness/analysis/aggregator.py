@@ -180,12 +180,14 @@ def run_aggregation(results_dir: Path | None = None, category: str | None = None
     # Collect chart specs from chart definition modules
     all_specs: list[ChartSpec] = []
 
+    from benchmarks.harness.analysis.charts_embed import EMBED_CHARTS
     from benchmarks.harness.analysis.charts_graph import GRAPH_CHARTS
     from benchmarks.harness.analysis.charts_graph_vt import GRAPH_VT_CHARTS
     from benchmarks.harness.analysis.charts_kg import KG_CHARTS
     from benchmarks.harness.analysis.charts_vss import VSS_CHARTS
 
     all_specs.extend(VSS_CHARTS)
+    all_specs.extend(EMBED_CHARTS)
     all_specs.extend(GRAPH_CHARTS)
     all_specs.extend(GRAPH_VT_CHARTS)
     all_specs.extend(KG_CHARTS)

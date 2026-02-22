@@ -9,6 +9,8 @@ from typing import Any
 from benchmarks.harness.common import (
     CHARTS_DIR,
     DATASETS,
+    EMBED_FNS,
+    EMBED_SEARCH_BACKENDS,
     EMBEDDING_MODELS,
     GRAPH_MODELS,
     GRAPH_TVF_ENGINES,
@@ -83,6 +85,76 @@ def _build_vss_page() -> dict[str, Any]:
                         else (f'`"{m["query_prefix"]}"`' if m["query_prefix"] else "_(none)_"),
                     }
                     for name, m in EMBEDDING_MODELS.items()
+                ],
+            },
+        ],
+        "sections": None,
+    }
+
+
+def _build_embed_page() -> dict[str, Any]:
+    """Build the Embed doc page from annotated constants."""
+    return {
+        "title": "Embed Benchmarks",
+        "description": (
+            "Compares **[`llama.cpp`](https://github.com/ggml-org/llama.cpp)**-based embedding functions on metrics:\n"
+            "\n"
+            "- end-to-end query latency,\n"
+            "- embedding-only latency,\n"
+            "- insert throughput,\n"
+            "- and recall\n"
+            "\n"
+            "...across multiple **GGUF** embedding models, search backends, and corpus types."
+        ),
+        "tables": [
+            {
+                "title": "Embedding Functions",
+                "columns": ["Function", "Description"],
+                "rows": [
+                    {
+                        "Function": f"**{fn['display']}**",
+                        "Description": fn["description"],
+                    }
+                    for fn in EMBED_FNS
+                ],
+            },
+            {
+                "title": "Search Backends",
+                "columns": ["Backend", "Method", "Strategy"],
+                "rows": [
+                    {
+                        "Backend": f"**{b['display']}**",
+                        "Method": b["method"],
+                        "Strategy": b["strategy"],
+                    }
+                    for b in EMBED_SEARCH_BACKENDS
+                ],
+            },
+            {
+                "title": "GGUF Embedding Models",
+                "columns": ["Model", "Dimension", "Params", "GGUF File"],
+                "rows": [
+                    {
+                        "Model": f"**{name}**",
+                        "Dimension": str(m["dim"]),
+                        "Params": m["params"],
+                        "GGUF File": f'`{m["gguf_filename"]}`',
+                    }
+                    for name, m in EMBEDDING_MODELS.items()
+                    if m.get("embed_enabled", True)
+                ],
+            },
+            {
+                "title": "Datasets",
+                "columns": ["Dataset", "Source", "Passages", "Topology"],
+                "rows": [
+                    {
+                        "Dataset": _linked(d["display_name"], d["url"]),
+                        "Source": d["source_label"],
+                        "Passages": d["passages_desc"],
+                        "Topology": d["topology"],
+                    }
+                    for d in DATASETS.values()
                 ],
             },
         ],
@@ -402,6 +474,52 @@ _VSS_CHART_GROUPS = [
     },
 ]
 
+_EMBED_CHART_GROUPS = [
+    {
+        "title": "Query+Search Latency — AG News",
+        "charts": [
+            "embed_ql_MiniLM_ag_news",
+            "embed_ql_NomicEmbed_ag_news",
+        ],
+    },
+    {
+        "title": "Query+Search Latency — Wealth of Nations",
+        "charts": [
+            "embed_ql_MiniLM_wealth_of_nations",
+            "embed_ql_NomicEmbed_wealth_of_nations",
+        ],
+    },
+    {
+        "title": "Cross-Model Comparison — AG News",
+        "charts": ["embed_xmodel_ag_news"],
+    },
+    {
+        "title": "Cross-Model Comparison — Wealth of Nations",
+        "charts": ["embed_xmodel_wealth_of_nations"],
+    },
+    {
+        "title": "Embedding-Only Latency",
+        "charts": [
+            "embed_only_ag_news",
+            "embed_only_wealth_of_nations",
+        ],
+    },
+    {
+        "title": "Insert Throughput",
+        "charts": [
+            "embed_insert_ag_news",
+            "embed_insert_wealth_of_nations",
+        ],
+    },
+    {
+        "title": "Recall",
+        "charts": [
+            "embed_recall_ag_news",
+            "embed_recall_wealth_of_nations",
+        ],
+    },
+]
+
 _GRAPH_CHART_GROUPS = [
     {
         "title": "Traversal",
@@ -461,6 +579,7 @@ _GRAPH_VT_CHART_GROUPS = [
 
 _CHART_GROUPS: dict[str, list[dict[str, Any]]] = {
     "vss": _VSS_CHART_GROUPS,
+    "embed": _EMBED_CHART_GROUPS,
     "graph": _GRAPH_CHART_GROUPS,
     "graph_vt": _GRAPH_VT_CHART_GROUPS,
 }
@@ -470,6 +589,7 @@ _CHART_GROUPS: dict[str, list[dict[str, Any]]] = {
 
 DOC_PAGES: dict[str, dict[str, Any]] = {
     "vss": _build_vss_page(),
+    "embed": _build_embed_page(),
     "graph": _build_graph_page(),
     "graph_vt": _build_graph_vt_page(),
     "kg": _build_kg_page(),
@@ -490,6 +610,7 @@ def doc_page_context(page_slug: str) -> dict[str, Any]:
     Raises:
         KeyError: If page_slug is not in DOC_PAGES.
     """
+    from benchmarks.harness.analysis.charts_embed import EMBED_CHARTS
     from benchmarks.harness.analysis.charts_graph import GRAPH_CHARTS
     from benchmarks.harness.analysis.charts_graph_vt import GRAPH_VT_CHARTS
     from benchmarks.harness.analysis.charts_kg import KG_CHARTS
@@ -497,6 +618,7 @@ def doc_page_context(page_slug: str) -> dict[str, Any]:
 
     chart_map: dict[str, list] = {
         "vss": VSS_CHARTS,
+        "embed": EMBED_CHARTS,
         "graph": GRAPH_CHARTS,
         "graph_vt": GRAPH_VT_CHARTS,
         "kg": KG_CHARTS,

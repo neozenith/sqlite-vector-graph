@@ -289,7 +289,7 @@ docs-serve: docs-build                         ## Serve docs locally with live r
 
 docs-build: version-stamp                      ## Build documentation site
 	uv sync --all-groups
-	make -C benchmarks analyse
+	make -C benchmarks analyse-docs
 	uv run mkdocs build --strict
 	$(MAKE) docs-wasm
 

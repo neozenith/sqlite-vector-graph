@@ -224,6 +224,8 @@ def _embed_permutations():
     backend_slugs = [b["slug"] for b in EMBED_SEARCH_BACKENDS]
 
     for model_name, model_info in EMBEDDING_MODELS.items():
+        if not model_info.get("embed_enabled", True):
+            continue
         dim = model_info["dim"]
         for dataset in DATASETS:
             for n in EMBED_SIZES:

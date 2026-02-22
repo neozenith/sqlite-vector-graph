@@ -1,5 +1,6 @@
 exclude_docs: |
   plans/
+  logo/
 
 site_name: sqlite-muninn
 site_description: "HNSW vector search, graph traversal, centrality measures, community detection, CSR adjacency caching, dbt-style graph selection, and Node2Vec embeddings in a single SQLite extension."
@@ -58,6 +59,7 @@ nav:
     - VSS: benchmarks/vss.md
     - Graph: benchmarks/graph.md
     - Graph VT: benchmarks/graph_vt.md
+    - Embed: benchmarks/embed.md
     - KG: benchmarks/kg.md
 
 

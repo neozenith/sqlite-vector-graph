@@ -44,6 +44,13 @@ ENGINE_HUES: dict[str, int] = {
     "degree": 270,  # purple
     "betweenness": 330,  # pink
     "closeness": 175,  # teal
+    # Embed benchmarks (embed_fn × search_backend)
+    "muninn_embed_muninn-hnsw": 270,  # purple
+    "muninn_embed_sqlite-vector-pq": 300,  # violet
+    "muninn_embed_sqlite-vec-brute": 240,  # blue-purple
+    "lembed_muninn-hnsw": 175,  # teal
+    "lembed_sqlite-vector-pq": 130,  # green
+    "lembed_sqlite-vec-brute": 50,  # yellow-orange
     # Graph VT approaches (match legacy adjacency colors)
     "tvf": 0,  # red
     "csr": 30,  # orange
@@ -73,6 +80,13 @@ DISPLAY_LABELS: dict[str, str] = {
     "degree": "Degree",
     "betweenness": "Betweenness",
     "closeness": "Closeness",
+    # Embed benchmarks
+    "muninn_embed_muninn-hnsw": "muninn-embed + muninn-hnsw",
+    "muninn_embed_sqlite-vector-pq": "muninn-embed + sqlite-vector-pq",
+    "muninn_embed_sqlite-vec-brute": "muninn-embed + sqlite-vec-brute",
+    "lembed_muninn-hnsw": "lembed + muninn-hnsw",
+    "lembed_sqlite-vector-pq": "lembed + sqlite-vector-pq",
+    "lembed_sqlite-vec-brute": "lembed + sqlite-vec-brute",
     # Graph VT approaches
     "tvf": "TVF (no cache)",
     "csr": "CSR",
